@@ -6,7 +6,7 @@ import { createClient } from '../lib/supabase';
 import {
   Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck,
   Users, UserRound, Wifi, Pencil, Plus, Send, Smile, ArrowLeft, RefreshCw,
-  X, Sparkles
+  X, Sparkles, Zap.
 } from 'lucide-react';
 
 type Profile = {
