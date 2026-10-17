@@ -29,12 +29,12 @@ Open http://localhost:3000.
 
 ## 3. Deploy with managed hosting
 1. Push this folder to a private GitHub repository.
-2. Import the repository into Vercel (https://vercel.com/).
-3. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel project environment variables.
+2. Create a Render Web Service from the GitHub repository (https://render.com/).
+3. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Render project environment variables.
 4. Deploy, then add the production domain to Supabase Auth's allowed redirect URLs.
 5. Test account creation, email confirmation, sign-in, profile privacy, RLS, and session expiry on the deployed URL before inviting members.
 
-Vercel and Supabase each require the account owner to create/connect their own account and accept their terms. No credentials are included in this project.
+Render and Supabase each require the account owner to create/connect their own account and accept their terms. No credentials are included in this project.
 
 ## Registration and privacy design
 The requested registration fields are: name, phone number, nickname, department, level, college, email, and school. The public `profiles` table intentionally contains only nickname, level, college, school, avatar, bio, premium state, and online-time totals. Name, phone, department, and email should be captured in a separate private signup flow / protected server endpoint or appropriate Auth user metadata with strict server-side access controls. Do not copy them into the public profile table or expose them through directory queries. For phone verification, enable an OTP provider only if/when you choose to require it; current requested default is email/password.
