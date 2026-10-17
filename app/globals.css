@@ -48,3 +48,28 @@ body{background-image:radial-gradient(ellipse at 80% -18%,#1b4d9a20,transparent 
 .premium-badge{background:#182844;border-color:#47649a;color:#c9e4ff;border-radius:6px}.rank-tag{color:#a0b3ce}.empty-state{background:#0b1320;border-color:#2b3c53;border-radius:13px}.empty-state strong{font-size:17px}
 footer{color:#7789a4}footer span:last-child{color:#8dcaff}
 @media(max-width:760px){.sidebar{background:#080e19}.nav-item.active{background:#12213a;box-shadow:inset 0 -2px #6bbcff}.hero-banner{border-radius:14px}.person-card{border-radius:12px}.auth-panel{border-radius:15px}.topbar h1{letter-spacing:-1.2px}}
+
+/* 2026-10-17 Occupant-inspired clean royal-blue finish: simpler surfaces, clear hierarchy, mobile-first readability */
+:root{--bg:#101116;--panel:#14151b;--panel2:#191b22;--line:#2b2d35;--text:#f7f7fa;--muted:#a4a6b1;--blue:#0866ff;--cyan:#6d9fff;--navy:#101116;--mrc-bg:#101116;--mrc-panel:#14151b;--mrc-panel-2:#191b22;--mrc-line:#2b2d35;--mrc-blue:#0866ff;--mrc-cyan:#6d9fff;--mrc-text:#f7f7fa;--mrc-muted:#a4a6b1}
+html,body{background:#101116!important;color:#f7f7fa}
+body{background-image:none;font-size:15px;letter-spacing:0}
+.sidebar{background:#111217;border-color:#292a31;box-shadow:none}
+.brand-mark{background:#0866ff;box-shadow:none;border-radius:50%}
+.brand strong{font-size:16px;letter-spacing:-.4px}.brand span{color:#6d9fff;letter-spacing:2px}
+.online-dot{background:#35d18a;box-shadow:none}
+.nav-item{border-radius:8px;color:#b0b2bc}.nav-item:hover,.nav-item.active{background:#1b202b;border-color:#2c3444}.nav-item.active{box-shadow:inset 3px 0 #0866ff}.nav-item.active svg{color:#6d9fff}
+.premium-card{background:#171920;border-color:#30333d;box-shadow:none;color:#8db4ff}.premium-card>svg{color:#8db4ff}.premium-card button{background:#0866ff;border-color:#0866ff;color:white}
+.main-area{padding-top:clamp(22px,3vw,38px)}
+.eyebrow{color:#76a4ff;letter-spacing:1.1px}
+.topbar h1{font-size:clamp(27px,3.4vw,40px);letter-spacing:-1.3px;line-height:1.12}
+.online-stat{background:#171920;border:1px solid #2d3039;border-radius:9px}.online-stat strong{font-size:18px}.online-stat small{color:#a4a6b1}
+.primary-button{background:#0866ff;border:1px solid #0866ff;box-shadow:none;border-radius:8px;color:white}.primary-button:hover{background:#0056e8;filter:none;transform:translateY(-1px)}
+.secondary-button{background:#1a1c23;border-color:#363943;color:#e9eaf0;border-radius:8px}
+.auth-panel{background:#14151b;border-color:#2a2b33;border-radius:18px;box-shadow:none}.auth-art{background:#151923}.auth-art:after{color:#ffffff05}.auth-art h2{letter-spacing:-1.5px}.auth-art h2 em{background:none;color:#6d9fff;-webkit-text-fill-color:#6d9fff}.hero-icon{background:#0866ff;border-color:#4c8dff;box-shadow:none;border-radius:20px}.orbit{border-color:#ffffff12}.auth-pills span{background:#191c24;border-color:#303541;color:#d9e4ff}
+.auth-form{background:#14151b}.auth-form input,.modal input,.message-compose input{background:#101116;border-color:#30323b;border-radius:8px}.auth-form input:focus,.modal input:focus,.message-compose input:focus{border-color:#0866ff;box-shadow:0 0 0 3px #0866ff20}
+.hero-banner{background:#151923;border-color:#2c3445;border-radius:14px;box-shadow:none}.hero-label{color:#9dbdff;background:#1a2232;border-color:#303b50;border-radius:6px;letter-spacing:1px}.hero-copy h2{letter-spacing:-1.4px}.hero-copy h2 span{color:#6d9fff}.hero-copy p{color:#b7bac5}.light-button{background:#0866ff;color:#fff;border-radius:8px;font-weight:700}.banner-orb{border-color:#6d9fff22;background:transparent}.banner-orb:before,.banner-orb:after{border-color:#6d9fff16}.orb-core{background:#0866ff;box-shadow:none}.float-tag{background:#1b202b;border-color:#343b49;border-radius:7px;box-shadow:none;font-weight:600}
+.section-heading h2{font-size:19px;letter-spacing:-.4px}.section-heading p{color:#a4a6b1}.text-button{color:#6d9fff}.people-grid{gap:12px}.person-card{background:#15161c;border-color:#2b2d35;border-radius:11px;box-shadow:none}.person-card:hover{background:#191b23;border-color:#3d5c94;box-shadow:none;transform:translateY(-1px)}.person-card h3{letter-spacing:-.2px}.person-meta{color:#c2c4cc}.school-line{color:#9295a1}.person-footer{border-color:#2b2d35}.connect-button{background:#14264a;border-color:#2855a4;color:#a8c7ff;border-radius:7px}.connect-button:hover{background:#1b3260}
+.group-row{background:#15161c;border-color:#2b2d35;border-radius:10px}.group-icon{background:#1a2b4a;color:#9abaff;border-radius:9px}.chat-placeholder{background:#14161c;border-color:#2b2d35;border-radius:13px}.chat-empty-icon{background:#1a2b4a;border-color:#2c4b80;color:#9abaff;border-radius:14px}.profile-summary{background:#15161c;border-color:#2b2d35;border-radius:13px}.privacy-box{background:#18243a;border-color:#30486e;color:#b4ceff}.modal{background:#15161c;border-color:#30323b;border-radius:14px}
+.premium-badge{background:#1a2a49;border-color:#36558c;color:#c9dcff;border-radius:5px}.rank-tag{color:#a5afc1}.empty-state{background:#14151b;border-color:#343741;border-radius:11px}.empty-state strong{font-size:16px}
+footer{color:#858894}footer span:last-child{color:#8eb3ff}
+@media(max-width:760px){.sidebar{background:#111217}.nav-item.active{background:#1b202b;box-shadow:inset 0 -2px #0866ff}.hero-banner{border-radius:12px}.person-card{border-radius:10px}.auth-panel{border-radius:13px}.topbar h1{letter-spacing:-1px}.main-area{padding-left:14px;padding-right:14px}}
