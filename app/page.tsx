@@ -1,10 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 import { createClient } from '../lib/supabase';
-import { Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck, Users, UserRound, Zap } from 'lucide-react';
+import {
+  Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck,
+  Users, UserRound, Wifi, Pencil, Plus, Send, Smile, ArrowLeft, RefreshCw,
+  X, Sparkles
+} from 'lucide-react';
 
-type Profile = { id: string; nickname: string; level: string | null; college: string | null; school: string | null; avatar_url: string | null; premium_status: string; total_online_seconds: number };
+type Profile = {
+  id: string;
+  nickname: string;
+  level: string | null;
+  college: string | null;
+  school: string | null;
+  avatar_url: string | null;
+  premium_status: string;
+  total_online_seconds: number;
+};
+type CommunityGroup = { id: string; name: string };
+type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string };
+
+const NAV_ITEMS = [
+  { name: 'Messages', icon: MessageCircle, hint: 'Your Conversations Will Appear Here.' },
+  { name: 'Discover', icon: Search, hint: 'Find People Online' },
+  { name: 'Groups', icon: Users, hint: 'Find Your Community' },
+  { name: 'Requests', icon: Bell, hint: 'Your Message Requests' },
+  { name: 'My Profile', icon: UserRound, hint: 'Your Profile' },
+];
+const EMOJIS = ['😀','😃','😄','😁','😆','😅','😂','🥹','😊','😍','🥰','😘','😎','🤔','🙌','👏','🙏','💙','❤️','🔥','✨','🎉','👍','👋','💯','😭','🤣','🤝','💬','🌟','😴','🥳'];
 
 export default function Home() {
   const [supabase] = useState(() => { try { return createClient(); } catch { return null; } });
@@ -14,108 +39,192 @@ export default function Home() {
   const [nickname, setNickname] = useState('');
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
-  const [status, setStatus] = useState('Connect Supabase to enable live community features.');
-  const [tab, setTab] = useState('Discover');
+  const [status, setStatus] = useState('');
+  const [tab, setTab] = useState('Messages');
   const [requests, setRequests] = useState(0);
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<{id:string;body:string;sender_id:string;created_at:string}[]>([]);
-  const [groups, setGroups] = useState<{id:string;name:string}[]>([]);
+  const [groups, setGroups] = useState<CommunityGroup[]>([]);
   const [groupName, setGroupName] = useState('');
-  const [profileForm, setProfileForm] = useState({ nickname:'', level:'', college:'', school:'' });
+  const [profileForm, setProfileForm] = useState({ nickname: '', level: '', college: '', school: '' });
+  const [profileExists, setProfileExists] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
   const [showGroup, setShowGroup] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [draftMessage, setDraftMessage] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+
+  const refreshCommunity = useCallback(async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from('profiles')
+      .select('id,nickname,level,college,school,avatar_url,premium_status,total_online_seconds').limit(60);
+    if (data) setProfiles(data as Profile[]);
+    if (userId) {
+      const { data: req } = await supabase.from('message_requests').select('id')
+        .eq('recipient_id', userId).eq('status', 'pending');
+      setRequests(req?.length ?? 0);
+    }
+    const { data: grp } = await supabase.from('groups').select('id,name').limit(30);
+    if (grp) setGroups(grp as CommunityGroup[]);
+  }, [supabase, userId]);
+
+  const loadProfile = useCallback(async (id: string) => {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('profiles')
+      .select('id,nickname,level,college,school,avatar_url,premium_status,total_online_seconds')
+      .eq('id', id).maybeSingle();
+    if (error) {
+      setStatus('Your account is signed in, but the profiles table or its access policies need to be configured.');
+      setProfileExists(false);
+      return;
+    }
+    if (data) {
+      setProfileExists(true);
+      setNickname(data.nickname ?? '');
+      setProfileForm({ nickname: data.nickname ?? '', level: data.level ?? '', college: data.college ?? '', school: data.school ?? '' });
+    } else {
+      setProfileExists(false);
+      setNickname('');
+      setProfileForm({ nickname: '', level: '', college: '', school: '' });
+    }
+    await refreshCommunity();
+  }, [supabase, refreshCommunity]);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) { setAuthReady(true); setStatus('Supabase is not configured. Add the required environment variables in Render.'); return; }
+    let alive = true;
     supabase.auth.getSession().then(({ data }) => {
-      const id = data.session?.user.id ?? null; setUserId(id);
-      if (id) loadProfile(id);
+      if (!alive) return;
+      const id = data.session?.user.id ?? null;
+      setUserId(id); setAuthReady(true);
+      if (id) void loadProfile(id);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const id = session?.user.id ?? null; setUserId(id); if (id) loadProfile(id);
+      const id = session?.user.id ?? null;
+      setUserId(id); setAuthReady(true);
+      if (id) void loadProfile(id);
+      else {
+        setProfileExists(false); setNickname(''); setProfiles([]); setGroups([]); setRequests(0);
+      }
     });
-    return () => listener.subscription.unsubscribe();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase]);
+    return () => { alive = false; listener.subscription.unsubscribe(); };
+  }, [supabase, loadProfile]);
 
-  async function loadProfile(id: string) {
-    if (!supabase) return;
-    const { data, error } = await supabase.from('profiles').select('id,nickname,level,college,school,avatar_url,premium_status,total_online_seconds').eq('id', id).maybeSingle();
-    if (error) { setStatus('Signed in. Apply supabase/schema.sql and configure policies to activate your profile.'); return; }
-    if (data) { setNickname(data.nickname ?? ''); setProfileForm({ nickname:data.nickname ?? '', level:data.level ?? '', college:data.college ?? '', school:data.school ?? '' }); }
-    await refreshCommunity();
-    const channel = supabase.channel('online-presence', { config: { presence: { key: id } } });
-    channel.on('presence', { event: 'sync' }, () => setOnlineCount(Object.keys(channel.presenceState()).length));
-    channel.subscribe(async (state) => { if (state === 'SUBSCRIBED') await channel.track({ online_at: new Date().toISOString() }); });
-    return () => { supabase?.removeChannel(channel); };
-  }
-
-  async function refreshCommunity() {
-    if (!supabase) return;
-    const { data } = await supabase.from('profiles').select('id,nickname,level,college,school,avatar_url,premium_status,total_online_seconds').limit(60);
-    if (data) setProfiles(data as Profile[]);
-    const { data: req } = await supabase.from('message_requests').select('id').eq('recipient_id', userId).eq('status','pending');
-    setRequests(req?.length ?? 0);
-    const { data: grp } = await supabase.from('groups').select('id,name').limit(30);
-    if (grp) setGroups(grp);
-  }
-
-  async function signIn(e: React.FormEvent) {
-    e.preventDefault(); if (!supabase) return;
-    const { error } = await supabase.auth.signInWithPassword({ email, password }); setStatus(error ? error.message : 'Signed in.');
-  }
-  async function signUp(e: React.FormEvent) {
-    e.preventDefault(); if (!supabase) return;
-    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined } });
-    setStatus(error ? error.message : 'Check your email to confirm registration, then sign in. Complete your profile after the database schema is installed.');
-  }
-  async function signOut() { if (supabase) await supabase.auth.signOut(); setStatus('Signed out.'); }
-  async function saveProfile() {
+  useEffect(() => {
     if (!supabase || !userId) return;
+    const channel = supabase.channel(`online-presence-${userId}`, { config: { presence: { key: userId } } });
+    channel.on('presence', { event: 'sync' }, () => setOnlineCount(Object.keys(channel.presenceState()).length));
+    channel.subscribe(async state => {
+      if (state === 'SUBSCRIBED') await channel.track({ online_at: new Date().toISOString() });
+    });
+    return () => { void supabase.removeChannel(channel); };
+  }, [supabase, userId]);
+
+  async function signIn(e: FormEvent) {
+    e.preventDefault(); if (!supabase) return;
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setStatus(error ? error.message : 'Signed in successfully.');
+  }
+  async function signUp() {
+    if (!supabase) return;
+    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined } });
+    setStatus(error ? error.message : 'Check your email to confirm your registration, then sign in.');
+  }
+  async function signOut() {
+    if (supabase) await supabase.auth.signOut();
+    setStatus('Signed out.'); setTab('Messages'); setSelectedConversation(null);
+  }
+  async function saveProfile(e?: FormEvent) {
+    e?.preventDefault();
+    if (!supabase || !userId) { setStatus('Sign in before creating a profile.'); return; }
     const clean = profileForm.nickname.trim().replace(/^@/, '');
     if (!clean) { setStatus('Choose a nickname first.'); return; }
-    const { error } = await supabase.from('profiles').upsert({ id:userId, nickname:clean, level:profileForm.level, college:profileForm.college, school:profileForm.school });
-    setStatus(error ? error.message : 'Profile saved. Private registration details are not part of the public profile.'); setNickname(clean); setShowProfile(false); await refreshCommunity();
+    const { error } = await supabase.from('profiles').upsert({ id: userId, nickname: clean, level: profileForm.level || null, college: profileForm.college || null, school: profileForm.school || null });
+    if (error) { setStatus(error.message); return; }
+    setProfileExists(true); setNickname(clean); setShowProfile(false); setEditingProfile(false);
+    setStatus('Profile saved.');
+    await loadProfile(userId);
   }
   async function sendRequest(recipient: string) {
     if (!supabase || !userId || recipient === userId) return;
-    const { error } = await supabase.from('message_requests').insert({ sender_id:userId, recipient_id:recipient });
+    const { error } = await supabase.from('message_requests').insert({ sender_id: userId, recipient_id: recipient });
     setStatus(error ? error.message : 'Message request sent. You can chat after it is accepted.');
   }
-  async function sendMessage() {
-    if (!supabase || !userId || !message.trim()) return;
-    setStatus('Choose a conversation in the full messaging module; this starter keeps messages access-controlled by conversation membership.');
-  }
-  async function createGroup(e: React.FormEvent) {
-    e.preventDefault(); if (!supabase || !userId || !groupName.trim()) return;
-    const { data, error } = await supabase.from('groups').insert({ name:groupName.trim(), created_by:userId }).select('id,name').single();
+  async function createGroup(e: FormEvent) {
+    e.preventDefault();
+    if (!supabase || !userId || !groupName.trim()) return;
+    const { data, error } = await supabase.from('groups').insert({ name: groupName.trim(), created_by: userId }).select('id,name').single();
     if (error) { setStatus(error.message); return; }
-    await supabase.from('group_members').insert({ group_id:data.id, user_id:userId, role:'owner' });
-    setGroups(old => [data, ...old]); setGroupName(''); setShowGroup(false); setStatus('Group created. Invite members from the group details once group invitations are enabled.');
+    await supabase.from('group_members').insert({ group_id: data.id, user_id: userId, role: 'owner' });
+    setGroups(old => [data as CommunityGroup, ...old]); setGroupName(''); setShowGroup(false); setStatus('Group created.');
+  }
+  function sendDraft() {
+    if (!selectedConversation) return;
+    // Conversation/message tables and membership policies must be connected before sending is enabled.
+    setStatus('Messaging storage is not connected yet. Your message has not been sent.');
+  }
+  function openProfileEditor() {
+    if (!userId) { setStatus('Sign in to create your profile.'); return; }
+    setEditingProfile(profileExists);
+    setShowProfile(true);
   }
 
+  const currentNav = NAV_ITEMS.find(n => n.name === tab);
   const configured = !!supabase;
-  return <main className="shell">
-    <aside className="sidebar">
-      <div className="brand"><div className="brand-mark"><MessageCircle size={23}/></div><div><strong>MR RICH</strong><span>CONNECT</span></div></div>
-      <div className="workspace"><span className="online-dot"/> COMMUNITY NETWORK <span className="tiny-pill">BETA</span></div>
-      <nav>{[{name:'Discover',icon:Search},{name:'Messages',icon:MessageCircle},{name:'Groups',icon:Users},{name:'Requests',icon:Bell},{name:'My Profile',icon:UserRound}].map(item => <button key={item.name} onClick={() => { setTab(item.name); if(item.name==='My Profile') setShowProfile(true); }} className={`nav-item ${tab===item.name?'active':''}`}><item.icon size={18}/><span>{item.name}</span>{item.name==='Requests'&&requests>0&&<b className="count">{requests}</b>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="premium-card"><Crown size={19}/><strong>Go Premium</strong><p>Stand out with a special title and badge.</p><button onClick={() => setStatus('Premium can be granted by admin approval or connected payment checkout. Configure a payment provider before accepting payments.')}>Explore premium <span>↗</span></button></div><div className="signed-user"><div className="avatar">{nickname?.[0]?.toUpperCase()||'?'}</div><div className="signed-info"><strong>{nickname ? '@'+nickname : userId ? 'Your account' : 'Guest mode'}</strong><small>{userId?'Community member':'Sign in to connect'}</small></div>{userId&&<button className="icon-button" title="Sign out" onClick={signOut}><LogOut size={16}/></button>}</div></div>
-    </aside>
-    <section className="main-area">
-      <header className="topbar"><div><span className="eyebrow">YOUR CAMPUS. YOUR COMMUNITY.</span><h1>{tab==='Discover'?'Find your people.':tab==='Groups'?'Communities & groups':tab==='Requests'?'Message requests':tab==='My Profile'?'Your profile':'Your conversations'}</h1></div><div className="top-actions"><div className="online-stat"><span className="online-dot"/><div><strong>{onlineCount}</strong><small>online now</small></div></div><button className="primary-button" onClick={() => setShowProfile(true)}>Set up profile <span>＋</span></button></div></header>
-      {!configured && <div className="notice warning"><ShieldCheck size={18}/><div><strong>Backend not connected yet</strong><p>Copy <code>.env.example</code> to <code>.env.local</code>, add your Supabase project URL and anon key, then run the SQL setup in the included README.</p></div></div>}
-      {status && <div className="status-line">{status}</div>}
-      {!userId ? <section className="auth-panel"><div className="auth-art"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="hero-icon"><MessageCircle size={45}/></div><h2>More than a chat.<br/><em>A real connection.</em></h2><p>Meet people, join groups, and grow your campus network.</p><div className="auth-pills"><span>✦ Live community</span><span>✦ Private by design</span></div></div><form className="auth-form" onSubmit={signIn}><span className="eyebrow">WELCOME TO THE NETWORK</span><h2>Connect with your people</h2><p className="muted">Sign in or create an account to get started.</p><label>Email address<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/></label><label>Password<input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="current-password"/></label><button className="primary-button full" type="submit"><LogIn size={17}/> Sign in</button><button className="secondary-button full" type="button" onClick={signUp}>Create an account</button><small className="privacy-note"><ShieldCheck size={14}/> Your email, phone, name and department are private.</small></form></section> : <>
-        {tab==='Discover' && <><section className="hero-banner"><div className="hero-copy"><span className="hero-label"><Zap size={13}/> YOUR NEXT CONNECTION STARTS HERE</span><h2>Make connections.<br/><span>Build your circle.</span></h2><p>Discover people from your school, college and department community.</p><button className="light-button" onClick={()=>setShowProfile(true)}>Complete your profile <span>→</span></button></div><div className="banner-orb"><div className="orb-core"><Users size={46}/></div><span className="float-tag tag-a">✦ Meet people</span><span className="float-tag tag-b">+ New connections</span><span className="float-tag tag-c">● Community</span></div></section><div className="section-heading"><div><h2>People you may know</h2><p>Discover members and send a message request.</p></div><button className="text-button" onClick={refreshCommunity}>Refresh directory ↻</button></div><div className="people-grid">{profiles.filter(p=>p.id!==userId).map(p=><article className="person-card" key={p.id}><div className="person-top"><div className="avatar large">{p.avatar_url?<img src={p.avatar_url} alt=""/>:p.nickname?.[0]?.toUpperCase()||'M'}</div>{p.premium_status==='active'&&<span className="premium-badge"><Crown size={12}/> PREMIUM</span>}</div><h3>@{p.nickname}</h3><p className="person-meta">{[p.level,p.college].filter(Boolean).join(' · ')||'Community member'}</p><p className="school-line">{p.school||'School not listed'}</p><div className="person-footer"><span className="rank-tag"><Zap size={13}/> {Math.floor((p.total_online_seconds||0)/3600)}h online</span><button className="connect-button" onClick={()=>sendRequest(p.id)}>Connect <span>＋</span></button></div></article>)}</div>{profiles.length===0&&<div className="empty-state"><Users size={28}/><strong>Your community is getting ready</strong><p>Once other members register and complete their public profiles, they will appear here.</p></div>}</>}
-        {tab==='Groups'&&<><div className="section-heading"><div><h2>Your communities</h2><p>Build a space around your interests.</p></div><button className="primary-button" onClick={()=>setShowGroup(true)}>＋ Create group</button></div><div className="group-list">{groups.map(g=><div className="group-row" key={g.id}><div className="group-icon"><Hash size={22}/></div><div><strong>{g.name}</strong><p>MR RICH CONNECT community</p></div><button className="secondary-button" onClick={()=>setStatus('Group membership and real-time group chat are protected by group membership policies in the database schema.')}>Open group →</button></div>)}{groups.length===0&&<div className="empty-state"><Users size={28}/><strong>No groups yet</strong><p>Create the first community and invite others to join.</p><button className="primary-button" onClick={()=>setShowGroup(true)}>Create a group</button></div>}</div></>}
-        {tab==='Messages'&&<div className="chat-placeholder"><div className="chat-empty-icon"><MessageCircle size={32}/></div><h2>Your conversations, all in one place.</h2><p>Accepted requests unlock private chats. Group conversations are available to members only.</p><div className="message-compose"><button className="emoji-button" onClick={()=>setMessage(m=>m+' 😊')}>😊</button><input value={message} onChange={e=>setMessage(e.target.value)} placeholder="Write a message…"/><button className="primary-button" onClick={sendMessage}>Send ↗</button></div><small>Choose a conversation to send messages. Messages are never public.</small></div>}
-        {tab==='Requests'&&<div className="empty-state"><Bell size={28}/><strong>Message requests</strong><p>Your pending requests will appear here. Accepting a request enables a private conversation.</p><button className="secondary-button" onClick={refreshCommunity}>Refresh requests</button></div>}
-        {tab==='My Profile'&&<div className="profile-summary"><div className="avatar huge">{nickname?.[0]?.toUpperCase()||'?'}</div><h2>@{nickname||'choose_nickname'}</h2><p>{profileForm.level||'Level not set'} · {profileForm.college||'College not set'}</p><p>{profileForm.school||'School not set'}</p><button className="primary-button" onClick={()=>setShowProfile(true)}>Edit profile</button><div className="privacy-box"><ShieldCheck size={19}/><div><strong>Your private information stays private</strong><p>Your name, phone number, department and email are registration-only fields and are not shown on public profiles.</p></div></div></div>}
-      </>}
-      <footer><span>© {new Date().getFullYear()} MR RICH CONNECT</span><span><ShieldCheck size={13}/> Built for meaningful connections</span></footer>
-    </section>
-    {showProfile&&<div className="modal-backdrop" onClick={()=>setShowProfile(false)}><form className="modal" onSubmit={e=>{e.preventDefault();saveProfile();}} onClick={e=>e.stopPropagation()}><button type="button" className="modal-close" onClick={()=>setShowProfile(false)}>×</button><span className="eyebrow">YOUR PUBLIC IDENTITY</span><h2>Set up your profile</h2><p className="muted">Only these fields appear publicly.</p><label>Nickname<input required maxLength={24} value={profileForm.nickname} onChange={e=>setProfileForm({...profileForm,nickname:e.target.value})} placeholder="@yournickname"/></label><label>Level<input value={profileForm.level} onChange={e=>setProfileForm({...profileForm,level:e.target.value})} placeholder="e.g. 200 level"/></label><label>College<input value={profileForm.college} onChange={e=>setProfileForm({...profileForm,college:e.target.value})} placeholder="Your college"/></label><label>School<input value={profileForm.school} onChange={e=>setProfileForm({...profileForm,school:e.target.value})} placeholder="Your school or university"/></label><div className="privacy-box"><ShieldCheck size={17}/><p>Name, phone number, department and email are not included in this public form.</p></div><button className="primary-button full" type="submit">Save public profile</button></form></div>}
-    {showGroup&&<div className="modal-backdrop" onClick={()=>setShowGroup(false)}><form className="modal" onSubmit={createGroup} onClick={e=>e.stopPropagation()}><button type="button" className="modal-close" onClick={()=>setShowGroup(false)}>×</button><span className="eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="muted">Start a community around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e=>setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><button className="primary-button full" type="submit">Create group</button></form></div>}
+
+  return <main className="rc-shell">
+    <header className="rc-mobile-header">
+      <div className="rc-brand">
+        <div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div>
+        <div className="rc-brand-type"><strong>MR RICH</strong><span>CONNECT</span></div>
+      </div>
+      <div className="rc-header-actions">
+        {userId && <span className="rc-online-pill"><i/> {onlineCount} online</span>}
+        {userId ? <button className="rc-icon-btn" aria-label="Sign out" onClick={signOut}><LogOut size={19}/></button> : <button className="rc-small-login" onClick={() => document.getElementById('rc-email')?.focus()}>Login</button>}
+      </div>
+    </header>
+
+    {!userId ? <section className="rc-auth-layout">
+      <div className="rc-auth-intro"><span className="rc-eyebrow"><Sparkles size={14}/> YOUR CAMPUS. YOUR COMMUNITY.</span><h1>Find your people.<br/><em>Build your circle.</em></h1><p>Connect with people from your school and community.</p><div className="rc-auth-symbol"><MessageCircle size={58}/><Wifi size={25}/></div></div>
+      <form className="rc-auth-card" onSubmit={signIn}><span className="rc-eyebrow">WELCOME TO THE NETWORK</span><h2>Sign in</h2><p className="rc-muted">Use your email and password to continue.</p><label>Email address<input id="rc-email" type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/></label><label>Password<input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="current-password"/></label><button className="rc-primary rc-full" type="submit"><LogIn size={17}/> Sign in</button><button className="rc-secondary rc-full" type="button" onClick={signUp}>Create an account</button><small className="rc-privacy"><ShieldCheck size={14}/> Your private registration details stay private.</small></form>
+    </section> : <>
+      <div className="rc-page-heading"><div><span className="rc-eyebrow">{tab === 'Messages' ? 'YOUR INBOX' : tab === 'Discover' ? 'MEET YOUR COMMUNITY' : tab === 'Groups' ? 'YOUR COMMUNITIES' : tab === 'Requests' ? 'NEW CONNECTIONS' : 'YOUR SPACE'}</span><h1>{tab === 'Messages' ? 'Messages' : tab === 'Discover' ? 'Find People Online' : tab === 'Groups' ? 'Find Your Community' : tab === 'Requests' ? 'Message Requests' : 'Your Profile'}</h1></div>
+        {tab === 'Groups' && <button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={17}/> Create group</button>}
+        {tab === 'Discover' && <button className="rc-icon-btn" aria-label="Refresh people" onClick={() => void refreshCommunity()}><RefreshCw size={18}/></button>}
+      </div>
+
+      {!configured && <div className="rc-notice"><ShieldCheck size={18}/><span>Supabase is not configured. Add your project URL and public key to your Render environment variables.</span></div>}
+      {status && <div className="rc-status" role="status">{status}<button aria-label="Dismiss notice" onClick={() => setStatus('')}><X size={14}/></button></div>}
+
+      {tab === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''}`}>
+        <aside className="rc-conversation-list"><div className="rc-list-heading"><div><h2>Conversations</h2><p>Private and group chats</p></div></div>
+          {/* Conversation records will appear here when the conversations table and membership query are connected. */}
+          {!selectedConversation && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Connect with someone or join a group to start a conversation.</p></div>}
+          {selectedConversation && <button className="rc-conversation-row active" onClick={() => setSelectedConversation(selectedConversation)}><span className="rc-conversation-avatar"><MessageCircle size={20}/></span><span><strong>{selectedConversation.title}</strong><small>{selectedConversation.subtitle || 'Conversation'}</small></span></button>}
+        </aside>
+        <section className="rc-chat-panel">
+          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar"><MessageCircle size={20}/></div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div className="rc-chat-empty"><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Messages will appear here once messaging storage is connected.</p></div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={sendDraft} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+        </section>
+      </section>}
+
+      {tab === 'Discover' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>People you may know</h2><p>Connect with members from your community.</p></div><button className="rc-text-btn" onClick={() => void refreshCommunity()}>Refresh <RefreshCw size={14}/></button></div>
+        <div className="rc-people-grid">{profiles.filter(p => p.id !== userId).map(p => <article className="rc-person-card" key={p.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div>{p.premium_status === 'active' && <span className="rc-premium-badge"><Crown size={12}/> PREMIUM</span>}</div><h3>@{p.nickname}</h3><p>{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor((p.total_online_seconds || 0) / 3600)}h online</span><button className="rc-primary rc-connect" onClick={() => void sendRequest(p.id)}>Connect <Plus size={15}/></button></div></article>)}</div>
+        {profiles.filter(p => p.id !== userId).length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No people to show yet</h2><p>New members will appear here when they create a profile.</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}</div>}
+      </section>}
+
+      {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <button className="rc-group-row" key={g.id} onClick={() => { setSelectedConversation({id:g.id,title:g.name,kind:'group'}); setTab('Messages'); }}><span className="rc-group-icon"><Hash size={22}/></span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
+
+      {tab === 'Requests' && <section className="rc-content-section"><div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>Message requests will appear here. Accepting one will allow a private chat.</p><button className="rc-secondary" onClick={() => void refreshCommunity()}><RefreshCw size={15}/> Refresh requests</button></div></section>}
+
+      {tab === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><div className="rc-profile-avatar">{nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}</div><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}</section>}
+    </>}
+
+    <footer className="rc-footer"><span>© {new Date().getFullYear()} MR RICH CONNECT</span><span><ShieldCheck size={13}/> Your campus. Your community.</span></footer>
+
+    {userId && <nav className="rc-bottom-nav" aria-label="Main navigation">{NAV_ITEMS.map(item => <button key={item.name} className={`rc-bottom-item ${tab === item.name ? 'active' : ''}`} onClick={() => { setTab(item.name); setShowProfile(false); setShowGroup(false); setShowEmojiPicker(false); }}><span className="rc-bottom-icon"><item.icon size={24} strokeWidth={tab === item.name ? 2.5 : 2}/>{item.name === 'Requests' && requests > 0 && <i className="rc-nav-badge">{requests}</i>}</span><span className="rc-bottom-label">{item.name === 'My Profile' ? 'Profile' : item.name}</span></button>)}</nav>}
+
+    {showProfile && <div className="rc-modal-backdrop" onClick={() => { setShowProfile(false); setEditingProfile(false); }}><form className="rc-modal" onSubmit={saveProfile} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => { setShowProfile(false); setEditingProfile(false); }} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">YOUR PUBLIC IDENTITY</span><h2>{editingProfile ? 'Edit profile' : 'Create your profile'}</h2><p className="rc-muted">Only these details appear on your public profile.</p><label>Nickname<input required maxLength={24} value={profileForm.nickname} onChange={e => setProfileForm({...profileForm, nickname:e.target.value})} placeholder="@yournickname"/></label><label>Level<input value={profileForm.level} onChange={e => setProfileForm({...profileForm, level:e.target.value})} placeholder="e.g. 200 level"/></label><label>College<input value={profileForm.college} onChange={e => setProfileForm({...profileForm, college:e.target.value})} placeholder="Your college"/></label><label>School<input value={profileForm.school} onChange={e => setProfileForm({...profileForm, school:e.target.value})} placeholder="Your school or university"/></label><div className="rc-privacy"><ShieldCheck size={15}/> Name, phone, department and email stay private.</div><button className="rc-primary rc-full" type="submit">Save profile</button></form></div>}
+    {showGroup && <div className="rc-modal-backdrop" onClick={() => setShowGroup(false)}><form className="rc-modal" onSubmit={createGroup} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setShowGroup(false)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="rc-muted">Start a space around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><button className="rc-primary rc-full" type="submit">Create group</button></form></div>}
+    {!authReady && <div className="rc-loading" aria-label="Loading"/>}
   </main>;
 }
