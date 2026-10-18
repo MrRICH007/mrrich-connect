@@ -381,7 +381,7 @@ export default function Home() {
       return {
         id: c.id,
         title: isGroup ? (c.title || 'Group chat') : (nicknameById.get(other?.user_id ?? '') ? `@${nicknameById.get(other?.user_id ?? '')}` : (c.title && !['Private chat', 'Private conversation'].includes(c.title) ? c.title : 'Private chat')),
-        kind: isGroup ? 'group' : 'person',
+        kind: isGroup ? ('group' as const) : ('person' as const),
         otherUserId: other?.user_id,
         avatarUrl: isGroup ? (groups.find(g => g.conversation_id === c.id)?.avatar_url ?? null) : avatarById.get(other?.user_id ?? '') ?? null,
         lastMessageAt: latestByConversation.get(c.id) ?? null
