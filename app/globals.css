@@ -88,3 +88,37 @@
 .rc-message-mine .rc-message-body{text-align:left!important;align-self:stretch!important;width:100%;}
 /* Keep received message text left-aligned inside its bubble in both private and group chats. */
 .rc-message-other .rc-message-body{text-align:left!important;align-self:stretch!important;width:100%!important;}
+
+
+/* Messaging delivery indicators, compact discover cards, reply UI and keyboard autofill fixes */
+.rc-list-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.rc-notification-toggle{padding:8px!important;flex:0 0 auto}
+.rc-conversation-row{position:relative;gap:10px!important}
+.rc-conversation-copy{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.rc-conversation-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-unread-badge{min-width:22px;height:22px;padding:0 6px;display:grid;place-items:center;border-radius:999px;background:#0866ff;color:#fff;font-size:11px;font-weight:800;flex:0 0 auto}
+.rc-reply-preview{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;margin:0 2px 8px;border-left:3px solid #4387ff;background:#172033;border-radius:8px}
+.rc-reply-preview>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.rc-reply-preview strong{font-size:12px;color:#8bb6ff}
+.rc-reply-preview small{font-size:12px;color:#d5dced;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75vw}
+.rc-reply-preview button{border:0;background:transparent;color:#d5dced;padding:5px}
+.rc-message-row[title="Swipe right to reply"]{touch-action:pan-y;cursor:default}
+.rc-message-row[title="Swipe right to reply"]:active .rc-message-bubble{filter:brightness(1.12)}
+.rc-message-body{ text-align:left!important; align-self:stretch!important}
+.rc-message-mine .rc-message-sender{text-align:left!important}
+.rc-message-mine .rc-message-time{text-align:left!important;align-self:flex-start!important}
+.rc-discover-person{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px!important}
+.rc-discover-main{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+.rc-discover-main .rc-person-top{flex:0 0 auto}
+.rc-discover-main .rc-avatar-large{width:48px;height:48px}
+.rc-discover-main h3{font-size:14px!important;margin:0 0 4px!important;overflow-wrap:anywhere}
+.rc-discover-main p{font-size:11px!important;margin:2px 0!important;line-height:1.35}
+.rc-discover-main small{font-size:10px!important;display:block;line-height:1.35;overflow-wrap:anywhere}
+.rc-discover-main .rc-premium-title{display:none}
+.rc-discover-main .rc-premium-badge{font-size:8px;white-space:nowrap}
+.rc-discover-person .rc-person-footer{border:0;margin:0;padding:0;flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+.rc-discover-person .rc-person-footer>span{font-size:10px;white-space:nowrap}
+.rc-discover-person .rc-connect{font-size:11px;padding:8px 10px;white-space:nowrap}
+.rc-profile-page .rc-online-rankings{padding:12px 0 0!important;margin-top:20px;border-top:1px solid var(--rc-line)}
+.rc-composer input{autocomplete:off}
+@media(max-width:600px){.rc-discover-person{gap:8px;padding:10px!important}.rc-discover-main{gap:8px}.rc-discover-main .rc-avatar-large{width:42px;height:42px}.rc-discover-main h3{font-size:12px!important}.rc-discover-main p,.rc-discover-main small{font-size:10px!important}.rc-discover-person .rc-connect{padding:7px 8px;font-size:10px}.rc-discover-person .rc-person-footer>span{font-size:9px}}
