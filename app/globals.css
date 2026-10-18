@@ -28,3 +28,20 @@
 .rc-profile-avatar-click .rc-profile-avatar i{position:absolute;right:0;bottom:0;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#0866ff;border:2px solid #141720;color:white;font-style:normal}
 .rc-hidden-file{display:none!important}
 @media(max-width:420px){.rc-message-body{font-size:18px!important}.rc-emoji-grid{grid-template-columns:repeat(7,minmax(0,1fr))!important}}
+
+/* Focused, borderless chat layout: header and composer stay still; only messages scroll. */
+.rc-messages-layout{padding-bottom:0!important;min-height:0!important;}
+.rc-chat-panel{border:0!important;border-radius:0!important;background:transparent!important;min-height:0!important;height:calc(100dvh - 150px)!important;overflow:hidden!important;}
+.rc-chat-header{position:sticky;top:0;z-index:5;flex:0 0 auto;background:var(--rc-bg)!important;border:0!important;padding:10px 12px!important;}
+.rc-chat-empty{flex:1 1 auto!important;min-height:0!important;height:0!important;overflow-y:auto!important;overscroll-behavior:contain;scrollbar-width:thin;padding:8px 2px!important;}
+.rc-composer-wrap{flex:0 0 auto!important;position:sticky!important;bottom:0!important;z-index:6;background:var(--rc-bg)!important;border:0!important;padding:8px 2px calc(8px + env(safe-area-inset-bottom))!important;}
+.rc-emoji-grid{z-index:10!important;}
+@media(max-width:800px){
+ .rc-messages-layout{padding:0!important;margin:0!important;}
+ .rc-messages-layout.has-chat{position:fixed!important;inset:76px 0 0!important;z-index:35!important;display:block!important;width:100%!important;height:auto!important;max-width:none!important;background:var(--rc-bg)!important;}
+ .rc-messages-layout.has-chat .rc-chat-panel{display:flex!important;width:100%!important;height:100%!important;min-height:0!important;border:0!important;border-radius:0!important;}
+ .rc-messages-layout.has-chat .rc-chat-header{padding:8px 10px!important;}
+ .rc-messages-layout.has-chat .rc-chat-empty{padding-left:2px!important;padding-right:2px!important;}
+ .rc-messages-layout.has-chat .rc-composer-wrap{padding-left:6px!important;padding-right:6px!important;}
+ .rc-messages-layout.has-chat~.rc-bottom-nav{display:none!important;}
+}
