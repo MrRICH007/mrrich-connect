@@ -80,20 +80,67 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [status]);
 
+  
   async function uploadAvatar(file?: File) {
     if (!file || !supabase || !userId) return;
-    if (!file.type.startsWith('image/')) { setStatus('Choose an image file for your avatar.'); return; }
-    if (file.size > 5 * 1024 * 1024) { setStatus('Avatar images must be 5 MB or smaller.'); return; }
+
+    if (!file.type.startsWith('image/')) {
+      setStatus('Choose an image file for your avatar.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setStatus('Avatar images must be 5 MB or smaller.');
+      return;
+    }
+
     setAvatarUploading(true);
-    const extension = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
-    const path = `${userId}/${Date.now()}.${extension}`;
-    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
-    if (error) { setAvatarUploading(false); setStatus(`Avatar upload failed: ${error.message}. Create a public Supabase Storage bucket named avatars and allow signed-in users to upload to their own folder.`); return; }
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-    setProfileForm(old => ({ ...old, avatar_url: data.publicUrl }));
-    setAvatarUploading(false);
-    setStatus('Avatar uploaded. Save your profile to publish it.');
+
+    try {
+      const extension =
+        file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
+
+      const path = `${userId}/${Date.now()}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, {
+          upsert: true,
+          contentType: file.type,
+        });
+
+      if (uploadError) {
+        setStatus(`Avatar upload failed: ${uploadError.message}`);
+        return;
+      }
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+
+      const { error: saveError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: data.publicUrl })
+        .eq('id', userId);
+
+      if (saveError) {
+        setStatus(`Image uploaded, but profile save failed: ${saveError.message}`);
+        return;
+      }
+
+      setProfileForm(old => ({ ...old, avatar_url: data.publicUrl }));
+      setProfiles(old =>
+        old.map(p =>
+          p.id === userId ? { ...p, avatar_url: data.publicUrl } : p
+        )
+      );
+
+      setStatus('Profile avatar saved successfully.');
+    } catch {
+      setStatus('Something went wrong while saving your avatar.');
+    } finally {
+      setAvatarUploading(false);
+    }
   }
+
 
   function nicknameColor(id: string) {
     const palette = ['#7dd3fc', '#f9a8d4', '#c4b5fd', '#86efac', '#fcd34d', '#fda4af', '#a5b4fc', '#67e8f9', '#fdba74', '#d9f99d'];
