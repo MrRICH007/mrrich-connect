@@ -22,7 +22,7 @@ type Profile = {
   bio?: string | null;
   department?: string | null;
 };
-type CommunityGroup = { id: string; name: string; conversation_id?: string | null };
+type CommunityGroup = { id: string; name: string; conversation_id?: string | null; avatar_url?: string | null };
 type AdCampaign = { id: string; title: string; media_type: 'image' | 'video'; media_path: string; target_url: string | null; expires_at: string };
 type IncomingRequest = { id: string; sender_id: string; created_at: string; sender_nickname: string };
 type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string; otherUserId?: string };
@@ -56,6 +56,8 @@ export default function Home() {
   const [groups, setGroups] = useState<CommunityGroup[]>([]);
   const [activeAds, setActiveAds] = useState<AdCampaign[]>([]);
   const [groupName, setGroupName] = useState('');
+  const [groupAvatarUrl, setGroupAvatarUrl] = useState('');
+  const [groupAvatarUploading, setGroupAvatarUploading] = useState(false);
   const [profileForm, setProfileForm] = useState({ nickname: '', level: '', college: '', school: '', department: '', bio: '', avatar_url: '', full_name: '', phone: '' });
   const [profileExists, setProfileExists] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -110,7 +112,7 @@ export default function Home() {
         .eq('recipient_id', userId).eq('status', 'pending');
       setRequests(req?.length ?? 0);
     }
-    const { data: grp } = await supabase.from('groups').select('id,name,conversation_id').limit(30);
+    const { data: grp } = await supabase.from('groups').select('id,name,conversation_id,avatar_url').limit(30);
     if (grp) setGroups(grp as CommunityGroup[]);
     const { data: ads } = await supabase.from('ad_campaigns').select('id,title,media_type,media_path,target_url,expires_at').eq('is_enabled', true).lte('starts_at', new Date().toISOString()).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(5);
     if (ads) setActiveAds(ads as AdCampaign[]);
@@ -259,14 +261,28 @@ export default function Home() {
     const { error } = await supabase.from('message_requests').insert({ sender_id: userId, recipient_id: recipient });
     setStatus(error ? error.message : 'Message request sent. You can chat after it is accepted.');
   }
+  async function uploadGroupAvatar(file?: File) {
+    if (!file || !supabase || !userId) return;
+    if (!file.type.startsWith('image/')) { setStatus('Choose an image file for the group avatar.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setStatus('Group avatar images must be 5 MB or smaller.'); return; }
+    setGroupAvatarUploading(true);
+    const ext = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
+    const path = `groups/${userId}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+    if (error) { setGroupAvatarUploading(false); setStatus(`Group avatar upload failed: ${error.message}`); return; }
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+    setGroupAvatarUrl(data.publicUrl); setGroupAvatarUploading(false); setStatus('Group avatar uploaded. Create the group to save it.');
+  }
+
   async function createGroup(e: FormEvent) {
     e.preventDefault();
     if (!supabase || !userId || !groupName.trim()) return;
     const { data: groupId, error } = await supabase.rpc('create_group_with_conversation', { p_name: groupName.trim(), p_description: null });
     if (error) { setStatus(`Could not create group: ${error.message}. Run the feature bundle SQL migration first.`); return; }
-    const { data } = await supabase.from('groups').select('id,name,conversation_id').eq('id', groupId).single();
+    if (groupAvatarUrl) { const { error: avatarError } = await supabase.from('groups').update({ avatar_url: groupAvatarUrl }).eq('id', groupId); if (avatarError) { setStatus(`Group created, but avatar could not be saved: ${avatarError.message}`); } }
+    const { data } = await supabase.from('groups').select('id,name,conversation_id,avatar_url').eq('id', groupId).single();
     if (data) setGroups(old => [data as CommunityGroup, ...old]);
-    setGroupName(''); setShowGroup(false); setStatus('Group and group chat created.');
+    setGroupName(''); setGroupAvatarUrl(''); setShowGroup(false); if (!groupAvatarUrl) setStatus('Group and group chat created.');
     await loadConversations();
   }
   const loadConversations = useCallback(async () => {
@@ -424,7 +440,7 @@ export default function Home() {
             </div>
             {mine && !groupChat && <span className="rc-message-avatar">{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt=""/> : (message.sender_nickname?.[0] || 'Y').toUpperCase()}</span>}
           </div>;
-        })}</div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendDraft();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+        })}</div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendDraft();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); setShowEmojiPicker(false); }} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -435,12 +451,12 @@ export default function Home() {
         {profiles.filter(p => p.id !== userId).length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No people to show yet</h2><p>New members will appear here when they create a profile.</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}</div>}
       </section>}
 
-      {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <button className="rc-group-row" key={g.id} onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon"><Users size={22}/></span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
+      {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <button className="rc-group-row" key={g.id} onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
 
       {tab === 'Requests' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Message requests</h2><p>Accept a request to open a private conversation.</p></div><button className="rc-text-btn" onClick={() => void loadIncomingRequests()}><RefreshCw size={14}/> Refresh</button></div>
         {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card" key={request.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><span className="rc-eyebrow">MESSAGE REQUEST</span></div><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation with you.</p><small>{new Date(request.created_at).toLocaleDateString()}</small><div className="rc-person-footer"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p><button className="rc-secondary" onClick={() => void loadIncomingRequests()}><RefreshCw size={15}/> Refresh requests</button></div>}</section>}
 
-      {tab === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><div className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}</div><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}</section>}
+      {tab === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}</section>}
     </>}
 
     <footer className="rc-footer"><span>© {new Date().getFullYear()} MR RICH CONNECT</span><span><ShieldCheck size={13}/> Your campus. Your community.</span></footer>
@@ -455,7 +471,7 @@ export default function Home() {
 <label>Full name<input value={profileForm.full_name} onChange={e => setProfileForm({...profileForm, full_name:e.target.value})} placeholder="Your real name"/></label>
 <label>Phone number<input type="tel" value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone:e.target.value})} placeholder="Private phone number"/></label>
 <div className="rc-privacy"><ShieldCheck size={15}/> Email is kept in your authentication account and isn't shown publicly. Full name and phone are stored separately.</div><button className="rc-primary rc-full" type="submit">Save profile</button></form></div>}
-    {showGroup && <div className="rc-modal-backdrop" onClick={() => setShowGroup(false)}><form className="rc-modal" onSubmit={createGroup} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setShowGroup(false)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="rc-muted">Start a space around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><button className="rc-primary rc-full" type="submit">Create group</button></form></div>}
+    {showGroup && <div className="rc-modal-backdrop" onClick={() => setShowGroup(false)}><form className="rc-modal" onSubmit={createGroup} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setShowGroup(false)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="rc-muted">Start a space around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><label>Group image (optional)<input type="file" accept="image/*" onChange={e => void uploadGroupAvatar(e.target.files?.[0])} disabled={groupAvatarUploading}/></label>{groupAvatarUploading && <p className="rc-muted">Uploading group image…</p>}{groupAvatarUrl && <div className="rc-avatar-preview"><img src={groupAvatarUrl} alt="Group avatar preview"/><button type="button" className="rc-secondary" onClick={() => setGroupAvatarUrl('')}>Remove image</button></div>}<button className="rc-primary rc-full" type="submit" disabled={groupAvatarUploading}>{groupAvatarUploading ? 'Uploading…' : 'Create group'}</button></form></div>}
     {!authReady && <div className="rc-loading" aria-label="Loading"/>}
   </main>;
 }
