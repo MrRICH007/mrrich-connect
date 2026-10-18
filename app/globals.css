@@ -79,3 +79,10 @@
 .rc-chat-panel{position:relative!important;}
 .rc-scroll-latest{position:absolute;right:16px;bottom:78px;z-index:9;width:42px;height:42px;display:grid;place-items:center;border:1px solid #34415d;border-radius:50%;background:#0866ff;color:#fff;box-shadow:0 6px 20px #0007;}
 .rc-scroll-latest:active{transform:scale(.96)}
+
+/* Conversation and chat-header avatars use saved profile/group photos when available. */
+.rc-conversation-avatar{overflow:hidden;}
+.rc-conversation-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;}
+.rc-chat-header-avatar{width:42px;height:42px;flex:0 0 42px;}
+/* Keep sent bubbles on the right, but align the message content to the left inside them. */
+.rc-message-mine .rc-message-body{text-align:left!important;align-self:stretch!important;width:100%;}

@@ -25,7 +25,7 @@ type Profile = {
 type CommunityGroup = { id: string; name: string; conversation_id?: string | null; avatar_url?: string | null; created_by?: string | null };
 type AdCampaign = { id: string; title: string; media_type: 'image' | 'video'; media_path: string; target_url: string | null; expires_at: string };
 type IncomingRequest = { id: string; sender_id: string; created_at: string; sender_nickname: string };
-type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string; otherUserId?: string };
+type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string; otherUserId?: string; avatarUrl?: string | null };
 type ChatMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; sender_nickname?: string; sender_avatar_url?: string | null };
 
 const NAV_ITEMS = [
@@ -358,11 +358,13 @@ export default function Home() {
       .filter((m: { conversation_id: string; user_id: string }) => m.user_id !== userId)
       .map((m: { conversation_id: string; user_id: string }) => m.user_id))];
     let nicknameById = new Map<string, string>();
+    let avatarById = new Map<string, string | null>();
     if (privateOtherIds.length) {
       const { data: otherProfiles, error: otherProfileError } = await supabase.from('profiles')
-        .select('id,nickname').in('id', privateOtherIds);
+        .select('id,nickname,avatar_url').in('id', privateOtherIds);
       if (otherProfileError) setStatus(`Chats loaded, but some participant names could not be read: ${otherProfileError.message}`);
       nicknameById = new Map((otherProfiles ?? []).map((p: { id: string; nickname: string }) => [p.id, p.nickname]));
+      avatarById = new Map((otherProfiles ?? []).map((p: { id: string; avatar_url: string | null }) => [p.id, p.avatar_url]));
     }
     const mapped: Conversation[] = (convs ?? []).map((c: { id: string; title: string | null; kind: string }) => {
       const other = (allMembers ?? []).find((m: { conversation_id: string; user_id: string }) => m.conversation_id === c.id && m.user_id !== userId);
@@ -371,12 +373,13 @@ export default function Home() {
         id: c.id,
         title: isGroup ? (c.title || 'Group chat') : (nicknameById.get(other?.user_id ?? '') ? `@${nicknameById.get(other?.user_id ?? '')}` : (c.title && !['Private chat', 'Private conversation'].includes(c.title) ? c.title : 'Private chat')),
         kind: isGroup ? 'group' : 'person',
-        otherUserId: other?.user_id
+        otherUserId: other?.user_id,
+        avatarUrl: isGroup ? (groups.find(g => g.conversation_id === c.id)?.avatar_url ?? null) : avatarById.get(other?.user_id ?? '') ?? null
       };
     });
     setConversationList(mapped);
     setSelectedConversation(current => current ? (mapped.find(c => c.id === current.id) ?? current) : null);
-  }, [supabase, userId]);
+  }, [supabase, userId, groups]);
 
   const loadChatMessages = useCallback(async (conversationId: string) => {
     if (!supabase || !userId) return;
@@ -499,11 +502,11 @@ export default function Home() {
 
       {tab === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''}`}>
         <aside className="rc-conversation-list"><div className="rc-list-heading"><div><h2>Conversations</h2><p>Private and group chats</p></div></div>
-          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => setSelectedConversation(convo)}><span className="rc-conversation-avatar">{convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span></button>)}
+          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => setSelectedConversation(convo)}><span className="rc-conversation-avatar">{convo.avatarUrl ? <img src={convo.avatarUrl} alt=""/> : convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span></button>)}
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
-          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar">{selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div ref={chatMessagesRef} onScroll={handleChatScroll} className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
+          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar">{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div ref={chatMessagesRef} onScroll={handleChatScroll} className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
           const mine = message.sender_id === userId;
           const groupChat = selectedConversation.kind === 'group';
           const senderName = mine ? 'You' : `@${message.sender_nickname || 'Member'}`;
