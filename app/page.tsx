@@ -22,7 +22,7 @@ type Profile = {
   bio?: string | null;
   department?: string | null;
 };
-type CommunityGroup = { id: string; name: string; conversation_id?: string | null; avatar_url?: string | null };
+type CommunityGroup = { id: string; name: string; conversation_id?: string | null; avatar_url?: string | null; created_by?: string | null };
 type AdCampaign = { id: string; title: string; media_type: 'image' | 'video'; media_path: string; target_url: string | null; expires_at: string };
 type IncomingRequest = { id: string; sender_id: string; created_at: string; sender_nickname: string };
 type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string; otherUserId?: string };
@@ -71,6 +71,7 @@ export default function Home() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!status) return;
@@ -80,59 +81,21 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [status]);
 
-  
   async function uploadAvatar(file?: File) {
     if (!file || !supabase || !userId) return;
-
-    if (!file.type.startsWith('image/')) {
-      setStatus('Choose an image file for your avatar.');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setStatus('Avatar images must be 5 MB or smaller.');
-      return;
-    }
-
+    if (!file.type.startsWith('image/')) { setStatus('Choose an image file for your avatar.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setStatus('Avatar images must be 5 MB or smaller.'); return; }
     setAvatarUploading(true);
-
     try {
-      const extension =
-        file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
-
+      const extension = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
       const path = `${userId}/${Date.now()}.${extension}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(path, file, {
-          upsert: true,
-          contentType: file.type,
-        });
-
-      if (uploadError) {
-        setStatus(`Avatar upload failed: ${uploadError.message}`);
-        return;
-      }
-
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) { setStatus(`Avatar upload failed: ${uploadError.message}`); return; }
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-
-      const { error: saveError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: data.publicUrl })
-        .eq('id', userId);
-
-      if (saveError) {
-        setStatus(`Image uploaded, but profile save failed: ${saveError.message}`);
-        return;
-      }
-
+      const { error: saveError } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', userId);
+      if (saveError) { setStatus(`Image uploaded, but profile save failed: ${saveError.message}`); return; }
       setProfileForm(old => ({ ...old, avatar_url: data.publicUrl }));
-      setProfiles(old =>
-        old.map(p =>
-          p.id === userId ? { ...p, avatar_url: data.publicUrl } : p
-        )
-      );
-
+      setProfiles(old => old.map(profile => profile.id === userId ? { ...profile, avatar_url: data.publicUrl } : profile));
       setStatus('Profile avatar saved successfully.');
     } catch {
       setStatus('Something went wrong while saving your avatar.');
@@ -140,7 +103,6 @@ export default function Home() {
       setAvatarUploading(false);
     }
   }
-
 
   function nicknameColor(id: string) {
     const palette = ['#7dd3fc', '#f9a8d4', '#c4b5fd', '#86efac', '#fcd34d', '#fda4af', '#a5b4fc', '#67e8f9', '#fdba74', '#d9f99d'];
@@ -151,6 +113,8 @@ export default function Home() {
 
   const refreshCommunity = useCallback(async () => {
     if (!supabase) return;
+    const { data: adminResult } = await supabase.rpc('is_admin');
+    setIsAdmin(adminResult === true);
     const { data } = await supabase.from('profiles')
       .select('id,nickname,level,college,school,department,bio,avatar_url,premium_status,premium_title,total_online_seconds').limit(60);
     if (data) setProfiles(data as Profile[]);
@@ -159,7 +123,7 @@ export default function Home() {
         .eq('recipient_id', userId).eq('status', 'pending');
       setRequests(req?.length ?? 0);
     }
-    const { data: grp } = await supabase.from('groups').select('id,name,conversation_id,avatar_url').limit(30);
+    const { data: grp } = await supabase.from('groups').select('id,name,conversation_id,avatar_url,created_by').limit(30);
     if (grp) setGroups(grp as CommunityGroup[]);
     const { data: ads } = await supabase.from('ad_campaigns').select('id,title,media_type,media_path,target_url,expires_at').eq('is_enabled', true).lte('starts_at', new Date().toISOString()).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(5);
     if (ads) setActiveAds(ads as AdCampaign[]);
@@ -321,50 +285,23 @@ export default function Home() {
     setGroupAvatarUrl(data.publicUrl); setGroupAvatarUploading(false); setStatus('Group avatar uploaded. Create the group to save it.');
   }
 
-  
   async function changeExistingGroupAvatar(group: CommunityGroup, file?: File) {
     if (!file || !supabase || !userId) return;
-
-    if (!file.type.startsWith('image/')) {
-      setStatus('Choose an image file.');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setStatus('Image must be 5 MB or smaller.');
-      return;
-    }
-
+    if (group.created_by !== userId && !isAdmin) { setStatus('Only the group creator or an admin can change this image.'); return; }
+    if (!file.type.startsWith('image/')) { setStatus('Choose an image file.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setStatus('Image must be 5 MB or smaller.'); return; }
     setStatus('Uploading group image...');
     const ext = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
     const path = `groups/${userId}/${group.id}-${Date.now()}.${ext}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(path, file, { upsert: true, contentType: file.type });
-
-    if (uploadError) {
-      setStatus(`Upload failed: ${uploadError.message}`);
-      return;
-    }
-
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+    if (uploadError) { setStatus(`Upload failed: ${uploadError.message}`); return; }
     const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-    const { error } = await supabase
-      .from('groups')
-      .update({ avatar_url: data.publicUrl })
-      .eq('id', group.id);
-
-    if (error) {
-      setStatus(`Could not save image: ${error.message}`);
-      return;
-    }
-
-    setGroups(old => old.map(g =>
-      g.id === group.id ? { ...g, avatar_url: data.publicUrl } : g
-    ));
+    const { error } = await supabase.from('groups').update({ avatar_url: data.publicUrl }).eq('id', group.id);
+    if (error) { setStatus(`Could not save image: ${error.message}`); return; }
+    setGroups(old => old.map(g => g.id === group.id ? { ...g, avatar_url: data.publicUrl } : g));
     setStatus('Group image updated!');
-        }
-  
+  }
+
   async function createGroup(e: FormEvent) {
     e.preventDefault();
     if (!supabase || !userId || !groupName.trim()) return;
@@ -542,57 +479,7 @@ export default function Home() {
         {profiles.filter(p => p.id !== userId).length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No people to show yet</h2><p>New members will appear here when they create a profile.</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}</div>}
       </section>}
 
-      
-      {tab === 'Groups' && <section className="rc-content-section">
-        <div className="rc-section-title">
-          <div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div>
-        </div>
-        <div className="rc-group-list">
-          {groups.map(g => <div className="rc-group-row-wrap" key={g.id}>
-            <button className="rc-group-row" onClick={() => {
-              void (async () => {
-                if (!supabase) return;
-                if (!g.conversation_id) {
-                  setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.');
-                  return;
-                }
-                const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id });
-                if (error) {
-                  setStatus(`Could not join group: ${error.message}`);
-                  return;
-                }
-                setSelectedConversation({ id: conversationId || g.conversation_id!, title: g.name, kind: 'group' });
-                setTab('Messages');
-                await loadConversations();
-              })();
-            }}>
-              <span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt="" /> : <Users size={22} />}</span>
-              <span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span>
-              <span className="rc-arrow">→</span>
-            </button>
-            <label className="rc-edit-group-avatar">
-              <Pencil size={14} />
-              <span>Change image</span>
-              <input
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={e => {
-                  const file = e.currentTarget.files?.[0];
-                  e.currentTarget.value = '';
-                  void changeExistingGroupAvatar(g, file);
-                }}
-              />
-            </label>
-          </div>)}
-        </div>
-        {groups.length === 0 && <div className="rc-empty-state">
-          <div className="rc-empty-icon"><Users size={27} /></div>
-          <h2>No groups yet</h2>
-          <p>Create the first group for your community.</p>
-          <button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16} /> Create group</button>
-        </div>}
-      </section>}
+      {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <label className="rc-edit-group-avatar"><Pencil size={14}/><span>Change image</span><input type="file" accept="image/*" style={{display:'none'}} onChange={e => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; void changeExistingGroupAvatar(g, file); }}/></label>}</div>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
 
       {tab === 'Requests' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Message requests</h2><p>Accept a request to open a private conversation.</p></div><button className="rc-text-btn" onClick={() => void loadIncomingRequests()}><RefreshCw size={14}/> Refresh</button></div>
         {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card" key={request.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><span className="rc-eyebrow">MESSAGE REQUEST</span></div><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation with you.</p><small>{new Date(request.created_at).toLocaleDateString()}</small><div className="rc-person-footer"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p><button className="rc-secondary" onClick={() => void loadIncomingRequests()}><RefreshCw size={15}/> Refresh requests</button></div>}</section>}

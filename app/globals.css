@@ -46,28 +46,9 @@
  .rc-messages-layout.has-chat~.rc-bottom-nav{display:none!important;}
 }
 
-.rc-group-row-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
 
-.rc-group-row-wrap > .rc-group-row {
-  flex: 1;
-  min-width: 0;
-}
-
-.rc-edit-group-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 9px;
-  border-radius: 10px;
-  background: var(--rc-panel2);
-  color: var(--rc-muted);
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
+/* Group image controls and a small right-side inset for my own chat messages */
+.rc-group-row-wrap{display:flex;align-items:center;gap:8px;width:100%}
+.rc-group-row-wrap>.rc-group-row{flex:1;min-width:0}
+.rc-edit-group-avatar{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px;border-radius:10px;background:var(--rc-panel2);color:var(--rc-muted);font-size:12px;cursor:pointer;white-space:nowrap}
+.rc-message-mine{padding-right:8px!important}
