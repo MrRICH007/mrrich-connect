@@ -52,3 +52,19 @@
 .rc-group-row-wrap>.rc-group-row{flex:1;min-width:0}
 .rc-edit-group-avatar{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px;border-radius:10px;background:var(--rc-panel2);color:var(--rc-muted);font-size:12px;cursor:pointer;white-space:nowrap}
 .rc-message-mine{padding-right:8px!important}
+
+
+/* Keep chat title and composer visible when the on-screen keyboard opens. */
+@media(max-width:800px){
+  .rc-messages-layout.has-chat{
+    top:calc(76px + var(--rc-visual-offset, 0px))!important;
+    bottom:auto!important;
+    height:calc(var(--rc-visual-height, 100dvh) - 76px - var(--rc-visual-offset, 0px))!important;
+    max-height:calc(var(--rc-visual-height, 100dvh) - 76px - var(--rc-visual-offset, 0px))!important;
+    overflow:hidden!important;
+  }
+  .rc-messages-layout.has-chat .rc-chat-panel{height:100%!important;max-height:100%!important;min-height:0!important;}
+  .rc-messages-layout.has-chat .rc-chat-header{position:relative!important;top:auto!important;flex-shrink:0!important;}
+  .rc-messages-layout.has-chat .rc-chat-empty{flex:1 1 auto!important;min-height:0!important;}
+  .rc-messages-layout.has-chat .rc-composer-wrap{position:relative!important;bottom:auto!important;flex-shrink:0!important;}
+}

@@ -73,6 +73,27 @@ export default function Home() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Keep the mobile chat aligned with the visible viewport when the keyboard opens.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const updateViewport = () => {
+      document.documentElement.style.setProperty('--rc-visual-height', `${viewport.height}px`);
+      document.documentElement.style.setProperty('--rc-visual-offset', `${Math.max(0, viewport.offsetTop)}px`);
+    };
+    updateViewport();
+    viewport.addEventListener('resize', updateViewport);
+    viewport.addEventListener('scroll', updateViewport);
+    window.addEventListener('resize', updateViewport);
+    return () => {
+      viewport.removeEventListener('resize', updateViewport);
+      viewport.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+      document.documentElement.style.removeProperty('--rc-visual-height');
+      document.documentElement.style.removeProperty('--rc-visual-offset');
+    };
+  }, []);
+
   useEffect(() => {
     if (!status) return;
     const lower = status.toLowerCase();
