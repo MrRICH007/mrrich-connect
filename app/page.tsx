@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createClient } from '../lib/supabase';
 import {
   Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck,
   Users, UserRound, Wifi, Pencil, Plus, Send, Smile, ArrowLeft, RefreshCw,
-  X, Sparkles, Zap
+  X, Sparkles, Zap, ArrowDown
 } from 'lucide-react';
 
 type Profile = {
@@ -66,6 +66,8 @@ export default function Home() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [conversationList, setConversationList] = useState<Conversation[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const chatMessagesRef = useRef<HTMLDivElement | null>(null);
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [draftMessage, setDraftMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -78,8 +80,10 @@ export default function Home() {
     const viewport = window.visualViewport;
     if (!viewport) return;
     const updateViewport = () => {
+      const keyboardOpen = window.innerHeight - viewport.height > 140;
       document.documentElement.style.setProperty('--rc-visual-height', `${viewport.height}px`);
       document.documentElement.style.setProperty('--rc-visual-offset', `${Math.max(0, viewport.offsetTop)}px`);
+      document.documentElement.classList.toggle('rc-keyboard-open', keyboardOpen);
     };
     updateViewport();
     viewport.addEventListener('resize', updateViewport);
@@ -91,6 +95,7 @@ export default function Home() {
       window.removeEventListener('resize', updateViewport);
       document.documentElement.style.removeProperty('--rc-visual-height');
       document.documentElement.style.removeProperty('--rc-visual-offset');
+      document.documentElement.classList.remove('rc-keyboard-open');
     };
   }, []);
 
@@ -402,6 +407,28 @@ export default function Home() {
     setShowEmojiPicker(false);
   }
 
+  const scrollChatToLatest = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const el = chatMessagesRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+    setShowScrollToLatest(false);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedConversation || chatMessages.length === 0) {
+      setShowScrollToLatest(false);
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => scrollChatToLatest('smooth'));
+    return () => window.cancelAnimationFrame(frame);
+  }, [chatMessages, selectedConversation?.id, scrollChatToLatest]);
+
+  function handleChatScroll() {
+    const el = chatMessagesRef.current;
+    if (!el) return;
+    setShowScrollToLatest(el.scrollHeight - el.scrollTop - el.clientHeight > 100);
+  }
+
   useEffect(() => { if (userId) void loadConversations(); }, [userId, loadConversations]);
   useEffect(() => {
     if (!supabase || !userId || !selectedConversation) { setChatMessages([]); return; }
@@ -476,7 +503,7 @@ export default function Home() {
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
-          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar">{selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
+          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar">{selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div ref={chatMessagesRef} onScroll={handleChatScroll} className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
           const mine = message.sender_id === userId;
           const groupChat = selectedConversation.kind === 'group';
           const senderName = mine ? 'You' : `@${message.sender_nickname || 'Member'}`;
@@ -489,7 +516,7 @@ export default function Home() {
             </div>
             {mine && !groupChat && <span className="rc-message-avatar">{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt=""/> : (message.sender_nickname?.[0] || 'Y').toUpperCase()}</span>}
           </div>;
-        })}</div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendDraft();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); setShowEmojiPicker(false); }} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+        })}</div>{showScrollToLatest && <button type="button" className="rc-scroll-latest" onClick={() => scrollChatToLatest('smooth')} aria-label="Scroll to latest message" title="Latest message"><ArrowDown size={20}/></button>}<div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendDraft();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); setShowEmojiPicker(false); }} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 

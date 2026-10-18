@@ -68,3 +68,14 @@
   .rc-messages-layout.has-chat .rc-chat-empty{flex:1 1 auto!important;min-height:0!important;}
   .rc-messages-layout.has-chat .rc-composer-wrap{position:relative!important;bottom:auto!important;flex-shrink:0!important;}
 }
+
+
+/* When the mobile keyboard opens, hide the app brand header and let the chat title sit at the top. */
+@media(max-width:800px){
+  html.rc-keyboard-open .rc-mobile-header{transform:translateY(-110%);margin-bottom:-76px;visibility:hidden;pointer-events:none;}
+  html.rc-keyboard-open .rc-messages-layout.has-chat{top:0!important;inset:0 0 0!important;height:var(--rc-visual-height,100dvh)!important;max-height:var(--rc-visual-height,100dvh)!important;}
+  html.rc-keyboard-open .rc-messages-layout.has-chat .rc-chat-header{position:sticky!important;top:0!important;z-index:8!important;background:var(--rc-bg)!important;}
+}
+.rc-chat-panel{position:relative!important;}
+.rc-scroll-latest{position:absolute;right:16px;bottom:78px;z-index:9;width:42px;height:42px;display:grid;place-items:center;border:1px solid #34415d;border-radius:50%;background:#0866ff;color:#fff;box-shadow:0 6px 20px #0007;}
+.rc-scroll-latest:active{transform:scale(.96)}
