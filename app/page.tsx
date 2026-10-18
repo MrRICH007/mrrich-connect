@@ -20,6 +20,7 @@ type Profile = {
   total_online_seconds: number;
 };
 type CommunityGroup = { id: string; name: string };
+type IncomingRequest = { id: string; sender_id: string; created_at: string; sender_nickname: string };
 type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string };
 
 const NAV_ITEMS = [
@@ -42,6 +43,8 @@ export default function Home() {
   const [status, setStatus] = useState('');
   const [tab, setTab] = useState('Messages');
   const [requests, setRequests] = useState(0);
+  const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([]);
+  const [requestBusy, setRequestBusy] = useState<string | null>(null);
   const [groups, setGroups] = useState<CommunityGroup[]>([]);
   const [groupName, setGroupName] = useState('');
   const [profileForm, setProfileForm] = useState({ nickname: '', level: '', college: '', school: '' });
@@ -67,6 +70,58 @@ export default function Home() {
     const { data: grp } = await supabase.from('groups').select('id,name').limit(30);
     if (grp) setGroups(grp as CommunityGroup[]);
   }, [supabase, userId]);
+
+  const loadIncomingRequests = useCallback(async () => {
+    if (!supabase || !userId) { setIncomingRequests([]); return; }
+    const { data: rows, error } = await supabase.from('message_requests')
+      .select('id,sender_id,created_at')
+      .eq('recipient_id', userId).eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) {
+      setStatus(`Could not load message requests: ${error.message}`);
+      return;
+    }
+    const pending = rows ?? [];
+    setRequests(pending.length);
+    if (pending.length === 0) { setIncomingRequests([]); return; }
+    const senderIds = [...new Set(pending.map((r: { sender_id: string }) => r.sender_id))];
+    const { data: senders, error: profileError } = await supabase.from('profiles')
+      .select('id,nickname').in('id', senderIds);
+    if (profileError) {
+      setStatus(`Requests loaded, but sender profiles could not be read: ${profileError.message}`);
+    }
+    const nicknameById = new Map((senders ?? []).map((p: { id: string; nickname: string }) => [p.id, p.nickname]));
+    setIncomingRequests(pending.map((r: { id: string; sender_id: string; created_at: string }) => ({
+      ...r, sender_nickname: nicknameById.get(r.sender_id) || 'Community member'
+    })));
+  }, [supabase, userId]);
+
+  async function respondToRequest(requestId: string, action: 'accept' | 'decline') {
+    if (!supabase) return;
+    setRequestBusy(requestId);
+    const rpcName = action === 'accept' ? 'accept_message_request' : 'decline_message_request';
+    const { data, error } = await supabase.rpc(rpcName, { p_request_id: requestId });
+    setRequestBusy(null);
+    if (error) {
+      setStatus(`Could not ${action} request: ${error.message}`);
+      return;
+    }
+    if (action === 'accept') {
+      const conversationId = typeof data === 'string' ? data : data?.id;
+      const request = incomingRequests.find(r => r.id === requestId);
+      if (conversationId) setSelectedConversation({ id: conversationId, title: request?.sender_nickname || 'Private chat', kind: 'person' });
+      setTab('Messages');
+      setStatus('Request accepted. The private conversation is ready, but message storage still needs to be connected.');
+    } else {
+      setStatus('Message request declined.');
+    }
+    await loadIncomingRequests();
+    await refreshCommunity();
+  }
+
+  useEffect(() => {
+    if (userId && tab === 'Requests') void loadIncomingRequests();
+  }, [userId, tab, loadIncomingRequests]);
 
   const loadProfile = useCallback(async (id: string) => {
     if (!supabase) return;
@@ -214,7 +269,8 @@ export default function Home() {
 
       {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <button className="rc-group-row" key={g.id} onClick={() => { setSelectedConversation({id:g.id,title:g.name,kind:'group'}); setTab('Messages'); }}><span className="rc-group-icon"><Hash size={22}/></span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
 
-      {tab === 'Requests' && <section className="rc-content-section"><div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>Message requests will appear here. Accepting one will allow a private chat.</p><button className="rc-secondary" onClick={() => void refreshCommunity()}><RefreshCw size={15}/> Refresh requests</button></div></section>}
+      {tab === 'Requests' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Message requests</h2><p>Accept a request to open a private conversation.</p></div><button className="rc-text-btn" onClick={() => void loadIncomingRequests()}><RefreshCw size={14}/> Refresh</button></div>
+        {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card" key={request.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><span className="rc-eyebrow">MESSAGE REQUEST</span></div><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation with you.</p><small>{new Date(request.created_at).toLocaleDateString()}</small><div className="rc-person-footer"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p><button className="rc-secondary" onClick={() => void loadIncomingRequests()}><RefreshCw size={15}/> Refresh requests</button></div>}</section>}
 
       {tab === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><div className="rc-profile-avatar">{nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}</div><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}</section>}
     </>}
