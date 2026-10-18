@@ -22,6 +22,7 @@ type Profile = {
 type CommunityGroup = { id: string; name: string };
 type IncomingRequest = { id: string; sender_id: string; created_at: string; sender_nickname: string };
 type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string };
+type ChatMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
 
 const NAV_ITEMS = [
   { name: 'Messages', icon: MessageCircle, hint: 'Your Conversations Will Appear Here.' },
@@ -53,6 +54,9 @@ export default function Home() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [showGroup, setShowGroup] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [conversationList, setConversationList] = useState<Conversation[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [draftMessage, setDraftMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [authReady, setAuthReady] = useState(false);
@@ -109,7 +113,7 @@ export default function Home() {
     if (action === 'accept') {
       const conversationId = typeof data === 'string' ? data : data?.id;
       const request = incomingRequests.find(r => r.id === requestId);
-      if (conversationId) setSelectedConversation({ id: conversationId, title: request?.sender_nickname || 'Private chat', kind: 'person' });
+      if (conversationId) { const convo = { id: conversationId, title: request?.sender_nickname || 'Private chat', kind: 'person' as const }; setSelectedConversation(convo); setConversationList(old => [convo, ...old.filter(c => c.id !== conversationId)]); }
       setTab('Messages');
       setStatus('Request accepted. The private conversation is ready, but message storage still needs to be connected.');
     } else {
@@ -213,11 +217,58 @@ export default function Home() {
     await supabase.from('group_members').insert({ group_id: data.id, user_id: userId, role: 'owner' });
     setGroups(old => [data as CommunityGroup, ...old]); setGroupName(''); setShowGroup(false); setStatus('Group created.');
   }
-  function sendDraft() {
-    if (!selectedConversation) return;
-    // Conversation/message tables and membership policies must be connected before sending is enabled.
-    setStatus('Messaging storage is not connected yet. Your message has not been sent.');
+  const loadConversations = useCallback(async () => {
+    if (!supabase || !userId) { setConversationList([]); return; }
+    const { data: memberships, error: memberError } = await supabase.from('conversation_members')
+      .select('conversation_id').eq('user_id', userId);
+    if (memberError) { setStatus(`Could not load conversations: ${memberError.message}`); return; }
+    const ids = [...new Set((memberships ?? []).map((m: { conversation_id: string }) => m.conversation_id))];
+    if (!ids.length) { setConversationList([]); return; }
+    const { data: convs, error: convError } = await supabase.from('conversations')
+      .select('id,title,kind').in('id', ids);
+    if (convError) { setStatus(`Could not load conversations: ${convError.message}`); return; }
+    const mapped: Conversation[] = (convs ?? []).map((c: { id: string; title: string | null; kind: string }) => ({
+      id: c.id, title: c.title || (c.kind === 'group' ? 'Group chat' : 'Private chat'),
+      kind: c.kind === 'group' ? 'group' : 'person'
+    }));
+    setConversationList(mapped);
+  }, [supabase, userId]);
+
+  const loadChatMessages = useCallback(async (conversationId: string) => {
+    if (!supabase || !userId) return;
+    const { data, error } = await supabase.from('messages')
+      .select('id,conversation_id,sender_id,body,created_at')
+      .eq('conversation_id', conversationId).is('deleted_at', null)
+      .order('created_at', { ascending: true }).limit(200);
+    if (error) { setStatus(`Could not load messages: ${error.message}`); return; }
+    setChatMessages((data ?? []) as ChatMessage[]);
+  }, [supabase, userId]);
+
+  async function sendDraft() {
+    const body = draftMessage.trim();
+    if (!supabase || !userId || !selectedConversation || !body || sendingMessage) return;
+    setSendingMessage(true);
+    const { data, error } = await supabase.from('messages').insert({
+      conversation_id: selectedConversation.id, sender_id: userId, body
+    }).select('id,conversation_id,sender_id,body,created_at').single();
+    setSendingMessage(false);
+    if (error) { setStatus(`Message not sent: ${error.message}`); return; }
+    setChatMessages(old => [...old, data as ChatMessage]);
+    setDraftMessage('');
+    setShowEmojiPicker(false);
   }
+
+  useEffect(() => { if (userId) void loadConversations(); }, [userId, loadConversations]);
+  useEffect(() => {
+    if (!supabase || !userId || !selectedConversation) { setChatMessages([]); return; }
+    void loadChatMessages(selectedConversation.id);
+    const channel = supabase.channel(`messages-${selectedConversation.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConversation.id}` }, payload => {
+        const incoming = payload.new as ChatMessage;
+        setChatMessages(old => old.some(m => m.id === incoming.id) ? old : [...old, incoming]);
+      }).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [supabase, userId, selectedConversation?.id, loadChatMessages]);
   function openProfileEditor() {
     if (!userId) { setStatus('Sign in to create your profile.'); return; }
     setEditingProfile(profileExists);
@@ -253,12 +304,11 @@ export default function Home() {
 
       {tab === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''}`}>
         <aside className="rc-conversation-list"><div className="rc-list-heading"><div><h2>Conversations</h2><p>Private and group chats</p></div></div>
-          {/* Conversation records will appear here when the conversations table and membership query are connected. */}
-          {!selectedConversation && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Connect with someone or join a group to start a conversation.</p></div>}
-          {selectedConversation && <button className="rc-conversation-row active" onClick={() => setSelectedConversation(selectedConversation)}><span className="rc-conversation-avatar"><MessageCircle size={20}/></span><span><strong>{selectedConversation.title}</strong><small>{selectedConversation.subtitle || 'Conversation'}</small></span></button>}
+          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => setSelectedConversation(convo)}><span className="rc-conversation-avatar"><MessageCircle size={20}/></span><span><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span></button>)}
+          {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
-          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar"><MessageCircle size={20}/></div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div className="rc-chat-empty"><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Messages will appear here once messaging storage is connected.</p></div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={sendDraft} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar"><MessageCircle size={20}/></div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => <div key={message.id} style={{alignSelf: message.sender_id === userId ? 'flex-end' : 'flex-start', maxWidth:'82%', padding:'10px 13px', borderRadius:'14px', background: message.sender_id === userId ? '#174ea6' : '#202938', color:'#fff', overflowWrap:'anywhere'}}><div>{message.body}</div><small style={{opacity:.7, fontSize:'11px'}}>{new Date(message.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small></div>)}</div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendDraft();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
