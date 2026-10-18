@@ -86,3 +86,5 @@
 .rc-chat-header-avatar{width:42px;height:42px;flex:0 0 42px;}
 /* Keep sent bubbles on the right, but align the message content to the left inside them. */
 .rc-message-mine .rc-message-body{text-align:left!important;align-self:stretch!important;width:100%;}
+/* Keep received message text left-aligned inside its bubble in both private and group chats. */
+.rc-message-other .rc-message-body{text-align:left!important;align-self:stretch!important;width:100%!important;}
