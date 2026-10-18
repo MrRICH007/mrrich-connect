@@ -48,6 +48,7 @@ export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [status, setStatus] = useState('');
+  const [statusType, setStatusType] = useState<'success' | 'error' | 'info'>('info');
   const [tab, setTab] = useState('Messages');
   const [requests, setRequests] = useState(0);
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([]);
@@ -67,6 +68,37 @@ export default function Home() {
   const [draftMessage, setDraftMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  useEffect(() => {
+    if (!status) return;
+    const lower = status.toLowerCase();
+    setStatusType(/could not|error|failed|not sent|unable|denied|invalid|need to|must |can't|cannot/.test(lower) ? 'error' : /success|sent\.|saved\.|created\.|accepted\.|signed in|submitted\./.test(lower) ? 'success' : 'info');
+    const timer = window.setTimeout(() => setStatus(''), 4200);
+    return () => window.clearTimeout(timer);
+  }, [status]);
+
+  async function uploadAvatar(file?: File) {
+    if (!file || !supabase || !userId) return;
+    if (!file.type.startsWith('image/')) { setStatus('Choose an image file for your avatar.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setStatus('Avatar images must be 5 MB or smaller.'); return; }
+    setAvatarUploading(true);
+    const extension = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
+    const path = `${userId}/${Date.now()}.${extension}`;
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+    if (error) { setAvatarUploading(false); setStatus(`Avatar upload failed: ${error.message}. Create a public Supabase Storage bucket named avatars and allow signed-in users to upload to their own folder.`); return; }
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+    setProfileForm(old => ({ ...old, avatar_url: data.publicUrl }));
+    setAvatarUploading(false);
+    setStatus('Avatar uploaded. Save your profile to publish it.');
+  }
+
+  function nicknameColor(id: string) {
+    const palette = ['#7dd3fc', '#f9a8d4', '#c4b5fd', '#86efac', '#fcd34d', '#fda4af', '#a5b4fc', '#67e8f9', '#fdba74', '#d9f99d'];
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+    return palette[hash % palette.length];
+  }
 
   const refreshCommunity = useCallback(async () => {
     if (!supabase) return;
@@ -371,7 +403,7 @@ export default function Home() {
       </div>
 
       {!configured && <div className="rc-notice"><ShieldCheck size={18}/><span>Supabase is not configured. Add your project URL and public key to your Render environment variables.</span></div>}
-      {status && <div className="rc-status" role="status">{status}<button aria-label="Dismiss notice" onClick={() => setStatus('')}><X size={14}/></button></div>}
+      {status && <div className={`rc-toast rc-toast-${statusType}`} role={statusType === 'error' ? 'alert' : 'status'}>{status}<button aria-label="Dismiss notice" onClick={() => setStatus('')}><X size={14}/></button></div>}
 
       {tab === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''}`}>
         <aside className="rc-conversation-list"><div className="rc-list-heading"><div><h2>Conversations</h2><p>Private and group chats</p></div></div>
@@ -379,14 +411,20 @@ export default function Home() {
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
-          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar">{selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => <div key={message.id} style={{alignSelf: message.sender_id === userId ? 'flex-end' : 'flex-start', display:'flex',alignItems:'flex-end',gap:8,maxWidth:'90%'}}>
-          {message.sender_id !== userId && <span style={{width:30,height:30,flex:'0 0 30px',borderRadius:'50%',overflow:'hidden',display:'grid',placeItems:'center',background:'#263c59',fontSize:12,fontWeight:700}}>{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : (message.sender_nickname?.[0] || 'M').toUpperCase()}</span>}
-          <div style={{maxWidth:'100%',padding:'10px 13px',borderRadius:14,background:message.sender_id === userId ? '#174ea6' : '#202938',color:'#fff',overflowWrap:'anywhere'}}>
-            {selectedConversation.kind === 'group' && <strong style={{display:'block',fontSize:12,marginBottom:4,color:'#9fc5ff'}}>{message.sender_id === userId ? 'You' : `@${message.sender_nickname || 'Member'}`}</strong>}
-            <div>{message.body}</div><small style={{opacity:.7,fontSize:11}}>{new Date(message.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small>
-          </div>
-          {message.sender_id === userId && <span style={{width:30,height:30,flex:'0 0 30px',borderRadius:'50%',overflow:'hidden',display:'grid',placeItems:'center',background:'#263c59',fontSize:12,fontWeight:700}}>{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : (message.sender_nickname?.[0] || 'Y').toUpperCase()}</span>}
-        </div>)}</div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendDraft();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar">{selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
+          const mine = message.sender_id === userId;
+          const groupChat = selectedConversation.kind === 'group';
+          const senderName = mine ? 'You' : `@${message.sender_nickname || 'Member'}`;
+          return <div key={message.id} className={`rc-message-row ${mine ? 'rc-message-mine' : 'rc-message-other'} ${groupChat ? 'rc-message-group' : 'rc-message-private'}`}>
+            {!mine && <span className="rc-message-avatar">{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt=""/> : (message.sender_nickname?.[0] || 'M').toUpperCase()}</span>}
+            <div className={`rc-message-bubble ${mine ? 'mine' : 'other'}`}>
+              {groupChat && <strong className="rc-message-sender" style={{color: mine ? '#ffffff' : nicknameColor(message.sender_id)}}>{senderName}</strong>}
+              <div className="rc-message-body">{message.body}</div>
+              <small className="rc-message-time">{new Date(message.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small>
+            </div>
+            {mine && !groupChat && <span className="rc-message-avatar">{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt=""/> : (message.sender_nickname?.[0] || 'Y').toUpperCase()}</span>}
+          </div>;
+        })}</div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendDraft();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -402,7 +440,7 @@ export default function Home() {
       {tab === 'Requests' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Message requests</h2><p>Accept a request to open a private conversation.</p></div><button className="rc-text-btn" onClick={() => void loadIncomingRequests()}><RefreshCw size={14}/> Refresh</button></div>
         {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card" key={request.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><span className="rc-eyebrow">MESSAGE REQUEST</span></div><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation with you.</p><small>{new Date(request.created_at).toLocaleDateString()}</small><div className="rc-person-footer"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p><button className="rc-secondary" onClick={() => void loadIncomingRequests()}><RefreshCw size={15}/> Refresh requests</button></div>}</section>}
 
-      {tab === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><div className="rc-profile-avatar">{nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}</div><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}</section>}
+      {tab === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><div className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}</div><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}</section>}
     </>}
 
     <footer className="rc-footer"><span>© {new Date().getFullYear()} MR RICH CONNECT</span><span><ShieldCheck size={13}/> Your campus. Your community.</span></footer>
@@ -411,7 +449,7 @@ export default function Home() {
 
     {showProfile && <div className="rc-modal-backdrop" onClick={() => { setShowProfile(false); setEditingProfile(false); }}><form className="rc-modal" onSubmit={saveProfile} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => { setShowProfile(false); setEditingProfile(false); }} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">YOUR PUBLIC IDENTITY</span><h2>{editingProfile ? 'Edit profile' : 'Create your profile'}</h2><p className="rc-muted">Public details are visible to members. Private details are only readable by your own account.</p><label>Nickname<input required maxLength={24} value={profileForm.nickname} onChange={e => setProfileForm({...profileForm, nickname:e.target.value})} placeholder="@yournickname"/></label><label>Level<input value={profileForm.level} onChange={e => setProfileForm({...profileForm, level:e.target.value})} placeholder="e.g. 200 level"/></label><label>College<input value={profileForm.college} onChange={e => setProfileForm({...profileForm, college:e.target.value})} placeholder="Your college"/></label><label>School<input value={profileForm.school} onChange={e => setProfileForm({...profileForm, school:e.target.value})} placeholder="Your school or university"/></label>
 <label>Department<input value={profileForm.department} onChange={e => setProfileForm({...profileForm, department:e.target.value})} placeholder="Your department"/></label>
-<label>Profile photo URL (optional)<input type="url" value={profileForm.avatar_url} onChange={e => setProfileForm({...profileForm, avatar_url:e.target.value})} placeholder="https://..."/></label>
+<label>Profile avatar (optional)<input type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label>{avatarUploading && <p className="rc-muted">Uploading avatar…</p>}{profileForm.avatar_url && <div className="rc-avatar-preview"><img src={profileForm.avatar_url} alt="Avatar preview"/><button type="button" className="rc-secondary" onClick={() => setProfileForm({...profileForm,avatar_url:''})}>Remove photo</button></div>}<label>Or paste a profile photo URL<input type="url" value={profileForm.avatar_url} onChange={e => setProfileForm({...profileForm,avatar_url:e.target.value})} placeholder="https://..."/></label>
 <label>About me (public)<textarea value={profileForm.bio} onChange={e => setProfileForm({...profileForm, bio:e.target.value})} placeholder="Short introduction"/></label>
 <h3>Private information — only you can read this</h3>
 <label>Full name<input value={profileForm.full_name} onChange={e => setProfileForm({...profileForm, full_name:e.target.value})} placeholder="Your real name"/></label>
