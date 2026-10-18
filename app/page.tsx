@@ -17,11 +17,13 @@ type Profile = {
   school: string | null;
   avatar_url: string | null;
   premium_status: string;
+  premium_title?: string | null;
   total_online_seconds: number;
 };
-type CommunityGroup = { id: string; name: string };
+type CommunityGroup = { id: string; name: string; conversation_id?: string | null };
+type AdCampaign = { id: string; title: string; media_type: 'image' | 'video'; media_path: string; target_url: string | null; expires_at: string };
 type IncomingRequest = { id: string; sender_id: string; created_at: string; sender_nickname: string };
-type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string };
+type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string; otherUserId?: string };
 type ChatMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
 
 const NAV_ITEMS = [
@@ -47,6 +49,7 @@ export default function Home() {
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([]);
   const [requestBusy, setRequestBusy] = useState<string | null>(null);
   const [groups, setGroups] = useState<CommunityGroup[]>([]);
+  const [activeAds, setActiveAds] = useState<AdCampaign[]>([]);
   const [groupName, setGroupName] = useState('');
   const [profileForm, setProfileForm] = useState({ nickname: '', level: '', college: '', school: '' });
   const [profileExists, setProfileExists] = useState(false);
@@ -64,15 +67,17 @@ export default function Home() {
   const refreshCommunity = useCallback(async () => {
     if (!supabase) return;
     const { data } = await supabase.from('profiles')
-      .select('id,nickname,level,college,school,avatar_url,premium_status,total_online_seconds').limit(60);
+      .select('id,nickname,level,college,school,avatar_url,premium_status,premium_title,total_online_seconds').limit(60);
     if (data) setProfiles(data as Profile[]);
     if (userId) {
       const { data: req } = await supabase.from('message_requests').select('id')
         .eq('recipient_id', userId).eq('status', 'pending');
       setRequests(req?.length ?? 0);
     }
-    const { data: grp } = await supabase.from('groups').select('id,name').limit(30);
+    const { data: grp } = await supabase.from('groups').select('id,name,conversation_id').limit(30);
     if (grp) setGroups(grp as CommunityGroup[]);
+    const { data: ads } = await supabase.from('ad_campaigns').select('id,title,media_type,media_path,target_url,expires_at').eq('is_enabled', true).lte('starts_at', new Date().toISOString()).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(5);
+    if (ads) setActiveAds(ads as AdCampaign[]);
   }, [supabase, userId]);
 
   const loadIncomingRequests = useCallback(async () => {
@@ -113,7 +118,7 @@ export default function Home() {
     if (action === 'accept') {
       const conversationId = typeof data === 'string' ? data : data?.id;
       const request = incomingRequests.find(r => r.id === requestId);
-      if (conversationId) { const convo = { id: conversationId, title: request?.sender_nickname || 'Private chat', kind: 'person' as const }; setSelectedConversation(convo); setConversationList(old => [convo, ...old.filter(c => c.id !== conversationId)]); }
+      if (conversationId) { const convo = { id: conversationId, title: request?.sender_nickname ? `@${request.sender_nickname}` : 'Private chat', kind: 'person' as const }; setSelectedConversation(convo); setConversationList(old => [convo, ...old.filter(c => c.id !== conversationId)]); }
       setTab('Messages');
       setStatus('Request accepted. The private conversation is ready, but message storage still needs to be connected.');
     } else {
@@ -130,7 +135,7 @@ export default function Home() {
   const loadProfile = useCallback(async (id: string) => {
     if (!supabase) return;
     const { data, error } = await supabase.from('profiles')
-      .select('id,nickname,level,college,school,avatar_url,premium_status,total_online_seconds')
+      .select('id,nickname,level,college,school,avatar_url,premium_status,premium_title,total_online_seconds')
       .eq('id', id).maybeSingle();
     if (error) {
       setStatus('Your account is signed in, but the profiles table or its access policies need to be configured.');
@@ -171,7 +176,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!supabase || !userId) return;
-    const channel = supabase.channel(`online-presence-${userId}`, { config: { presence: { key: userId } } });
+    const channel = supabase.channel('mrrich-community-presence', { config: { presence: { key: userId } } });
     channel.on('presence', { event: 'sync' }, () => setOnlineCount(Object.keys(channel.presenceState()).length));
     channel.subscribe(async state => {
       if (state === 'SUBSCRIBED') await channel.track({ online_at: new Date().toISOString() });
@@ -212,10 +217,12 @@ export default function Home() {
   async function createGroup(e: FormEvent) {
     e.preventDefault();
     if (!supabase || !userId || !groupName.trim()) return;
-    const { data, error } = await supabase.from('groups').insert({ name: groupName.trim(), created_by: userId }).select('id,name').single();
-    if (error) { setStatus(error.message); return; }
-    await supabase.from('group_members').insert({ group_id: data.id, user_id: userId, role: 'owner' });
-    setGroups(old => [data as CommunityGroup, ...old]); setGroupName(''); setShowGroup(false); setStatus('Group created.');
+    const { data: groupId, error } = await supabase.rpc('create_group_with_conversation', { p_name: groupName.trim(), p_description: null });
+    if (error) { setStatus(`Could not create group: ${error.message}. Run the feature bundle SQL migration first.`); return; }
+    const { data } = await supabase.from('groups').select('id,name,conversation_id').eq('id', groupId).single();
+    if (data) setGroups(old => [data as CommunityGroup, ...old]);
+    setGroupName(''); setShowGroup(false); setStatus('Group and group chat created.');
+    await loadConversations();
   }
   const loadConversations = useCallback(async () => {
     if (!supabase || !userId) { setConversationList([]); return; }
@@ -227,11 +234,33 @@ export default function Home() {
     const { data: convs, error: convError } = await supabase.from('conversations')
       .select('id,title,kind').in('id', ids);
     if (convError) { setStatus(`Could not load conversations: ${convError.message}`); return; }
-    const mapped: Conversation[] = (convs ?? []).map((c: { id: string; title: string | null; kind: string }) => ({
-      id: c.id, title: c.title || (c.kind === 'group' ? 'Group chat' : 'Private chat'),
-      kind: c.kind === 'group' ? 'group' : 'person'
-    }));
+
+    // Find the other member of each private conversation so the UI can show their nickname.
+    const { data: allMembers, error: membersError } = await supabase.from('conversation_members')
+      .select('conversation_id,user_id').in('conversation_id', ids);
+    if (membersError) { setStatus(`Could not load conversation members: ${membersError.message}`); return; }
+    const privateOtherIds = [...new Set((allMembers ?? [])
+      .filter((m: { conversation_id: string; user_id: string }) => m.user_id !== userId)
+      .map((m: { conversation_id: string; user_id: string }) => m.user_id))];
+    let nicknameById = new Map<string, string>();
+    if (privateOtherIds.length) {
+      const { data: otherProfiles, error: otherProfileError } = await supabase.from('profiles')
+        .select('id,nickname').in('id', privateOtherIds);
+      if (otherProfileError) setStatus(`Chats loaded, but some participant names could not be read: ${otherProfileError.message}`);
+      nicknameById = new Map((otherProfiles ?? []).map((p: { id: string; nickname: string }) => [p.id, p.nickname]));
+    }
+    const mapped: Conversation[] = (convs ?? []).map((c: { id: string; title: string | null; kind: string }) => {
+      const other = (allMembers ?? []).find((m: { conversation_id: string; user_id: string }) => m.conversation_id === c.id && m.user_id !== userId);
+      const isGroup = c.kind === 'group';
+      return {
+        id: c.id,
+        title: isGroup ? (c.title || 'Group chat') : (nicknameById.get(other?.user_id ?? '') ? `@${nicknameById.get(other?.user_id ?? '')}` : (c.title && !['Private chat', 'Private conversation'].includes(c.title) ? c.title : 'Private chat')),
+        kind: isGroup ? 'group' : 'person',
+        otherUserId: other?.user_id
+      };
+    });
     setConversationList(mapped);
+    setSelectedConversation(current => current ? (mapped.find(c => c.id === current.id) ?? current) : null);
   }, [supabase, userId]);
 
   const loadChatMessages = useCallback(async (conversationId: string) => {
@@ -313,11 +342,13 @@ export default function Home() {
       </section>}
 
       {tab === 'Discover' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>People you may know</h2><p>Connect with members from your community.</p></div><button className="rc-text-btn" onClick={() => void refreshCommunity()}>Refresh <RefreshCw size={14}/></button></div>
-        <div className="rc-people-grid">{profiles.filter(p => p.id !== userId).map(p => <article className="rc-person-card" key={p.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div>{p.premium_status === 'active' && <span className="rc-premium-badge"><Crown size={12}/> PREMIUM</span>}</div><h3>@{p.nickname}</h3><p>{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor((p.total_online_seconds || 0) / 3600)}h online</span><button className="rc-primary rc-connect" onClick={() => void sendRequest(p.id)}>Connect <Plus size={15}/></button></div></article>)}</div>
+        {activeAds.length > 0 && <section className="rc-ad-feed" aria-label="Sponsored community announcements"><div className="rc-section-title"><div><h2>Community spotlight</h2><p>Promotions and announcements</p></div></div><div className="rc-people-grid">{activeAds.map(ad => <article className="rc-person-card rc-ad-card" key={ad.id}><span className="rc-eyebrow">SPONSORED</span><h3>{ad.title}</h3>{ad.media_type === 'image' ? <img src={ad.media_path} alt={ad.title} style={{width:'100%',maxHeight:220,objectFit:'cover',borderRadius:12}}/> : <video src={ad.media_path} controls playsInline style={{width:'100%',maxHeight:220,borderRadius:12}}/>}{ad.target_url && <a href={ad.target_url} target="_blank" rel="noreferrer" className="rc-primary">Learn more</a>}<small>Expires {new Date(ad.expires_at).toLocaleDateString()}</small></article>)}</div></section>}
+        {profiles.length > 0 && <section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{[...profiles].sort((a,b)=>(b.total_online_seconds||0)-(a.total_online_seconds||0)).slice(0,5).map((p,i)=><div className="rc-group-row" key={p.id}><span className="rc-group-icon">#{i+1}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small>{p.premium_status === 'active' && p.premium_title ? p.premium_title : 'Community member'}</small></span><span className="rc-arrow">{Math.floor((p.total_online_seconds||0)/3600)}h</span></div>)}</div></section>}
+        <div className="rc-people-grid">{profiles.filter(p => p.id !== userId).map(p => <article className="rc-person-card" key={p.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div>{p.premium_status === 'active' && <span className="rc-premium-badge"><Crown size={12}/> PREMIUM</span>}</div><h3>@{p.nickname}</h3>{p.premium_status === 'active' && p.premium_title && <p className="rc-premium-title">{p.premium_title}</p>}<p>{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor((p.total_online_seconds || 0) / 3600)}h online</span><button className="rc-primary rc-connect" onClick={() => void sendRequest(p.id)}>Connect <Plus size={15}/></button></div></article>)}</div>
         {profiles.filter(p => p.id !== userId).length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No people to show yet</h2><p>New members will appear here when they create a profile.</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}</div>}
       </section>}
 
-      {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <button className="rc-group-row" key={g.id} onClick={() => { setSelectedConversation({id:g.id,title:g.name,kind:'group'}); setTab('Messages'); }}><span className="rc-group-icon"><Hash size={22}/></span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
+      {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <button className="rc-group-row" key={g.id} onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon"><Hash size={22}/></span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
 
       {tab === 'Requests' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Message requests</h2><p>Accept a request to open a private conversation.</p></div><button className="rc-text-btn" onClick={() => void loadIncomingRequests()}><RefreshCw size={14}/> Refresh</button></div>
         {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card" key={request.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><span className="rc-eyebrow">MESSAGE REQUEST</span></div><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation with you.</p><small>{new Date(request.created_at).toLocaleDateString()}</small><div className="rc-person-footer"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p><button className="rc-secondary" onClick={() => void loadIncomingRequests()}><RefreshCw size={15}/> Refresh requests</button></div>}</section>}
