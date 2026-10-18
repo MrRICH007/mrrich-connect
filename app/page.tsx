@@ -19,12 +19,14 @@ type Profile = {
   premium_status: string;
   premium_title?: string | null;
   total_online_seconds: number;
+  bio?: string | null;
+  department?: string | null;
 };
 type CommunityGroup = { id: string; name: string; conversation_id?: string | null };
 type AdCampaign = { id: string; title: string; media_type: 'image' | 'video'; media_path: string; target_url: string | null; expires_at: string };
 type IncomingRequest = { id: string; sender_id: string; created_at: string; sender_nickname: string };
 type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string; otherUserId?: string };
-type ChatMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
+type ChatMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; sender_nickname?: string; sender_avatar_url?: string | null };
 
 const NAV_ITEMS = [
   { name: 'Messages', icon: MessageCircle, hint: 'Your Conversations Will Appear Here.' },
@@ -39,6 +41,8 @@ export default function Home() {
   const [supabase] = useState(() => { try { return createClient(); } catch { return null; } });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [registration, setRegistration] = useState({ nickname: '', full_name: '', phone: '', department: '', level: '', college: '', school: '', bio: '' });
   const [userId, setUserId] = useState<string | null>(null);
   const [nickname, setNickname] = useState('');
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -51,7 +55,7 @@ export default function Home() {
   const [groups, setGroups] = useState<CommunityGroup[]>([]);
   const [activeAds, setActiveAds] = useState<AdCampaign[]>([]);
   const [groupName, setGroupName] = useState('');
-  const [profileForm, setProfileForm] = useState({ nickname: '', level: '', college: '', school: '' });
+  const [profileForm, setProfileForm] = useState({ nickname: '', level: '', college: '', school: '', department: '', bio: '', avatar_url: '', full_name: '', phone: '' });
   const [profileExists, setProfileExists] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -67,7 +71,7 @@ export default function Home() {
   const refreshCommunity = useCallback(async () => {
     if (!supabase) return;
     const { data } = await supabase.from('profiles')
-      .select('id,nickname,level,college,school,avatar_url,premium_status,premium_title,total_online_seconds').limit(60);
+      .select('id,nickname,level,college,school,department,bio,avatar_url,premium_status,premium_title,total_online_seconds').limit(60);
     if (data) setProfiles(data as Profile[]);
     if (userId) {
       const { data: req } = await supabase.from('message_requests').select('id')
@@ -135,7 +139,7 @@ export default function Home() {
   const loadProfile = useCallback(async (id: string) => {
     if (!supabase) return;
     const { data, error } = await supabase.from('profiles')
-      .select('id,nickname,level,college,school,avatar_url,premium_status,premium_title,total_online_seconds')
+      .select('id,nickname,level,college,school,department,bio,avatar_url,premium_status,premium_title,total_online_seconds')
       .eq('id', id).maybeSingle();
     if (error) {
       setStatus('Your account is signed in, but the profiles table or its access policies need to be configured.');
@@ -145,11 +149,12 @@ export default function Home() {
     if (data) {
       setProfileExists(true);
       setNickname(data.nickname ?? '');
-      setProfileForm({ nickname: data.nickname ?? '', level: data.level ?? '', college: data.college ?? '', school: data.school ?? '' });
+      const { data: privateData } = await supabase.from('private_profiles').select('full_name,phone').eq('user_id', id).maybeSingle();
+      setProfileForm({ nickname: data.nickname ?? '', level: data.level ?? '', college: data.college ?? '', school: data.school ?? '', department: data.department ?? '', bio: data.bio ?? '', avatar_url: data.avatar_url ?? '', full_name: privateData?.full_name ?? '', phone: privateData?.phone ?? '' });
     } else {
       setProfileExists(false);
       setNickname('');
-      setProfileForm({ nickname: '', level: '', college: '', school: '' });
+      setProfileForm({ nickname: '', level: '', college: '', school: '', department: '', bio: '', avatar_url: '', full_name: '', phone: '' });
     }
     await refreshCommunity();
   }, [supabase, refreshCommunity]);
@@ -189,10 +194,16 @@ export default function Home() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setStatus(error ? error.message : 'Signed in successfully.');
   }
-  async function signUp() {
+  async function signUp(e?: FormEvent) {
+    e?.preventDefault();
     if (!supabase) return;
-    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined } });
-    setStatus(error ? error.message : 'Check your email to confirm your registration, then sign in.');
+    if (!registration.nickname.trim() || !registration.full_name.trim()) { setStatus('Enter your nickname and full name to register.'); return; }
+    const { error } = await supabase.auth.signUp({ email, password, options: {
+      emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+      data: { nickname: registration.nickname.trim().replace(/^@/, ''), full_name: registration.full_name.trim(), phone: registration.phone.trim(), department: registration.department.trim(), level: registration.level.trim(), college: registration.college.trim(), school: registration.school.trim(), bio: registration.bio.trim() }
+    }});
+    setStatus(error ? error.message : 'Registration submitted. Confirm your email, then sign in. Run the profile-fields SQL migration so the database creates the separate public and private records.');
+    if (!error) setAuthMode('signin');
   }
   async function signOut() {
     if (supabase) await supabase.auth.signOut();
@@ -203,8 +214,10 @@ export default function Home() {
     if (!supabase || !userId) { setStatus('Sign in before creating a profile.'); return; }
     const clean = profileForm.nickname.trim().replace(/^@/, '');
     if (!clean) { setStatus('Choose a nickname first.'); return; }
-    const { error } = await supabase.from('profiles').upsert({ id: userId, nickname: clean, level: profileForm.level || null, college: profileForm.college || null, school: profileForm.school || null });
+    const { error } = await supabase.from('profiles').upsert({ id: userId, nickname: clean, level: profileForm.level || null, college: profileForm.college || null, school: profileForm.school || null, department: profileForm.department || null, bio: profileForm.bio || null, avatar_url: profileForm.avatar_url || null });
     if (error) { setStatus(error.message); return; }
+    const { error: privateError } = await supabase.from('private_profiles').upsert({ user_id: userId, full_name: profileForm.full_name || null, phone: profileForm.phone || null });
+    if (privateError) { setStatus(`Public profile saved, but private details could not be saved: ${privateError.message}`); return; }
     setProfileExists(true); setNickname(clean); setShowProfile(false); setEditingProfile(false);
     setStatus('Profile saved.');
     await loadProfile(userId);
@@ -270,7 +283,11 @@ export default function Home() {
       .eq('conversation_id', conversationId).is('deleted_at', null)
       .order('created_at', { ascending: true }).limit(200);
     if (error) { setStatus(`Could not load messages: ${error.message}`); return; }
-    setChatMessages((data ?? []) as ChatMessage[]);
+    const rows = (data ?? []) as ChatMessage[];
+    const senderIds = [...new Set(rows.map(m => m.sender_id))];
+    const { data: senderProfiles } = senderIds.length ? await supabase.from('profiles').select('id,nickname,avatar_url').in('id', senderIds) : { data: [] };
+    const senderMap = new Map((senderProfiles ?? []).map((p: {id:string;nickname:string;avatar_url:string|null}) => [p.id, p]));
+    setChatMessages(rows.map(m => ({ ...m, sender_nickname: senderMap.get(m.sender_id)?.nickname || (m.sender_id === userId ? 'You' : 'Member'), sender_avatar_url: senderMap.get(m.sender_id)?.avatar_url || null })));
   }, [supabase, userId]);
 
   async function sendDraft() {
@@ -282,7 +299,8 @@ export default function Home() {
     }).select('id,conversation_id,sender_id,body,created_at').single();
     setSendingMessage(false);
     if (error) { setStatus(`Message not sent: ${error.message}`); return; }
-    setChatMessages(old => [...old, data as ChatMessage]);
+    const { data: sender } = await supabase.from('profiles').select('nickname,avatar_url').eq('id', userId).maybeSingle();
+    setChatMessages(old => [...old, { ...(data as ChatMessage), sender_nickname: sender?.nickname || 'You', sender_avatar_url: sender?.avatar_url || null }]);
     setDraftMessage('');
     setShowEmojiPicker(false);
   }
@@ -294,7 +312,11 @@ export default function Home() {
     const channel = supabase.channel(`messages-${selectedConversation.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConversation.id}` }, payload => {
         const incoming = payload.new as ChatMessage;
-        setChatMessages(old => old.some(m => m.id === incoming.id) ? old : [...old, incoming]);
+        void (async () => {
+          const { data: sender } = await supabase.from('profiles').select('nickname,avatar_url').eq('id', incoming.sender_id).maybeSingle();
+          const enriched = { ...incoming, sender_nickname: sender?.nickname || (incoming.sender_id === userId ? 'You' : 'Member'), sender_avatar_url: sender?.avatar_url || null };
+          setChatMessages(old => old.some(m => m.id === enriched.id) ? old : [...old, enriched]);
+        })();
       }).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [supabase, userId, selectedConversation?.id, loadChatMessages]);
@@ -321,7 +343,27 @@ export default function Home() {
 
     {!userId ? <section className="rc-auth-layout">
       <div className="rc-auth-intro"><span className="rc-eyebrow"><Sparkles size={14}/> YOUR CAMPUS. YOUR COMMUNITY.</span><h1>Find your people.<br/><em>Build your circle.</em></h1><p>Connect with people from your school and community.</p><div className="rc-auth-symbol"><MessageCircle size={58}/><Wifi size={25}/></div></div>
-      <form className="rc-auth-card" onSubmit={signIn}><span className="rc-eyebrow">WELCOME TO THE NETWORK</span><h2>Sign in</h2><p className="rc-muted">Use your email and password to continue.</p><label>Email address<input id="rc-email" type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/></label><label>Password<input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="current-password"/></label><button className="rc-primary rc-full" type="submit"><LogIn size={17}/> Sign in</button><button className="rc-secondary rc-full" type="button" onClick={signUp}>Create an account</button><small className="rc-privacy"><ShieldCheck size={14}/> Your private registration details stay private.</small></form>
+      <form className="rc-auth-card" onSubmit={authMode === 'signin' ? signIn : signUp}>
+        <span className="rc-eyebrow">WELCOME TO THE NETWORK</span><h2>{authMode === 'signin' ? 'Sign in' : 'Create your account'}</h2>
+        <p className="rc-muted">{authMode === 'signin' ? 'Use your email and password to continue.' : 'Public profile details and private information are collected separately.'}</p>
+        {authMode === 'signup' && <>
+          <h3>Public profile</h3>
+          <label>Nickname<input required maxLength={24} value={registration.nickname} onChange={e=>setRegistration({...registration,nickname:e.target.value})} placeholder="@yournickname"/></label>
+          <label>School or university<input value={registration.school} onChange={e=>setRegistration({...registration,school:e.target.value})} placeholder="Your institution"/></label>
+          <label>College / faculty<input value={registration.college} onChange={e=>setRegistration({...registration,college:e.target.value})} placeholder="Your college or faculty"/></label>
+          <label>Department<input value={registration.department} onChange={e=>setRegistration({...registration,department:e.target.value})} placeholder="Your department"/></label>
+          <label>Level<input value={registration.level} onChange={e=>setRegistration({...registration,level:e.target.value})} placeholder="e.g. 200 level"/></label>
+          <label>About me (optional)<textarea value={registration.bio} onChange={e=>setRegistration({...registration,bio:e.target.value})} placeholder="A short public introduction"/></label>
+          <h3>Private information</h3>
+          <label>Full name<input required value={registration.full_name} onChange={e=>setRegistration({...registration,full_name:e.target.value})} placeholder="Your real name" autoComplete="name"/></label>
+          <label>Phone number (optional)<input type="tel" value={registration.phone} onChange={e=>setRegistration({...registration,phone:e.target.value})} placeholder="Private phone number" autoComplete="tel"/></label>
+        </>}
+        <label>Email address<input id="rc-email" type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/></label>
+        <label>Password<input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'}/></label>
+        <button className="rc-primary rc-full" type="submit">{authMode === 'signin' ? <><LogIn size={17}/> Sign in</> : 'Create account'}</button>
+        <button className="rc-secondary rc-full" type="button" onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}>{authMode === 'signin' ? 'Create an account' : 'Already have an account? Sign in'}</button>
+        <small className="rc-privacy"><ShieldCheck size={14}/> Full name and phone are private. Email stays in your authentication account.</small>
+      </form>
     </section> : <>
       <div className="rc-page-heading"><div><span className="rc-eyebrow">{tab === 'Messages' ? 'YOUR INBOX' : tab === 'Discover' ? 'MEET YOUR COMMUNITY' : tab === 'Groups' ? 'YOUR COMMUNITIES' : tab === 'Requests' ? 'NEW CONNECTIONS' : 'YOUR SPACE'}</span><h1>{tab === 'Messages' ? 'Messages' : tab === 'Discover' ? 'Find People Online' : tab === 'Groups' ? 'Find Your Community' : tab === 'Requests' ? 'Message Requests' : 'Your Profile'}</h1></div>
         {tab === 'Groups' && <button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={17}/> Create group</button>}
@@ -333,11 +375,18 @@ export default function Home() {
 
       {tab === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''}`}>
         <aside className="rc-conversation-list"><div className="rc-list-heading"><div><h2>Conversations</h2><p>Private and group chats</p></div></div>
-          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => setSelectedConversation(convo)}><span className="rc-conversation-avatar"><MessageCircle size={20}/></span><span><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span></button>)}
+          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => setSelectedConversation(convo)}><span className="rc-conversation-avatar">{convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span></button>)}
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
-          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar"><MessageCircle size={20}/></div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => <div key={message.id} style={{alignSelf: message.sender_id === userId ? 'flex-end' : 'flex-start', maxWidth:'82%', padding:'10px 13px', borderRadius:'14px', background: message.sender_id === userId ? '#174ea6' : '#202938', color:'#fff', overflowWrap:'anywhere'}}><div>{message.body}</div><small style={{opacity:.7, fontSize:'11px'}}>{new Date(message.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small></div>)}</div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendDraft();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar">{selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => <div key={message.id} style={{alignSelf: message.sender_id === userId ? 'flex-end' : 'flex-start', display:'flex',alignItems:'flex-end',gap:8,maxWidth:'90%'}}>
+          {message.sender_id !== userId && <span style={{width:30,height:30,flex:'0 0 30px',borderRadius:'50%',overflow:'hidden',display:'grid',placeItems:'center',background:'#263c59',fontSize:12,fontWeight:700}}>{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : (message.sender_nickname?.[0] || 'M').toUpperCase()}</span>}
+          <div style={{maxWidth:'100%',padding:'10px 13px',borderRadius:14,background:message.sender_id === userId ? '#174ea6' : '#202938',color:'#fff',overflowWrap:'anywhere'}}>
+            {selectedConversation.kind === 'group' && <strong style={{display:'block',fontSize:12,marginBottom:4,color:'#9fc5ff'}}>{message.sender_id === userId ? 'You' : `@${message.sender_nickname || 'Member'}`}</strong>}
+            <div>{message.body}</div><small style={{opacity:.7,fontSize:11}}>{new Date(message.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small>
+          </div>
+          {message.sender_id === userId && <span style={{width:30,height:30,flex:'0 0 30px',borderRadius:'50%',overflow:'hidden',display:'grid',placeItems:'center',background:'#263c59',fontSize:12,fontWeight:700}}>{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : (message.sender_nickname?.[0] || 'Y').toUpperCase()}</span>}
+        </div>)}</div><div className="rc-composer-wrap"><div className="rc-composer"><button className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button><input value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendDraft();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div></> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -348,7 +397,7 @@ export default function Home() {
         {profiles.filter(p => p.id !== userId).length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No people to show yet</h2><p>New members will appear here when they create a profile.</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}</div>}
       </section>}
 
-      {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <button className="rc-group-row" key={g.id} onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon"><Hash size={22}/></span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
+      {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <button className="rc-group-row" key={g.id} onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon"><Users size={22}/></span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
 
       {tab === 'Requests' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Message requests</h2><p>Accept a request to open a private conversation.</p></div><button className="rc-text-btn" onClick={() => void loadIncomingRequests()}><RefreshCw size={14}/> Refresh</button></div>
         {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card" key={request.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><span className="rc-eyebrow">MESSAGE REQUEST</span></div><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation with you.</p><small>{new Date(request.created_at).toLocaleDateString()}</small><div className="rc-person-footer"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p><button className="rc-secondary" onClick={() => void loadIncomingRequests()}><RefreshCw size={15}/> Refresh requests</button></div>}</section>}
@@ -360,7 +409,14 @@ export default function Home() {
 
     {userId && <nav className="rc-bottom-nav" aria-label="Main navigation">{NAV_ITEMS.map(item => <button key={item.name} className={`rc-bottom-item ${tab === item.name ? 'active' : ''}`} onClick={() => { setTab(item.name); setShowProfile(false); setShowGroup(false); setShowEmojiPicker(false); }}><span className="rc-bottom-icon"><item.icon size={24} strokeWidth={tab === item.name ? 2.5 : 2}/>{item.name === 'Requests' && requests > 0 && <i className="rc-nav-badge">{requests}</i>}</span><span className="rc-bottom-label">{item.name === 'My Profile' ? 'Profile' : item.name}</span></button>)}</nav>}
 
-    {showProfile && <div className="rc-modal-backdrop" onClick={() => { setShowProfile(false); setEditingProfile(false); }}><form className="rc-modal" onSubmit={saveProfile} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => { setShowProfile(false); setEditingProfile(false); }} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">YOUR PUBLIC IDENTITY</span><h2>{editingProfile ? 'Edit profile' : 'Create your profile'}</h2><p className="rc-muted">Only these details appear on your public profile.</p><label>Nickname<input required maxLength={24} value={profileForm.nickname} onChange={e => setProfileForm({...profileForm, nickname:e.target.value})} placeholder="@yournickname"/></label><label>Level<input value={profileForm.level} onChange={e => setProfileForm({...profileForm, level:e.target.value})} placeholder="e.g. 200 level"/></label><label>College<input value={profileForm.college} onChange={e => setProfileForm({...profileForm, college:e.target.value})} placeholder="Your college"/></label><label>School<input value={profileForm.school} onChange={e => setProfileForm({...profileForm, school:e.target.value})} placeholder="Your school or university"/></label><div className="rc-privacy"><ShieldCheck size={15}/> Name, phone, department and email stay private.</div><button className="rc-primary rc-full" type="submit">Save profile</button></form></div>}
+    {showProfile && <div className="rc-modal-backdrop" onClick={() => { setShowProfile(false); setEditingProfile(false); }}><form className="rc-modal" onSubmit={saveProfile} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => { setShowProfile(false); setEditingProfile(false); }} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">YOUR PUBLIC IDENTITY</span><h2>{editingProfile ? 'Edit profile' : 'Create your profile'}</h2><p className="rc-muted">Public details are visible to members. Private details are only readable by your own account.</p><label>Nickname<input required maxLength={24} value={profileForm.nickname} onChange={e => setProfileForm({...profileForm, nickname:e.target.value})} placeholder="@yournickname"/></label><label>Level<input value={profileForm.level} onChange={e => setProfileForm({...profileForm, level:e.target.value})} placeholder="e.g. 200 level"/></label><label>College<input value={profileForm.college} onChange={e => setProfileForm({...profileForm, college:e.target.value})} placeholder="Your college"/></label><label>School<input value={profileForm.school} onChange={e => setProfileForm({...profileForm, school:e.target.value})} placeholder="Your school or university"/></label>
+<label>Department<input value={profileForm.department} onChange={e => setProfileForm({...profileForm, department:e.target.value})} placeholder="Your department"/></label>
+<label>Profile photo URL (optional)<input type="url" value={profileForm.avatar_url} onChange={e => setProfileForm({...profileForm, avatar_url:e.target.value})} placeholder="https://..."/></label>
+<label>About me (public)<textarea value={profileForm.bio} onChange={e => setProfileForm({...profileForm, bio:e.target.value})} placeholder="Short introduction"/></label>
+<h3>Private information — only you can read this</h3>
+<label>Full name<input value={profileForm.full_name} onChange={e => setProfileForm({...profileForm, full_name:e.target.value})} placeholder="Your real name"/></label>
+<label>Phone number<input type="tel" value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone:e.target.value})} placeholder="Private phone number"/></label>
+<div className="rc-privacy"><ShieldCheck size={15}/> Email is kept in your authentication account and isn't shown publicly. Full name and phone are stored separately.</div><button className="rc-primary rc-full" type="submit">Save profile</button></form></div>}
     {showGroup && <div className="rc-modal-backdrop" onClick={() => setShowGroup(false)}><form className="rc-modal" onSubmit={createGroup} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setShowGroup(false)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="rc-muted">Start a space around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><button className="rc-primary rc-full" type="submit">Create group</button></form></div>}
     {!authReady && <div className="rc-loading" aria-label="Loading"/>}
   </main>;
