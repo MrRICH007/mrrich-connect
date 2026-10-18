@@ -25,8 +25,8 @@ type Profile = {
 type CommunityGroup = { id: string; name: string; conversation_id?: string | null; avatar_url?: string | null; created_by?: string | null };
 type AdCampaign = { id: string; title: string; media_type: 'image' | 'video'; media_path: string; target_url: string | null; expires_at: string };
 type IncomingRequest = { id: string; sender_id: string; created_at: string; sender_nickname: string };
-type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string; otherUserId?: string; avatarUrl?: string | null };
-type ChatMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; sender_nickname?: string; sender_avatar_url?: string | null };
+type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string; otherUserId?: string; avatarUrl?: string | null; lastMessageAt?: string | null };
+type ChatMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; sender_nickname?: string; sender_avatar_url?: string | null; reply_to?: { sender_id: string; sender_nickname: string; body: string } | null };
 
 const NAV_ITEMS = [
   { name: 'Messages', icon: MessageCircle, hint: 'Your Conversations Will Appear Here.' },
@@ -71,6 +71,8 @@ export default function Home() {
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const touchStartX = useRef<Record<string, number>>({});
+  const [draggingMessageId, setDraggingMessageId] = useState<string | null>(null);
+  const [dragOffsets, setDragOffsets] = useState<Record<string, number>>({});
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [draftMessage, setDraftMessage] = useState('');
@@ -370,6 +372,9 @@ export default function Home() {
       nicknameById = new Map((otherProfiles ?? []).map((p: { id: string; nickname: string }) => [p.id, p.nickname]));
       avatarById = new Map((otherProfiles ?? []).map((p: { id: string; avatar_url: string | null }) => [p.id, p.avatar_url]));
     }
+    const { data: recentMessages } = await supabase.from('messages').select('conversation_id,created_at').in('conversation_id', ids).is('deleted_at', null).order('created_at', { ascending: false });
+    const latestByConversation = new Map<string, string>();
+    for (const message of recentMessages ?? []) if (!latestByConversation.has(message.conversation_id)) latestByConversation.set(message.conversation_id, message.created_at);
     const mapped: Conversation[] = (convs ?? []).map((c: { id: string; title: string | null; kind: string }) => {
       const other = (allMembers ?? []).find((m: { conversation_id: string; user_id: string }) => m.conversation_id === c.id && m.user_id !== userId);
       const isGroup = c.kind === 'group';
@@ -378,12 +383,24 @@ export default function Home() {
         title: isGroup ? (c.title || 'Group chat') : (nicknameById.get(other?.user_id ?? '') ? `@${nicknameById.get(other?.user_id ?? '')}` : (c.title && !['Private chat', 'Private conversation'].includes(c.title) ? c.title : 'Private chat')),
         kind: isGroup ? 'group' : 'person',
         otherUserId: other?.user_id,
-        avatarUrl: isGroup ? (groups.find(g => g.conversation_id === c.id)?.avatar_url ?? null) : avatarById.get(other?.user_id ?? '') ?? null
+        avatarUrl: isGroup ? (groups.find(g => g.conversation_id === c.id)?.avatar_url ?? null) : avatarById.get(other?.user_id ?? '') ?? null,
+        lastMessageAt: latestByConversation.get(c.id) ?? null
       };
-    });
+    }).sort((a, b) => (b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0) - (a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0));
     setConversationList(mapped);
     setSelectedConversation(current => current ? (mapped.find(c => c.id === current.id) ?? current) : null);
   }, [supabase, userId, groups]);
+
+  function decodeChatMessage(message: ChatMessage): ChatMessage {
+    const prefix = '[[RC_REPLY]]';
+    if (!message.body.startsWith(prefix)) return message;
+    const newline = message.body.indexOf('\n');
+    if (newline < 0) return message;
+    try {
+      const reply_to = JSON.parse(message.body.slice(prefix.length, newline));
+      return { ...message, body: message.body.slice(newline + 1), reply_to };
+    } catch { return message; }
+  }
 
   const loadChatMessages = useCallback(async (conversationId: string) => {
     if (!supabase || !userId) return;
@@ -392,7 +409,7 @@ export default function Home() {
       .eq('conversation_id', conversationId).is('deleted_at', null)
       .order('created_at', { ascending: true }).limit(200);
     if (error) { setStatus(`Could not load messages: ${error.message}`); return; }
-    const rows = (data ?? []) as ChatMessage[];
+    const rows = ((data ?? []) as ChatMessage[]).map(decodeChatMessage);
     const senderIds = [...new Set(rows.map(m => m.sender_id))];
     const { data: senderProfiles } = senderIds.length ? await supabase.from('profiles').select('id,nickname,avatar_url').in('id', senderIds) : { data: [] };
     const senderMap = new Map((senderProfiles ?? []).map((p: {id:string;nickname:string;avatar_url:string|null}) => [p.id, p]));
@@ -403,13 +420,15 @@ export default function Home() {
     const body = draftMessage.trim();
     if (!supabase || !userId || !selectedConversation || !body || sendingMessage) return;
     setSendingMessage(true);
+    const storedBody = replyTo ? `[[RC_REPLY]]${JSON.stringify({ sender_id: replyTo.sender_id, sender_nickname: replyTo.sender_nickname || (replyTo.sender_id === userId ? 'You' : 'Member'), body: replyTo.body.slice(0, 500) })}\n${body}` : body;
     const { data, error } = await supabase.from('messages').insert({
-      conversation_id: selectedConversation.id, sender_id: userId, body: replyTo ? `↪ Reply to ${replyTo.sender_id === userId ? 'yourself' : '@' + (replyTo.sender_nickname || 'Member')}: ${replyTo.body.slice(0, 100)}${replyTo.body.length > 100 ? '…' : ''}\n${body}` : body
+      conversation_id: selectedConversation.id, sender_id: userId, body: storedBody
     }).select('id,conversation_id,sender_id,body,created_at').single();
     setSendingMessage(false);
     if (error) { setStatus(`Message not sent: ${error.message}`); return; }
     const { data: sender } = await supabase.from('profiles').select('nickname,avatar_url').eq('id', userId).maybeSingle();
-    setChatMessages(old => [...old, { ...(data as ChatMessage), sender_nickname: sender?.nickname || 'You', sender_avatar_url: sender?.avatar_url || null }]);
+    setChatMessages(old => [...old, { ...decodeChatMessage(data as ChatMessage), sender_nickname: sender?.nickname || 'You', sender_avatar_url: sender?.avatar_url || null }]);
+    setConversationList(old => old.map(c => c.id === selectedConversation.id ? { ...c, lastMessageAt: (data as ChatMessage).created_at } : c).sort((a,b) => (b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0) - (a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0)));
     setDraftMessage('');
     setReplyTo(null);
     setShowEmojiPicker(false);
@@ -452,10 +471,7 @@ export default function Home() {
     if (!supabase || !userId) return;
     const channel = supabase.channel(`all-user-messages-${userId}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
       const incoming = payload.new as ChatMessage;
-      setConversationList(current => {
-        if (!current.some(c => c.id === incoming.conversation_id)) return current;
-        return current;
-      });
+      setConversationList(current => current.map(c => c.id === incoming.conversation_id ? { ...c, lastMessageAt: incoming.created_at } : c).sort((a,b) => (b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0) - (a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0)));
       if (incoming.sender_id === userId) return;
       const active = selectedConversation?.id === incoming.conversation_id;
       if (!active) setUnreadCounts(old => ({ ...old, [incoming.conversation_id]: (old[incoming.conversation_id] || 0) + 1 }));
@@ -477,7 +493,7 @@ export default function Home() {
         const incoming = payload.new as ChatMessage;
         void (async () => {
           const { data: sender } = await supabase.from('profiles').select('nickname,avatar_url').eq('id', incoming.sender_id).maybeSingle();
-          const enriched = { ...incoming, sender_nickname: sender?.nickname || (incoming.sender_id === userId ? 'You' : 'Member'), sender_avatar_url: sender?.avatar_url || null };
+          const enriched = { ...decodeChatMessage(incoming), sender_nickname: sender?.nickname || (incoming.sender_id === userId ? 'You' : 'Member'), sender_avatar_url: sender?.avatar_url || null };
           setChatMessages(old => old.some(m => m.id === enriched.id) ? old : [...old, enriched]);
         })();
       }).subscribe();
@@ -546,10 +562,11 @@ export default function Home() {
           const mine = message.sender_id === userId;
           const groupChat = selectedConversation.kind === 'group';
           const senderName = mine ? 'You' : `@${message.sender_nickname || 'Member'}`;
-          return <div key={message.id} onTouchStart={e => { touchStartX.current[message.id] = e.changedTouches[0]?.clientX ?? 0; }} onTouchEnd={e => { const start = touchStartX.current[message.id]; const end = e.changedTouches[0]?.clientX ?? start; if (start !== undefined && end - start > 55) setReplyTo(message); delete touchStartX.current[message.id]; }} onDoubleClick={() => setReplyTo(message)} title="Swipe right to reply" className={`rc-message-row ${mine ? 'rc-message-mine' : 'rc-message-other'} ${groupChat ? 'rc-message-group' : 'rc-message-private'}`}>
+          return <div key={message.id} onTouchStart={e => { touchStartX.current[message.id] = e.changedTouches[0]?.clientX ?? 0; setDraggingMessageId(message.id); }} onTouchMove={e => { const start = touchStartX.current[message.id]; const current = e.changedTouches[0]?.clientX ?? start; if (start !== undefined) setDragOffsets(old => ({...old, [message.id]: Math.max(0, Math.min(72, current - start))})); }} onTouchEnd={e => { const start = touchStartX.current[message.id]; const end = e.changedTouches[0]?.clientX ?? start; if (start !== undefined && end - start > 55) setReplyTo(message); delete touchStartX.current[message.id]; setDraggingMessageId(null); setDragOffsets(old => ({...old, [message.id]: 0})); }} onDoubleClick={() => setReplyTo(message)} title="Swipe right to reply" className={`rc-message-row ${mine ? 'rc-message-mine' : 'rc-message-other'} ${groupChat ? 'rc-message-group' : 'rc-message-private'}`}>
             {!mine && <span className="rc-message-avatar">{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt=""/> : (message.sender_nickname?.[0] || 'M').toUpperCase()}</span>}
-            <div className={`rc-message-bubble ${mine ? 'mine' : 'other'}`}>
+            <div className={`rc-message-bubble ${mine ? 'mine' : 'other'} ${draggingMessageId === message.id ? 'rc-message-dragging' : ''}`} style={{transform: `translateX(${dragOffsets[message.id] || 0}px)`, transition: draggingMessageId === message.id ? 'none' : 'transform 180ms ease-out'}}>
               {groupChat && <strong className="rc-message-sender" style={{color: mine ? '#ffffff' : nicknameColor(message.sender_id)}}>{senderName}</strong>}
+              {message.reply_to && <div className="rc-replied-message"><strong style={{color: nicknameColor(message.reply_to.sender_id)}}>{message.reply_to.sender_id === userId ? 'You' : '@' + message.reply_to.sender_nickname}</strong><span>{message.reply_to.body.slice(0, 220)}{message.reply_to.body.length > 220 ? '…' : ''}</span></div>}
               <div className="rc-message-body">{message.body}</div>
               <small className="rc-message-time">{new Date(message.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small>
             </div>
@@ -561,14 +578,14 @@ export default function Home() {
 
       {tab === 'Discover' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>People you may know</h2><p>Connect with members from your community.</p></div><button className="rc-text-btn" onClick={() => void refreshCommunity()}>Refresh <RefreshCw size={14}/></button></div>
         {activeAds.length > 0 && <section className="rc-ad-feed" aria-label="Sponsored community announcements"><div className="rc-section-title"><div><h2>Community spotlight</h2><p>Promotions and announcements</p></div></div><div className="rc-people-grid">{activeAds.map(ad => <article className="rc-person-card rc-ad-card" key={ad.id}><span className="rc-eyebrow">SPONSORED</span><h3>{ad.title}</h3>{ad.media_type === 'image' ? <img src={ad.media_path} alt={ad.title} style={{width:'100%',maxHeight:220,objectFit:'cover',borderRadius:12}}/> : <video src={ad.media_path} controls playsInline style={{width:'100%',maxHeight:220,borderRadius:12}}/>}{ad.target_url && <a href={ad.target_url} target="_blank" rel="noreferrer" className="rc-primary">Learn more</a>}<small>Expires {new Date(ad.expires_at).toLocaleDateString()}</small></article>)}</div></section>}
-        <div className="rc-people-grid">{profiles.filter(p => p.id !== userId).map(p => <article className="rc-person-card rc-discover-person" key={p.id}><div className="rc-discover-main"><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div>{p.premium_status === 'active' && <span className="rc-premium-badge"><Crown size={12}/> PREMIUM</span>}</div><h3>@{p.nickname}</h3>{p.premium_status === 'active' && p.premium_title && <p className="rc-premium-title">{p.premium_title}</p>}<p>{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small></div><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor((p.total_online_seconds || 0) / 3600)}h online</span><button className="rc-primary rc-connect" onClick={() => void sendRequest(p.id)}>Connect <Plus size={15}/></button></div></article>)}</div>
+        <div className="rc-people-grid">{profiles.filter(p => p.id !== userId).map(p => <article className="rc-person-card rc-discover-person" key={p.id}><div className="rc-discover-main"><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div></div><div className="rc-discover-details"><h3>@{p.nickname}</h3><p className="rc-discover-level-college">{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small>{p.premium_status === 'active' && <span className="rc-premium-badge"><Crown size={10}/> PREMIUM</span>}</div></div><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor((p.total_online_seconds || 0) / 3600)}h online</span><button className="rc-primary rc-connect" onClick={() => void sendRequest(p.id)}>Connect <Plus size={15}/></button></div></article>)}</div>
         {profiles.filter(p => p.id !== userId).length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No people to show yet</h2><p>New members will appear here when they create a profile.</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}</div>}
       </section>}
 
       {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <label className="rc-edit-group-avatar"><Pencil size={14}/><span>Change image</span><input type="file" accept="image/*" style={{display:'none'}} onChange={e => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; void changeExistingGroupAvatar(g, file); }}/></label>}</div>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
 
       {tab === 'Requests' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Message requests</h2><p>Accept a request to open a private conversation.</p></div><button className="rc-text-btn" onClick={() => void loadIncomingRequests()}><RefreshCw size={14}/> Refresh</button></div>
-        {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card" key={request.id}><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><span className="rc-eyebrow">MESSAGE REQUEST</span></div><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation with you.</p><small>{new Date(request.created_at).toLocaleDateString()}</small><div className="rc-person-footer"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p><button className="rc-secondary" onClick={() => void loadIncomingRequests()}><RefreshCw size={15}/> Refresh requests</button></div>}</section>}
+        {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card rc-request-slim" key={request.id}><div className="rc-request-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><div className="rc-request-details"><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation.</p><small>{new Date(request.created_at).toLocaleDateString()}</small></div></div><div className="rc-request-actions"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p><button className="rc-secondary" onClick={() => void loadIncomingRequests()}><RefreshCw size={15}/> Refresh requests</button></div>}</section>}
 
       {tab === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{[...profiles].sort((a,b)=>(b.total_online_seconds||0)-(a.total_online_seconds||0)).slice(0,5).map((p,i)=><div className="rc-group-row" key={p.id}><span className="rc-group-icon">#{i+1}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small>{p.premium_status === 'active' && p.premium_title ? p.premium_title : 'Community member'}</small></span><span className="rc-arrow">{Math.floor((p.total_online_seconds||0)/3600)}h</span></div>)}</div></section>}</section>}
     </>}

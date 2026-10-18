@@ -122,3 +122,32 @@
 .rc-profile-page .rc-online-rankings{padding:12px 0 0!important;margin-top:20px;border-top:1px solid var(--rc-line)}
 .rc-composer input{autocomplete:off}
 @media(max-width:600px){.rc-discover-person{gap:8px;padding:10px!important}.rc-discover-main{gap:8px}.rc-discover-main .rc-avatar-large{width:42px;height:42px}.rc-discover-main h3{font-size:12px!important}.rc-discover-main p,.rc-discover-main small{font-size:10px!important}.rc-discover-person .rc-connect{padding:7px 8px;font-size:10px}.rc-discover-person .rc-person-footer>span{font-size:9px}}
+
+/* Compact Discover cards: nickname first, then level and college on one line. */
+.rc-discover-main{align-items:center!important;gap:10px!important}
+.rc-discover-details{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;min-width:0;flex:1}
+.rc-discover-details h3{margin:0!important;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-discover-details .rc-discover-level-college{margin:0!important;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-discover-details small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-discover-details .rc-premium-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px!important}
+
+/* Slim request cards with Decline on the left and Accept on the right. */
+.rc-request-slim{display:flex;flex-direction:column;gap:10px;padding:12px!important}
+.rc-request-top{display:flex;align-items:center;gap:10px;min-width:0}
+.rc-request-top .rc-avatar-large{width:44px;height:44px;flex:0 0 44px;margin:0!important}
+.rc-request-details{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.rc-request-details h3{font-size:13px!important;margin:0!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-request-details p{font-size:11px!important;margin:0!important;color:var(--rc-muted)}
+.rc-request-details small{font-size:10px!important;color:var(--rc-muted)}
+.rc-request-actions{display:flex;justify-content:space-between;gap:10px;width:100%;padding-left:54px}
+.rc-request-actions button{min-width:100px;flex:1;justify-content:center;padding:8px 12px!important}
+
+/* Quoted reply appears as a distinct inset bubble inside the reply message. */
+.rc-replied-message{display:flex;flex-direction:column;gap:3px;padding:7px 9px;margin:0 0 7px;border-left:3px solid #6398ff;border-radius:7px;background:rgba(4,12,30,.36);max-width:100%;overflow:hidden}
+.rc-message-bubble.mine .rc-replied-message{background:rgba(0,0,0,.2);border-left-color:#a9c7ff}
+.rc-replied-message strong{font-size:10px;line-height:1.2;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-replied-message span{font-size:12px;line-height:1.35;color:#d7deed;overflow-wrap:anywhere;white-space:pre-wrap}
+.rc-message-bubble{will-change:transform}
+.rc-message-dragging{z-index:2;position:relative;box-shadow:0 5px 20px rgba(0,0,0,.18)}
+.rc-message-row{overflow:visible}
+@media(max-width:600px){.rc-request-actions{padding-left:54px}.rc-request-actions button{min-width:0}.rc-discover-details h3{font-size:12px!important}.rc-discover-details .rc-discover-level-college{font-size:10px!important}}
