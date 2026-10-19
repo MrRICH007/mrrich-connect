@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     if (subError) throw subError;
     webpush.setVapidDetails(subject, publicKey, privateKey);
     const title = 'New message on MR RICH CONNECT';
-    const notification = JSON.stringify({ title, body: `${sender?.nickname ? '@' + sender.nickname : 'Someone'} sent you a message.`, tag: `conversation-${message.conversation_id}`, conversation_id: message.conversation_id, url: '/' });
+    const notification = JSON.stringify({ title, body: `${sender?.nickname ? '@' + sender.nickname : 'Someone'} sent you a message.`, tag: `message-${message.id || crypto.randomUUID()}`, conversation_id: message.conversation_id, url: '/' });
     await Promise.all((subscriptions || []).map(async (sub: {id:string;subscription: unknown}) => {
       try { await webpush.sendNotification(sub.subscription as webpush.PushSubscription, notification); }
       catch (error) {
