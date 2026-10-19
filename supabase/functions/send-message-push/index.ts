@@ -7,8 +7,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
   const expectedSecret = Deno.env.get('MESSAGE_PUSH_WEBHOOK_SECRET');
   if (!expectedSecret || req.headers.get('x-webhook-secret') !== expectedSecret) return new Response('Unauthorized', { status: 401 });
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseUrl = Deno.env.get('PROJECT_URL');
+  const serviceKey = Deno.env.get('SERVICE_ROLE_KEY');
   const publicKey = Deno.env.get('VAPID_PUBLIC_KEY');
   const privateKey = Deno.env.get('VAPID_PRIVATE_KEY');
   const subject = Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@mrrich-connect.example';
