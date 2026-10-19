@@ -345,6 +345,22 @@ export default function Home() {
     setGroupName(''); setGroupAvatarUrl(''); setShowGroup(false); if (!groupAvatarUrl) setStatus('Group and group chat created.');
     await loadConversations();
   }
+  const loadUnreadCounts = useCallback(async () => {
+    if (!supabase || !userId) { setUnreadCounts({}); return; }
+    const { data, error } = await supabase.rpc('get_unread_message_counts');
+    if (error) { console.error('Unread counts could not be loaded:', error.message); return; }
+    const counts: Record<string, number> = {};
+    for (const row of data ?? []) counts[row.conversation_id] = Number(row.unread_count) || 0;
+    setUnreadCounts(counts);
+  }, [supabase, userId]);
+
+  const markConversationRead = useCallback(async (conversationId: string) => {
+    if (!supabase || !userId) return;
+    const { error } = await supabase.rpc('mark_conversation_read', { p_conversation_id: conversationId });
+    if (error) { console.error('Could not mark conversation read:', error.message); return; }
+    setUnreadCounts(old => ({ ...old, [conversationId]: 0 }));
+  }, [supabase, userId]);
+
   const loadConversations = useCallback(async () => {
     if (!supabase || !userId) { setConversationList([]); return; }
     const { data: memberships, error: memberError } = await supabase.from('conversation_members')
@@ -456,14 +472,59 @@ export default function Home() {
     setShowScrollToLatest(el.scrollHeight - el.scrollTop - el.clientHeight > 100);
   }
 
-  useEffect(() => { if (userId) void loadConversations(); }, [userId, loadConversations]);
+  useEffect(() => { if (userId) { void loadConversations(); void loadUnreadCounts(); } }, [userId, loadConversations, loadUnreadCounts]);
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    const channel = supabase.channel(`unread-refresh-${userId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        const msg = payload.new as ChatMessage;
+        if (msg.sender_id === userId) return;
+        if (selectedConversation?.id === msg.conversation_id && document.visibilityState === 'visible') {
+          void markConversationRead(msg.conversation_id);
+        } else {
+          void loadUnreadCounts();
+        }
+      }).subscribe();
+    const onFocus = () => { void loadUnreadCounts(); };
+    window.addEventListener('focus', onFocus);
+    return () => { window.removeEventListener('focus', onFocus); void supabase.removeChannel(channel); };
+  }, [supabase, userId, selectedConversation?.id, loadUnreadCounts, markConversationRead]);
 
   useEffect(() => { if (typeof window !== 'undefined' && 'Notification' in window) setNotificationPermission(Notification.permission); }, []);
   async function enableMessageNotifications() {
-    if (typeof window === 'undefined' || !('Notification' in window)) { setStatus('This browser does not support desktop notifications.'); return; }
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
-    setStatus(permission === 'granted' ? 'Message notifications enabled for this browser.' : 'Notifications are blocked. Enable them in your browser or phone settings.');
+    if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setStatus('This browser does not support web push notifications. Try installing/opening the site in a supported browser.'); return;
+    }
+    if (!supabase || !userId) { setStatus('Sign in before enabling message notifications.'); return; }
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!vapidPublicKey) { setStatus('Push notifications need NEXT_PUBLIC_VAPID_PUBLIC_KEY configured in Render first.'); return; }
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission !== 'granted') { setStatus('Notifications are blocked. Allow notifications in your browser or phone settings.'); return; }
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      const ready = await navigator.serviceWorker.ready;
+      const toUint8 = (value: string) => {
+        const padding = '='.repeat((4 - value.length % 4) % 4);
+        const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const raw = window.atob(base64);
+        return Uint8Array.from(raw, c => c.charCodeAt(0));
+      };
+      let subscription = await ready.pushManager.getSubscription();
+      if (!subscription) subscription = await ready.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toUint8(vapidPublicKey) });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) { setStatus('Your sign-in session expired. Sign in again and retry.'); return; }
+      const response = await fetch('/api/push/subscribe', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ subscription: subscription.toJSON() })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not save this device subscription.');
+      setStatus('Push notifications enabled on this device. You can receive alerts while the site is in the background when server push is configured.');
+    } catch (error) {
+      setStatus(`Could not enable push notifications: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   // Subscribe across conversations so the list updates even when a different chat is open.
@@ -488,6 +549,7 @@ export default function Home() {
   useEffect(() => {
     if (!supabase || !userId || !selectedConversation) { setChatMessages([]); return; }
     void loadChatMessages(selectedConversation.id);
+    if (document.visibilityState === 'visible') void markConversationRead(selectedConversation.id);
     const channel = supabase.channel(`messages-${selectedConversation.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConversation.id}` }, payload => {
         const incoming = payload.new as ChatMessage;
@@ -498,7 +560,7 @@ export default function Home() {
         })();
       }).subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [supabase, userId, selectedConversation?.id, loadChatMessages]);
+  }, [supabase, userId, selectedConversation?.id, loadChatMessages, markConversationRead]);
   function openProfileEditor() {
     if (!userId) { setStatus('Sign in to create your profile.'); return; }
     setEditingProfile(profileExists);
@@ -554,7 +616,7 @@ export default function Home() {
 
       {tab === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''}`}>
         <aside className="rc-conversation-list"><div className="rc-list-heading"><div><h2>Conversations</h2><p>Private and group chats</p></div><button type="button" className="rc-icon-btn rc-notification-toggle" onClick={() => void enableMessageNotifications()} title="Enable message notifications" aria-label="Enable message notifications"><Bell size={17}/></button></div>
-          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => { setSelectedConversation(convo); setUnreadCounts(old => ({ ...old, [convo.id]: 0 })); setReplyTo(null); }}><span className="rc-conversation-avatar">{convo.avatarUrl ? <img src={convo.avatarUrl} alt=""/> : convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span className="rc-conversation-copy"><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span>{(unreadCounts[convo.id] || 0) > 0 && <span className="rc-unread-badge">{unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}</span>}</button>)}
+          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => { setSelectedConversation(convo); void markConversationRead(convo.id); setReplyTo(null); }}><span className="rc-conversation-avatar">{convo.avatarUrl ? <img src={convo.avatarUrl} alt=""/> : convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span className="rc-conversation-copy"><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span>{(unreadCounts[convo.id] || 0) > 0 && <span className="rc-unread-badge">{unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}</span>}</button>)}
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
