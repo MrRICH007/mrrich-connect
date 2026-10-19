@@ -151,3 +151,18 @@
 .rc-message-dragging{z-index:2;position:relative;box-shadow:0 5px 20px rgba(0,0,0,.18)}
 .rc-message-row{overflow:visible}
 @media(max-width:600px){.rc-request-actions{padding-left:54px}.rc-request-actions button{min-width:0}.rc-discover-details h3{font-size:12px!important}.rc-discover-details .rc-discover-level-college{font-size:10px!important}}
+
+/* Keep the shared online count visible on narrow mobile screens. */
+@media(max-width:420px){
+  .rc-header-actions{gap:6px;min-width:0;flex-shrink:0}
+  .rc-online-pill{display:flex!important;white-space:nowrap;font-size:10px;gap:4px;max-width:94px;overflow:visible}
+  .rc-online-pill i{width:6px;height:6px;flex:0 0 6px}
+  .rc-mobile-header{gap:8px;padding-left:10px;padding-right:10px}
+  .rc-brand{gap:7px;min-width:0}
+  .rc-brand-mark{width:34px;height:34px;flex:0 0 34px}
+  .rc-brand-mark>svg:first-child{width:23px;height:23px}
+  .rc-logo-wifi{left:11px;top:11px;width:12px;height:12px}
+  .rc-brand-type strong{font-size:14px;letter-spacing:-.4px}
+  .rc-brand-type span{font-size:8px;letter-spacing:2px}
+  .rc-header-actions .rc-icon-btn{padding:7px;flex:0 0 auto}
+}
