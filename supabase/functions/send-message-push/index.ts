@@ -30,17 +30,53 @@ Deno.serve(async (req) => {
     webpush.setVapidDetails(subject, publicKey, privateKey);
     const title = 'New message on MR RICH CONNECT';
     const notification = JSON.stringify({ title, body: `${sender?.nickname ? '@' + sender.nickname : 'Someone'} sent you a message.`, tag: `message-${message.id || crypto.randomUUID()}`, conversation_id: message.conversation_id, url: '/' });
-    await Promise.all((subscriptions || []).map(async (sub: {id:string;subscription: unknown}) => {
-      try { await webpush.sendNotification(sub.subscription as webpush.PushSubscription, notification); }
-      catch (error) {
-        const status = (error as {statusCode?: number})?.statusCode;
-        if (status === 404 || status === 410) await admin.from('push_subscriptions').delete().eq('id', sub.id);
-        else console.error('Push delivery failed', status || error);
+    
+    let delivered = 0;
+    let failed = 0;
+
+    await Promise.all((subscriptions || []).map(async (sub: { id: string; subscription: unknown }) => {
+      try {
+        await webpush.sendNotification(
+          sub.subscription as webpush.PushSubscription,
+          notification
+        );
+        delivered++;
+      } catch (error) {
+        failed++;
+
+        const status = (error as { statusCode?: number })?.statusCode;
+
+        if (status === 404 || status === 410) {
+          const { error: deleteError } = await admin
+            .from('push_subscriptions')
+            .delete()
+            .eq('id', sub.id);
+
+          if (deleteError) console.error('Failed to remove expired subscription', deleteError);
+        } else {
+          console.error('Push delivery failed', status || error);
+        }
       }
     }));
-    return new Response(JSON.stringify({ sent: (subscriptions || []).length }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  } catch (error) {
-    console.error(error);
-    return new Response('Push delivery failed', { status: 500 });
-  }
-});
+
+    console.log(JSON.stringify({
+      event: 'push_delivery_summary',
+      subscriptions: (subscriptions || []).length,
+      delivered,
+      failed
+    }));
+
+    return new Response(
+      JSON.stringify({
+        subscriptions: (subscriptions || []).length,
+        delivered,
+        failed
+      }),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
