@@ -16,17 +16,7 @@ type Profile = {
   college: string | null;
   school: string | null;
   avatar_url: string | null;
-  premium_status: string;
-  premium_title?: string | null;
-  total_online_seconds: number;
-  bio?: string | null;
-  department?: string | null;
-};
-type CommunityGroup = { id: string; name: string; conversation_id?: string | null; avatar_url?: string | null; created_by?: string | null };
-type AdCampaign = { id: string; title: string; media_type: 'image' | 'video'; media_path: string; target_url: string | null; expires_at: string };
-type IncomingRequest = { id: string; sender_id: string; created_at: string; sender_nickname: string };
-type Conversation = { id: string; title: string; kind: 'person' | 'group'; subtitle?: string; otherUserId?: string; avatarUrl?: string | null; lastMessageAt?: string | null };
-type ChatMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; sender_nickname?: string; sender_avatar_url?: string | null; reply_to?: { sender_id: string; sender_nickname: string; body: string } | null };
+  premium_status: string;type ChatMessage = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; sender_nickname?: string; sender_avatar_url?: string | null; reply_to?: { sender_id: string; sender_nickname: string; body: string } | null; read_by?: string[] };
 
 const NAV_ITEMS = [
   { name: 'Messages', icon: MessageCircle, hint: 'Your Conversations Will Appear Here.' },
@@ -426,10 +416,20 @@ export default function Home() {
       .order('created_at', { ascending: true }).limit(200);
     if (error) { setStatus(`Could not load messages: ${error.message}`); return; }
     const rows = ((data ?? []) as ChatMessage[]).map(decodeChatMessage);
-    const senderIds = [...new Set(rows.map(m => m.sender_id))];
-    const { data: senderProfiles } = senderIds.length ? await supabase.from('profiles').select('id,nickname,avatar_url').in('id', senderIds) : { data: [] };
-    const senderMap = new Map((senderProfiles ?? []).map((p: {id:string;nickname:string;avatar_url:string|null}) => [p.id, p]));
-    setChatMessages(rows.map(m => ({ ...m, sender_nickname: senderMap.get(m.sender_id)?.nickname || (m.sender_id === userId ? 'You' : 'Member'), sender_avatar_url: senderMap.get(m.sender_id)?.avatar_url || null })));
+    const messageIds = rows.map(m => m.id);
+const { data: readReceipts, error: readReceiptsError } = messageIds.length
+  ? await supabase.from('message_reads')
+      .select('message_id,user_id')
+      .in('message_id', messageIds)
+  : { data: [], error: null };
+
+if (readReceiptsError) {
+  console.error('Could not load read receipts:', readReceiptsError.message);setChatMessages(rows.map(m => ({
+  ...m,
+  sender_nickname: senderMap.get(m.sender_id)?.nickname || (m.sender_id === userId ? 'You' : 'Member'),
+  sender_avatar_url: senderMap.get(m.sender_id)?.avatar_url || null,
+  read_by: readersByMessage[m.id] || []
+})));
   }, [supabase, userId]);
 
   async function sendDraft() {
