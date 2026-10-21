@@ -114,6 +114,8 @@ export default function Home() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [chatExiting, setChatExiting] = useState(false);
   const pageSwipeStart = useRef<{ x: number; y: number; kind: 'page' | 'chat' } | null>(null);
+  const [pageSwipeOffset, setPageSwipeOffset] = useState(0);
+  const [pageSwipeAnimating, setPageSwipeAnimating] = useState(false);
   const [conversationList, setConversationList] = useState<Conversation[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const chatMessagesRef = useRef<HTMLDivElement | null>(null);
@@ -814,7 +816,7 @@ delivered_by: deliveryByMessage[m.id] || []
 
   function handlePageTouchStart(e: TouchEvent<HTMLElement>) {
     const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, select, button, [contenteditable="true"], .rc-message-row, .rc-chat-empty, .rc-bottom-nav, .rc-modal, .rc-modal-backdrop')) {
+    if (target.closest('input, textarea, select, button, [contenteditable="true"], .rc-message-row, .rc-bottom-nav, .rc-modal, .rc-modal-backdrop')) {
       pageSwipeStart.current = null;
       return;
     }
@@ -822,29 +824,57 @@ delivered_by: deliveryByMessage[m.id] || []
     if (!touch) return;
     const inChat = Boolean(selectedConversation && target.closest('.rc-chat-panel'));
     pageSwipeStart.current = { x: touch.clientX, y: touch.clientY, kind: inChat ? 'chat' : 'page' };
+    setPageSwipeAnimating(false);
+  }
+
+  function handlePageTouchMove(e: TouchEvent<HTMLElement>) {
+    const start = pageSwipeStart.current;
+    const touch = e.changedTouches[0];
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
+    const limit = Math.max(180, window.innerWidth * 0.82);
+    setPageSwipeOffset(Math.max(-limit, Math.min(limit, dx)));
   }
 
   function handlePageTouchEnd(e: TouchEvent<HTMLElement>) {
     const start = pageSwipeStart.current;
     pageSwipeStart.current = null;
     const touch = e.changedTouches[0];
-    if (!start || !touch) return;
+    if (!start || !touch) { setPageSwipeOffset(0); return; }
     const dx = touch.clientX - start.x;
     const dy = touch.clientY - start.y;
-    if (Math.abs(dx) < 75 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
-    if (start.kind === 'chat') {
-      if (dx > 0) closeConversationWithMotion();
+    const horizontal = Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy) * 1.15;
+    if (!horizontal) { setPageSwipeOffset(0); return; }
+
+    if (start.kind === 'chat' && dx > 0) {
+      setPageSwipeAnimating(true);
+      setPageSwipeOffset(Math.max(window.innerWidth, dx + 60));
+      window.setTimeout(() => {
+        closeConversationWithMotion();
+        setPageSwipeOffset(0);
+        setPageSwipeAnimating(false);
+      }, 100);
       return;
     }
-    if (selectedConversation) return;
+
     const currentIndex = NAV_ITEMS.findIndex(item => item.name === tab);
     const nextIndex = dx < 0 ? Math.min(NAV_ITEMS.length - 1, currentIndex + 1) : Math.max(0, currentIndex - 1);
-    if (nextIndex !== currentIndex) {
+    if (nextIndex === currentIndex) { setPageSwipeOffset(0); return; }
+    setPageSwipeAnimating(true);
+    setPageSwipeOffset(dx < 0 ? -Math.max(window.innerWidth, Math.abs(dx) + 80) : Math.max(window.innerWidth, Math.abs(dx) + 80));
+    window.setTimeout(() => {
       setTab(NAV_ITEMS[nextIndex].name);
       setShowProfile(false);
       setShowGroup(false);
       setShowEmojiPicker(false);
-    }
+      setPageSwipeOffset(dx < 0 ? Math.max(window.innerWidth, 1) : -Math.max(window.innerWidth, 1));
+      window.setTimeout(() => {
+        setPageSwipeOffset(0);
+        window.setTimeout(() => setPageSwipeAnimating(false), 220);
+      }, 20);
+    }, 95);
   }
 
   function openProfileEditor() {
@@ -869,7 +899,8 @@ delivered_by: deliveryByMessage[m.id] || []
     return true;
   });
 
-  return <main className="rc-shell" onTouchStart={handlePageTouchStart} onTouchEnd={handlePageTouchEnd}>
+  return <main className="rc-shell" onTouchStart={handlePageTouchStart} onTouchMove={handlePageTouchMove} onTouchEnd={handlePageTouchEnd}>
+    <div className={`rc-swipe-stage ${pageSwipeAnimating ? 'is-swiping' : ''}`} style={{ transform: `translate3d(${pageSwipeOffset}px,0,0)` }}>
     <header className="rc-mobile-header">
       <div className="rc-brand">
         <div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div>
@@ -1003,6 +1034,8 @@ delivered_by: deliveryByMessage[m.id] || []
       {tab === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{[...profiles].sort((a,b)=>(b.total_online_seconds||0)-(a.total_online_seconds||0)).slice(0,5).map((p,i)=><div className="rc-group-row" key={p.id}><span className="rc-group-icon">#{i+1}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small>{p.premium_status === 'active' && p.premium_title ? p.premium_title : 'Community member'}</small></span><span className="rc-arrow">{Math.floor((p.total_online_seconds||0)/3600)}h</span></div>)}</div></section>}</section>}
     </>}
 
+    </div>
+
     <footer className="rc-footer"><span>© {new Date().getFullYear()} MR RICH CONNECT</span><span><ShieldCheck size={13}/> Your campus. Your community.</span></footer>
 
     {userId && <nav className="rc-bottom-nav" aria-label="Main navigation">{NAV_ITEMS.map(item => <button key={item.name} className={`rc-bottom-item ${tab === item.name ? 'active' : ''}`} onClick={() => { setTab(item.name); setShowProfile(false); setShowGroup(false); setShowEmojiPicker(false); }}><span className="rc-bottom-icon"><item.icon size={24} strokeWidth={tab === item.name ? 2.5 : 2}/>{item.name === 'Requests' && requests > 0 && <i className="rc-nav-badge">{requests}</i>}</span><span className="rc-bottom-label">{item.name === 'My Profile' ? 'Profile' : item.name}</span></button>)}</nav>}
@@ -1026,7 +1059,11 @@ delivered_by: deliveryByMessage[m.id] || []
       .rc-messages-layout.chat-exiting .rc-chat-panel { animation: rc-chat-swipe-out 160ms ease-in both; pointer-events: none; }
       .rc-person-card, .rc-group-row-wrap, .rc-request-card, .rc-conversation-row, .rc-primary, .rc-secondary, .rc-icon-btn, .rc-bottom-item { transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease; }
       .rc-person-card:active, .rc-group-row-wrap:active, .rc-request-card:active, .rc-conversation-row:active, .rc-primary:active, .rc-secondary:active, .rc-icon-btn:active, .rc-bottom-item:active { transform: scale(.985); }
-      .rc-shell { touch-action: pan-y; }
+      .rc-shell { touch-action: pan-y; overflow-x: clip; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+      .rc-swipe-stage { position: relative; min-height: calc(100dvh - 82px); transform: translate3d(0,0,0); will-change: transform; }
+      .rc-swipe-stage.is-swiping { transition: transform 105ms cubic-bezier(.18,.75,.2,1); }
+      .rc-bottom-nav { position: fixed !important; bottom: 0; z-index: 60; padding-bottom: max(8px, env(safe-area-inset-bottom)); transform: translate3d(0,0,0); }
+      @media (prefers-reduced-motion: reduce) { .rc-swipe-stage { transition: none !important; } }
       @media (prefers-reduced-motion: reduce) { .rc-content-section, .rc-profile-page, .rc-messages-layout, .rc-messages-layout.has-chat .rc-chat-panel, .rc-messages-layout.chat-exiting .rc-chat-panel { animation: none !important; transition: none !important; } }
     `}</style>
   </main>;
