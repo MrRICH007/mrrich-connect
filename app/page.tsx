@@ -33,6 +33,7 @@ type ChatMessage = {
     body: string;
   } | null;
   read_by?: string[];
+  delivered_by?: string[];
 };
 const NAV_ITEMS = [
   { name: 'Messages', icon: MessageCircle, hint: 'Your Conversations Will Appear Here.' },
@@ -367,6 +368,39 @@ export default function Home() {
     setUnreadCounts(old => ({ ...old, [conversationId]: 0 }));
   }, [supabase, userId]);
 
+  
+  const markMessagesDelivered = useCallback(async (conversationId: string) => {
+    if (!supabase || !userId || document.visibilityState !== 'visible') return;
+
+    const { data: incomingMessages, error: messagesError } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .neq('sender_id', userId)
+      .is('deleted_at', null)
+      .limit(200);
+
+    if (messagesError) {
+      console.error('Could not load incoming messages for delivery:', messagesError.message);
+      return;
+    }
+
+    if (!incomingMessages?.length) return;
+
+    const receipts = incomingMessages.map(message => ({
+      message_id: message.id,
+      user_id: userId
+    }));
+
+    const { error: deliveryError } = await supabase
+      .from('message_deliveries')
+      .upsert(receipts, { onConflict: 'message_id,user_id', ignoreDuplicates: true });
+
+    if (deliveryError) {
+      console.error('Could not mark messages delivered:', deliveryError.message);
+    }
+  }, [supabase, userId]);
+  
   const loadConversations = useCallback(async () => {
     if (!supabase || !userId) { setConversationList([]); return; }
     const { data: memberships, error: memberError } = await supabase.from('conversation_members')
@@ -441,6 +475,7 @@ export default function Home() {
     }
 
     const rows = ((data ?? []) as ChatMessage[]).map(decodeChatMessage);
+
     const messageIds = rows.map(m => m.id);
 
     const { data: readReceipts, error: readReceiptsError } = messageIds.length
@@ -453,17 +488,32 @@ export default function Home() {
       console.error('Could not load read receipts:', readReceiptsError.message);
     }
 
-    const readersByMessage: Record<string, string[]> = {};
+    const { data: deliveryReceipts, error: deliveryReceiptsError } = messageIds.length
+      ? await supabase.from('message_deliveries')
+          .select('message_id,user_id')
+          .in('message_id', messageIds)
+      : { data: [], error: null };
 
+    if (deliveryReceiptsError) {
+      console.error('Could not load delivery receipts:', deliveryReceiptsError.message);
+    }
+
+    const readersByMessage: Record<string, string[]> = {};
     for (const receipt of readReceipts ?? []) {
       const existing = readersByMessage[receipt.message_id] ?? [];
       if (!existing.includes(receipt.user_id)) {
-        readersByMessage[receipt.message_id] = [
-          ...existing,
-          receipt.user_id
-        ];
+        readersByMessage[receipt.message_id] = [...existing, receipt.user_id];
       }
     }
+
+    const deliveryByMessage: Record<string, string[]> = {};
+    for (const receipt of deliveryReceipts ?? []) {
+      const existing = deliveryByMessage[receipt.message_id] ?? [];
+      if (!existing.includes(receipt.user_id)) {
+        deliveryByMessage[receipt.message_id] = [...existing, receipt.user_id];
+      }
+    }
+
 
     const senderIds = [...new Set(rows.map(m => m.sender_id))];
     const { data: senders, error: senderError } = senderIds.length
@@ -485,7 +535,8 @@ export default function Home() {
       sender_nickname: senderMap.get(m.sender_id)?.nickname
         || (m.sender_id === userId ? 'You' : 'Member'),
       sender_avatar_url: senderMap.get(m.sender_id)?.avatar_url || null,
-      read_by: readersByMessage[m.id] || []
+      read_by: readersByMessage[m.id] || [],
+delivered_by: deliveryByMessage[m.id] || []
     })));
   }, [supabase, userId]);
 
@@ -605,8 +656,13 @@ export default function Home() {
   }, [supabase, userId, selectedConversation?.id, notificationPermission, conversationList, loadChatMessages]);
   useEffect(() => {
     if (!supabase || !userId || !selectedConversation) { setChatMessages([]); return; }
+    
     void loadChatMessages(selectedConversation.id);
-    if (document.visibilityState === 'visible') void markConversationRead(selectedConversation.id);
+    if (document.visibilityState === 'visible') {
+      void markMessagesDelivered(selectedConversation.id);
+      void markConversationRead(selectedConversation.id);
+    }
+
     const channel = supabase.channel(`messages-${selectedConversation.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConversation.id}` }, payload => {
         const incoming = payload.new as ChatMessage;
@@ -617,7 +673,9 @@ export default function Home() {
         })();
       }).subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [supabase, userId, selectedConversation?.id, loadChatMessages, markConversationRead]);
+  
+  }, [supabase, userId, selectedConversation?.id, loadChatMessages, markConversationRead, markMessagesDelivered]);
+
   function openProfileEditor() {
     if (!userId) { setStatus('Sign in to create your profile.'); return; }
     setEditingProfile(profileExists);
@@ -687,7 +745,45 @@ export default function Home() {
               {groupChat && <strong className="rc-message-sender" style={{color: mine ? '#ffffff' : nicknameColor(message.sender_id)}}>{senderName}</strong>}
               {message.reply_to && <div className="rc-replied-message"><strong style={{color: nicknameColor(message.reply_to.sender_id)}}>{message.reply_to.sender_id === userId ? 'You' : '@' + message.reply_to.sender_nickname}</strong><span>{message.reply_to.body.slice(0, 220)}{message.reply_to.body.length > 220 ? '…' : ''}</span></div>}
               <div className="rc-message-body">{message.body}</div>
-              <small className="rc-message-time">{new Date(message.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small>
+              
+              <small className="rc-message-time">
+                {new Date(message.created_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+                {mine && !groupChat && (
+                  <span
+                    title={
+  (message.read_by || []).some(id => id !== userId)
+    ? 'Read'
+    : (message.delivered_by || []).some(id => id !== userId)
+      ? 'Delivered'
+      : 'Sent'
+                    }
+                    aria-label={
+  (message.read_by || []).some(id => id !== userId)
+    ? 'Read'
+    : (message.delivered_by || []).some(id => id !== userId)
+      ? 'Delivered'
+      : 'Sent'
+                    }
+                    style={{
+                      marginLeft: '5px',
+                      fontWeight: 700,
+                      color: (message.read_by || []).some(id => id !== userId)
+                        ? '#facc15'
+                        : '#9ca3af'
+                    }}
+                  >
+                    {(message.read_by || []).some(id => id !== userId)
+  ? '✓✓'
+  : (message.delivered_by || []).some(id => id !== userId)
+    ? '✓✓'
+    : '✓'}
+                  </span>
+                )}
+              </small>
+
             </div>
             {mine && !groupChat && <span className="rc-message-avatar">{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt=""/> : (message.sender_nickname?.[0] || 'Y').toUpperCase()}</span>}
           </div>;
