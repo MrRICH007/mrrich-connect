@@ -302,32 +302,56 @@ export default function Home() {
   }, [supabase, loadProfile]);
 
   useEffect(() => {
-    if (!supabase || !userId) return;
-    const channel = supabase.channel('mrrich-community-presence', { config: { presence: { key: userId } } });
-    const updateOnlineCount = () => {
-      const state = channel.presenceState() as Record<string, Array<{ user_id?: string }>>;
-      const ids = Object.values(state).flat().map(entry => entry.user_id).filter((id): id is string => Boolean(id));
-      // Count distinct signed-in members, not browser tabs/sessions.
-      setOnlineCount(ids.length ? new Set(ids).size : Object.keys(state).length);
+    if (!supabase || !userId) {
+      setOnlineCount(0);
+      return;
+    }
+
+    let active = true;
+    // Heartbeats run every 30 seconds. A 3-minute freshness window tolerates
+    // ordinary background-tab throttling while eventually clearing abandoned sessions.
+    const HEARTBEAT_INTERVAL_MS = 30_000;
+    const ONLINE_WINDOW_MS = 3 * 60_000;
+
+    const sendHeartbeat = async () => {
+      const { error } = await supabase.rpc('heartbeat_user_presence');
+      if (error) console.warn('Could not update online heartbeat:', error.message);
     };
-    channel.on('presence', { event: 'sync' }, updateOnlineCount);
-    channel.subscribe(async state => {
-      if (state === 'SUBSCRIBED') {
-        await channel.track({ user_id: userId, online_at: new Date().toISOString() });
+
+    const refreshOnlineCount = async () => {
+      const cutoff = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
+      const { data, error } = await supabase
+        .from('user_presence')
+        .select('user_id,last_seen_at')
+        .gte('last_seen_at', cutoff);
+
+      if (error) {
+        console.warn('Could not refresh online count:', error.message);
+        return;
       }
-    });
-    const retrackWhenVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void channel.track({ user_id: userId, online_at: new Date().toISOString() });
-        updateOnlineCount();
-      }
+      if (!active) return;
+      const uniqueUsers = new Set((data ?? []).map(row => row.user_id).filter(Boolean));
+      setOnlineCount(uniqueUsers.size);
     };
-    window.addEventListener('focus', retrackWhenVisible);
-    document.addEventListener('visibilitychange', retrackWhenVisible);
+
+    const pulse = async () => {
+      await sendHeartbeat();
+      await refreshOnlineCount();
+    };
+
+    void pulse();
+    const intervalId = window.setInterval(() => { void pulse(); }, HEARTBEAT_INTERVAL_MS);
+    const refreshWhenActive = () => {
+      if (document.visibilityState === 'visible') void pulse();
+    };
+    window.addEventListener('focus', refreshWhenActive);
+    document.addEventListener('visibilitychange', refreshWhenActive);
+
     return () => {
-      window.removeEventListener('focus', retrackWhenVisible);
-      document.removeEventListener('visibilitychange', retrackWhenVisible);
-      void supabase.removeChannel(channel);
+      active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshWhenActive);
+      document.removeEventListener('visibilitychange', refreshWhenActive);
     };
   }, [supabase, userId]);
 
