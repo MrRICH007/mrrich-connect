@@ -304,11 +304,31 @@ export default function Home() {
   useEffect(() => {
     if (!supabase || !userId) return;
     const channel = supabase.channel('mrrich-community-presence', { config: { presence: { key: userId } } });
-    channel.on('presence', { event: 'sync' }, () => setOnlineCount(Object.keys(channel.presenceState()).length));
+    const updateOnlineCount = () => {
+      const state = channel.presenceState() as Record<string, Array<{ user_id?: string }>>;
+      const ids = Object.values(state).flat().map(entry => entry.user_id).filter((id): id is string => Boolean(id));
+      // Count distinct signed-in members, not browser tabs/sessions.
+      setOnlineCount(ids.length ? new Set(ids).size : Object.keys(state).length);
+    };
+    channel.on('presence', { event: 'sync' }, updateOnlineCount);
     channel.subscribe(async state => {
-      if (state === 'SUBSCRIBED') await channel.track({ online_at: new Date().toISOString() });
+      if (state === 'SUBSCRIBED') {
+        await channel.track({ user_id: userId, online_at: new Date().toISOString() });
+      }
     });
-    return () => { void supabase.removeChannel(channel); };
+    const retrackWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void channel.track({ user_id: userId, online_at: new Date().toISOString() });
+        updateOnlineCount();
+      }
+    };
+    window.addEventListener('focus', retrackWhenVisible);
+    document.addEventListener('visibilitychange', retrackWhenVisible);
+    return () => {
+      window.removeEventListener('focus', retrackWhenVisible);
+      document.removeEventListener('visibilitychange', retrackWhenVisible);
+      void supabase.removeChannel(channel);
+    };
   }, [supabase, userId]);
 
   async function signIn(e: FormEvent) {
@@ -716,17 +736,41 @@ delivered_by: deliveryByMessage[m.id] || []
           }
         })();
       })
-      // Receipt rows are stored separately from messages, so subscribe to both tables
-      // and reload the active chat to update sent/delivered/read ticks in real time.
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reads' }, () => {
+      // Listen for inserts and updates: an existing receipt may be updated rather than inserted.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reads' }, () => {
         void loadChatMessages(selectedConversation.id);
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_deliveries' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_deliveries' }, () => {
         void loadChatMessages(selectedConversation.id);
       }).subscribe();
-    return () => { void supabase.removeChannel(channel); };
+
+    // Recover from missed Realtime events when the browser throttles or suspends a tab.
+    const refreshActiveChat = () => {
+      if (document.visibilityState !== 'visible') return;
+      void loadChatMessages(selectedConversation.id);
+      void markMessagesDelivered(selectedConversation.id);
+      void markConversationRead(selectedConversation.id);
+      void loadUnreadCounts();
+    };
+    const refreshVisibleChat = () => {
+      if (document.visibilityState !== 'visible') return;
+      void loadChatMessages(selectedConversation.id);
+      void markMessagesDelivered(selectedConversation.id);
+      void markConversationRead(selectedConversation.id);
+      void loadUnreadCounts();
+    };
+    window.addEventListener('focus', refreshActiveChat);
+    document.addEventListener('visibilitychange', refreshActiveChat);
+    const refreshInterval = window.setInterval(refreshVisibleChat, 8000);
+
+    return () => {
+      window.removeEventListener('focus', refreshActiveChat);
+      document.removeEventListener('visibilitychange', refreshActiveChat);
+      window.clearInterval(refreshInterval);
+      void supabase.removeChannel(channel);
+    };
   
-  }, [supabase, userId, selectedConversation?.id, loadChatMessages, markConversationRead, markMessagesDelivered]);
+  }, [supabase, userId, selectedConversation?.id, loadChatMessages, markConversationRead, markMessagesDelivered, loadUnreadCounts]);
 
   function openProfileEditor() {
     if (!userId) { setStatus('Sign in to create your profile.'); return; }
