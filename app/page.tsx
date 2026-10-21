@@ -17,6 +17,10 @@ type Profile = {
   school: string | null;
   avatar_url: string | null;
   premium_status: string;
+  department?: string | null;
+  bio?: string | null;
+  premium_title?: string | null;
+  total_online_seconds?: number | null;
 };
 
 type ChatMessage = {
@@ -35,6 +39,40 @@ type ChatMessage = {
   read_by?: string[];
   delivered_by?: string[];
 };
+
+type IncomingRequest = {
+  id: string;
+  sender_id: string;
+  created_at: string;
+  sender_nickname: string;
+};
+
+type CommunityGroup = {
+  id: string;
+  name: string;
+  conversation_id: string | null;
+  avatar_url: string | null;
+  created_by: string;
+};
+
+type AdCampaign = {
+  id: string;
+  title: string;
+  media_type: string;
+  media_path: string;
+  target_url: string | null;
+  expires_at: string;
+};
+
+type Conversation = {
+  id: string;
+  title: string;
+  kind: 'person' | 'group';
+  otherUserId?: string;
+  avatarUrl?: string | null;
+  lastMessageAt?: string | null;
+};
+
 const NAV_ITEMS = [
   { name: 'Messages', icon: MessageCircle, hint: 'Your Conversations Will Appear Here.' },
   { name: 'Discover', icon: Search, hint: 'Find People Online' },
