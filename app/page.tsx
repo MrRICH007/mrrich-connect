@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, TouchEvent } from 'react';
 import { createClient } from '../lib/supabase';
 import {
   Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck,
@@ -112,6 +112,8 @@ export default function Home() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [showGroup, setShowGroup] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [chatExiting, setChatExiting] = useState(false);
+  const pageSwipeStart = useRef<{ x: number; y: number; kind: 'page' | 'chat' } | null>(null);
   const [conversationList, setConversationList] = useState<Conversation[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const chatMessagesRef = useRef<HTMLDivElement | null>(null);
@@ -800,6 +802,51 @@ delivered_by: deliveryByMessage[m.id] || []
   
   }, [supabase, userId, selectedConversation?.id, loadChatMessages, markConversationRead, markMessagesDelivered, loadUnreadCounts]);
 
+  function closeConversationWithMotion() {
+    if (!selectedConversation || chatExiting) return;
+    setChatExiting(true);
+    window.setTimeout(() => {
+      setSelectedConversation(null);
+      setChatExiting(false);
+      setReplyTo(null);
+    }, 170);
+  }
+
+  function handlePageTouchStart(e: TouchEvent<HTMLElement>) {
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, select, button, [contenteditable="true"], .rc-message-row, .rc-chat-empty, .rc-bottom-nav, .rc-modal, .rc-modal-backdrop')) {
+      pageSwipeStart.current = null;
+      return;
+    }
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const inChat = Boolean(selectedConversation && target.closest('.rc-chat-panel'));
+    pageSwipeStart.current = { x: touch.clientX, y: touch.clientY, kind: inChat ? 'chat' : 'page' };
+  }
+
+  function handlePageTouchEnd(e: TouchEvent<HTMLElement>) {
+    const start = pageSwipeStart.current;
+    pageSwipeStart.current = null;
+    const touch = e.changedTouches[0];
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 75 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    if (start.kind === 'chat') {
+      if (dx > 0) closeConversationWithMotion();
+      return;
+    }
+    if (selectedConversation) return;
+    const currentIndex = NAV_ITEMS.findIndex(item => item.name === tab);
+    const nextIndex = dx < 0 ? Math.min(NAV_ITEMS.length - 1, currentIndex + 1) : Math.max(0, currentIndex - 1);
+    if (nextIndex !== currentIndex) {
+      setTab(NAV_ITEMS[nextIndex].name);
+      setShowProfile(false);
+      setShowGroup(false);
+      setShowEmojiPicker(false);
+    }
+  }
+
   function openProfileEditor() {
     if (!userId) { setStatus('Sign in to create your profile.'); return; }
     setEditingProfile(profileExists);
@@ -822,7 +869,7 @@ delivered_by: deliveryByMessage[m.id] || []
     return true;
   });
 
-  return <main className="rc-shell">
+  return <main className="rc-shell" onTouchStart={handlePageTouchStart} onTouchEnd={handlePageTouchEnd}>
     <header className="rc-mobile-header">
       <div className="rc-brand">
         <div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div>
@@ -866,13 +913,13 @@ delivered_by: deliveryByMessage[m.id] || []
       {!configured && <div className="rc-notice"><ShieldCheck size={18}/><span>Supabase is not configured. Add your project URL and public key to your Render environment variables.</span></div>}
       {status && <div className={`rc-toast rc-toast-${statusType}`} role={statusType === 'error' ? 'alert' : 'status'}>{status}<button aria-label="Dismiss notice" onClick={() => setStatus('')}><X size={14}/></button></div>}
 
-      {tab === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''}`}>
+      {tab === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''} ${chatExiting ? 'chat-exiting' : ''}`}>
         <aside className="rc-conversation-list"><div className="rc-list-heading"><div><h2>Conversations</h2><p>Private and group chats</p></div><button type="button" className="rc-icon-btn rc-notification-toggle" onClick={() => void enableMessageNotifications()} title="Enable message notifications" aria-label="Enable message notifications"><Bell size={17}/></button></div>
           {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => { setSelectedConversation(convo); void markConversationRead(convo.id); setReplyTo(null); }}><span className="rc-conversation-avatar">{convo.avatarUrl ? <img src={convo.avatarUrl} alt=""/> : convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span className="rc-conversation-copy"><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span>{(unreadCounts[convo.id] || 0) > 0 && <span className="rc-unread-badge">{unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}</span>}</button>)}
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
-          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={() => setSelectedConversation(null)} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar">{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div ref={chatMessagesRef} onScroll={handleChatScroll} className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
+          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={closeConversationWithMotion} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar">{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div></header><div ref={chatMessagesRef} onScroll={handleChatScroll} className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
           const mine = message.sender_id === userId;
           const groupChat = selectedConversation.kind === 'group';
           const senderName = mine ? 'You' : `@${message.sender_nickname || 'Member'}`;
@@ -932,7 +979,7 @@ delivered_by: deliveryByMessage[m.id] || []
         <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr)',gap:12,marginBottom:20}}>
           <label style={{display:'flex',alignItems:'center',gap:10,background:'#12141c',border:'1px solid #292d3a',borderRadius:14,padding:'0 14px',minHeight:48}}>
             <Search size={18} color="#9ca4b8"/>
-            <input aria-label="Search members" value={discoverQuery} onChange={e => setDiscoverQuery(e.target.value)} placeholder="Search nickname, school, college, department or bio…" style={{width:'100%',minWidth:0,background:'transparent',border:0,outline:'none',color:'#f7f8fc',padding:'14px 0'}}/>
+            <input aria-label="Search members" type="search" enterKeyHint="search" autoComplete="off" value={discoverQuery} onChange={e => setDiscoverQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }} placeholder="Search nickname, school, college, department or bio…" style={{width:'100%',minWidth:0,background:'transparent',border:0,outline:'none',color:'#f7f8fc',padding:'14px 0'}}/>
             {discoverQuery && <button type="button" className="rc-icon-btn" aria-label="Clear search" onClick={() => setDiscoverQuery('')}><X size={15}/></button>}
           </label>
           <div role="group" aria-label="Filter members" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -970,5 +1017,17 @@ delivered_by: deliveryByMessage[m.id] || []
 <div className="rc-privacy"><ShieldCheck size={15}/> Email is kept in your authentication account and isn't shown publicly. Full name and phone are stored separately.</div><button className="rc-primary rc-full" type="submit">Save profile</button></form></div>}
     {showGroup && <div className="rc-modal-backdrop" onClick={() => setShowGroup(false)}><form className="rc-modal" onSubmit={createGroup} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setShowGroup(false)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="rc-muted">Start a space around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><label>Group image (optional)<input type="file" accept="image/*" onChange={e => void uploadGroupAvatar(e.target.files?.[0])} disabled={groupAvatarUploading}/></label>{groupAvatarUploading && <p className="rc-muted">Uploading group image…</p>}{groupAvatarUrl && <div className="rc-avatar-preview"><img src={groupAvatarUrl} alt="Group avatar preview"/><button type="button" className="rc-secondary" onClick={() => setGroupAvatarUrl('')}>Remove image</button></div>}<button className="rc-primary rc-full" type="submit" disabled={groupAvatarUploading}>{groupAvatarUploading ? 'Uploading…' : 'Create group'}</button></form></div>}
     {!authReady && <div className="rc-loading" aria-label="Loading"/>}
+    <style jsx global>{`
+      @keyframes rc-page-swipe-in { from { opacity: .55; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes rc-chat-swipe-in { from { opacity: .55; transform: translateX(32px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes rc-chat-swipe-out { from { opacity: 1; transform: translateX(0); } to { opacity: .5; transform: translateX(42px); } }
+      .rc-content-section, .rc-profile-page, .rc-messages-layout { animation: rc-page-swipe-in 190ms cubic-bezier(.2,.75,.25,1) both; }
+      .rc-messages-layout.has-chat .rc-chat-panel { animation: rc-chat-swipe-in 190ms cubic-bezier(.2,.75,.25,1) both; }
+      .rc-messages-layout.chat-exiting .rc-chat-panel { animation: rc-chat-swipe-out 160ms ease-in both; pointer-events: none; }
+      .rc-person-card, .rc-group-row-wrap, .rc-request-card, .rc-conversation-row, .rc-primary, .rc-secondary, .rc-icon-btn, .rc-bottom-item { transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease; }
+      .rc-person-card:active, .rc-group-row-wrap:active, .rc-request-card:active, .rc-conversation-row:active, .rc-primary:active, .rc-secondary:active, .rc-icon-btn:active, .rc-bottom-item:active { transform: scale(.985); }
+      .rc-shell { touch-action: pan-y; }
+      @media (prefers-reduced-motion: reduce) { .rc-content-section, .rc-profile-page, .rc-messages-layout, .rc-messages-layout.has-chat .rc-chat-panel, .rc-messages-layout.chat-exiting .rc-chat-panel { animation: none !important; transition: none !important; } }
+    `}</style>
   </main>;
 }
