@@ -816,7 +816,11 @@ delivered_by: deliveryByMessage[m.id] || []
 
   function handlePageTouchStart(e: TouchEvent<HTMLElement>) {
     const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, select, button, [contenteditable="true"], .rc-message-row, .rc-bottom-nav, .rc-modal, .rc-modal-backdrop')) {
+    const inConversationList = Boolean(target.closest('.rc-conversation-list'));
+    // Allow swipes to begin anywhere over the conversation list, including on a row;
+    // normal taps still open that conversation because navigation only happens after a clear horizontal drag.
+    if (target.closest('input, textarea, select, [contenteditable="true"], .rc-message-row, .rc-bottom-nav, .rc-modal, .rc-modal-backdrop') ||
+        (target.closest('button') && !inConversationList)) {
       pageSwipeStart.current = null;
       return;
     }
@@ -863,18 +867,23 @@ delivered_by: deliveryByMessage[m.id] || []
     const nextIndex = dx < 0 ? Math.min(NAV_ITEMS.length - 1, currentIndex + 1) : Math.max(0, currentIndex - 1);
     if (nextIndex === currentIndex) { setPageSwipeOffset(0); return; }
     setPageSwipeAnimating(true);
-    setPageSwipeOffset(dx < 0 ? -Math.max(window.innerWidth, Math.abs(dx) + 80) : Math.max(window.innerWidth, Math.abs(dx) + 80));
+    const pageWidth = Math.max(window.innerWidth, Math.abs(dx) + 80);
+    setPageSwipeOffset(dx < 0 ? -pageWidth : pageWidth);
+    // Swap the active page while the stage is off-screen, then let the incoming page
+    // slide back into the same viewport boundary rather than briefly flashing a blank gap.
     window.setTimeout(() => {
       setTab(NAV_ITEMS[nextIndex].name);
       setShowProfile(false);
       setShowGroup(false);
       setShowEmojiPicker(false);
-      setPageSwipeOffset(dx < 0 ? Math.max(window.innerWidth, 1) : -Math.max(window.innerWidth, 1));
-      window.setTimeout(() => {
-        setPageSwipeOffset(0);
-        window.setTimeout(() => setPageSwipeAnimating(false), 220);
-      }, 20);
-    }, 95);
+      setPageSwipeOffset(dx < 0 ? pageWidth : -pageWidth);
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          setPageSwipeOffset(0);
+          window.setTimeout(() => setPageSwipeAnimating(false), 150);
+        });
+      });
+    }, 105);
   }
 
   function openProfileEditor() {
@@ -1060,8 +1069,10 @@ delivered_by: deliveryByMessage[m.id] || []
       .rc-person-card, .rc-group-row-wrap, .rc-request-card, .rc-conversation-row, .rc-primary, .rc-secondary, .rc-icon-btn, .rc-bottom-item { transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease; }
       .rc-person-card:active, .rc-group-row-wrap:active, .rc-request-card:active, .rc-conversation-row:active, .rc-primary:active, .rc-secondary:active, .rc-icon-btn:active, .rc-bottom-item:active { transform: scale(.985); }
       .rc-shell { touch-action: pan-y; overflow-x: clip; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
-      .rc-swipe-stage { position: relative; min-height: calc(100dvh - 82px); transform: translate3d(0,0,0); will-change: transform; }
+      .rc-swipe-stage { position: relative; min-height: calc(100dvh - 82px); transform: translate3d(0,0,0); will-change: transform; backface-visibility: hidden; }
       .rc-swipe-stage.is-swiping { transition: transform 105ms cubic-bezier(.18,.75,.2,1); }
+      .rc-shell { position: relative; }
+      .rc-swipe-stage > header, .rc-swipe-stage > section { backface-visibility: hidden; }
       .rc-bottom-nav { position: fixed !important; bottom: 0; z-index: 60; padding-bottom: max(8px, env(safe-area-inset-bottom)); transform: translate3d(0,0,0); }
       @media (prefers-reduced-motion: reduce) { .rc-swipe-stage { transition: none !important; } }
       @media (prefers-reduced-motion: reduce) { .rc-content-section, .rc-profile-page, .rc-messages-layout, .rc-messages-layout.has-chat .rc-chat-panel, .rc-messages-layout.chat-exiting .rc-chat-panel { animation: none !important; transition: none !important; } }
