@@ -91,6 +91,9 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [nickname, setNickname] = useState('');
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [discoverQuery, setDiscoverQuery] = useState('');
+  const [discoverFilter, setDiscoverFilter] = useState<'all' | 'online' | 'school'>('all');
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [status, setStatus] = useState('');
   const [statusType, setStatusType] = useState<'success' | 'error' | 'info'>('info');
@@ -193,7 +196,7 @@ export default function Home() {
     const { data: adminResult } = await supabase.rpc('is_admin');
     setIsAdmin(adminResult === true);
     const { data } = await supabase.from('profiles')
-      .select('id,nickname,level,college,school,department,bio,avatar_url,premium_status,premium_title,total_online_seconds').limit(60);
+      .select('id,nickname,level,college,school,department,bio,avatar_url,premium_status,premium_title,total_online_seconds').limit(200);
     if (data) setProfiles(data as Profile[]);
     if (userId) {
       const { data: req } = await supabase.from('message_requests').select('id')
@@ -331,6 +334,7 @@ export default function Home() {
       }
       if (!active) return;
       const uniqueUsers = new Set((data ?? []).map(row => row.user_id).filter(Boolean));
+      setOnlineUserIds([...uniqueUsers]);
       setOnlineCount(uniqueUsers.size);
     };
 
@@ -804,6 +808,19 @@ delivered_by: deliveryByMessage[m.id] || []
 
   const currentNav = NAV_ITEMS.find(n => n.name === tab);
   const configured = !!supabase;
+  const discoverProfiles = profiles.filter(p => {
+    if (p.id === userId) return false;
+    const query = discoverQuery.trim().toLocaleLowerCase();
+    const searchableText = [p.nickname, p.school, p.college, p.department, p.level, p.bio]
+      .filter(Boolean).join(' ').toLocaleLowerCase();
+    if (query && !searchableText.includes(query)) return false;
+    if (discoverFilter === 'online' && !onlineUserIds.includes(p.id)) return false;
+    if (discoverFilter === 'school') {
+      const mySchool = profileForm.school.trim().toLocaleLowerCase();
+      if (!mySchool || (p.school || '').trim().toLocaleLowerCase() !== mySchool) return false;
+    }
+    return true;
+  });
 
   return <main className="rc-shell">
     <header className="rc-mobile-header">
@@ -911,10 +928,24 @@ delivered_by: deliveryByMessage[m.id] || []
         </section>
       </section>}
 
-      {tab === 'Discover' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>People you may know</h2><p>Connect with members from your community.</p></div><button className="rc-text-btn" onClick={() => void refreshCommunity()}>Refresh <RefreshCw size={14}/></button></div>
+      {tab === 'Discover' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>People you may know</h2><p>Search members and find people from your community.</p></div><button className="rc-text-btn" onClick={() => void refreshCommunity()}>Refresh <RefreshCw size={14}/></button></div>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr)',gap:12,marginBottom:20}}>
+          <label style={{display:'flex',alignItems:'center',gap:10,background:'#12141c',border:'1px solid #292d3a',borderRadius:14,padding:'0 14px',minHeight:48}}>
+            <Search size={18} color="#9ca4b8"/>
+            <input aria-label="Search members" value={discoverQuery} onChange={e => setDiscoverQuery(e.target.value)} placeholder="Search nickname, school, college, department or bio…" style={{width:'100%',minWidth:0,background:'transparent',border:0,outline:'none',color:'#f7f8fc',padding:'14px 0'}}/>
+            {discoverQuery && <button type="button" className="rc-icon-btn" aria-label="Clear search" onClick={() => setDiscoverQuery('')}><X size={15}/></button>}
+          </label>
+          <div role="group" aria-label="Filter members" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <button type="button" className={discoverFilter === 'all' ? 'rc-primary' : 'rc-secondary'} aria-pressed={discoverFilter === 'all'} onClick={() => setDiscoverFilter('all')}>All members</button>
+            <button type="button" className={discoverFilter === 'online' ? 'rc-primary' : 'rc-secondary'} aria-pressed={discoverFilter === 'online'} onClick={() => setDiscoverFilter('online')}><span style={{width:7,height:7,borderRadius:'50%',background:'#32d296',display:'inline-block'}}/> Online</button>
+            <button type="button" className={discoverFilter === 'school' ? 'rc-primary' : 'rc-secondary'} aria-pressed={discoverFilter === 'school'} onClick={() => setDiscoverFilter('school')}>My school</button>
+          </div>
+          {discoverFilter === 'school' && !profileForm.school.trim() && <p className="rc-muted" style={{margin:0,fontSize:13}}>Add your school in My Profile to use this filter.</p>}
+          <p className="rc-muted" style={{margin:0,fontSize:12}}>{discoverProfiles.length} member{discoverProfiles.length === 1 ? '' : 's'} found</p>
+        </div>
         {activeAds.length > 0 && <section className="rc-ad-feed" aria-label="Sponsored community announcements"><div className="rc-section-title"><div><h2>Community spotlight</h2><p>Promotions and announcements</p></div></div><div className="rc-people-grid">{activeAds.map(ad => <article className="rc-person-card rc-ad-card" key={ad.id}><span className="rc-eyebrow">SPONSORED</span><h3>{ad.title}</h3>{ad.media_type === 'image' ? <img src={ad.media_path} alt={ad.title} style={{width:'100%',maxHeight:220,objectFit:'cover',borderRadius:12}}/> : <video src={ad.media_path} controls playsInline style={{width:'100%',maxHeight:220,borderRadius:12}}/>}{ad.target_url && <a href={ad.target_url} target="_blank" rel="noreferrer" className="rc-primary">Learn more</a>}<small>Expires {new Date(ad.expires_at).toLocaleDateString()}</small></article>)}</div></section>}
-        <div className="rc-people-grid">{profiles.filter(p => p.id !== userId).map(p => <article className="rc-person-card rc-discover-person" key={p.id}><div className="rc-discover-main"><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div></div><div className="rc-discover-details"><h3>@{p.nickname}</h3><p className="rc-discover-level-college">{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small>{p.premium_status === 'active' && <span className="rc-premium-badge"><Crown size={10}/> PREMIUM</span>}</div></div><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor((p.total_online_seconds || 0) / 3600)}h online</span><button className="rc-primary rc-connect" onClick={() => void sendRequest(p.id)}>Connect <Plus size={15}/></button></div></article>)}</div>
-        {profiles.filter(p => p.id !== userId).length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No people to show yet</h2><p>New members will appear here when they create a profile.</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}</div>}
+        <div className="rc-people-grid">{discoverProfiles.map(p => <article className="rc-person-card rc-discover-person" key={p.id}><div className="rc-discover-main"><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div></div><div className="rc-discover-details"><h3>@{p.nickname} {onlineUserIds.includes(p.id) && <span title="Online now" aria-label="Online now" style={{display:'inline-block',width:8,height:8,borderRadius:'50%',background:'#32d296',verticalAlign:'middle',marginLeft:5}}/>}</h3><p className="rc-discover-level-college">{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small>{p.premium_status === 'active' && <span className="rc-premium-badge"><Crown size={10}/> PREMIUM</span>}</div></div><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor((p.total_online_seconds || 0) / 3600)}h online</span><button className="rc-primary rc-connect" onClick={() => void sendRequest(p.id)}>Connect <Plus size={15}/></button></div></article>)}</div>
+        {discoverProfiles.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>{discoverQuery || discoverFilter !== 'all' ? 'No matching members' : 'No people to show yet'}</h2><p>{discoverQuery || discoverFilter !== 'all' ? 'Try a different search or filter. Search currently checks the members loaded by Discover.' : 'New members will appear here when they create a profile.'}</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}{(discoverQuery || discoverFilter !== 'all') && <button className="rc-secondary" onClick={() => { setDiscoverQuery(''); setDiscoverFilter('all'); }}>Clear search and filters</button>}</div>}
       </section>}
 
       {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <label className="rc-edit-group-avatar"><Pencil size={14}/><span>Change image</span><input type="file" accept="image/*" style={{display:'none'}} onChange={e => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; void changeExistingGroupAvatar(g, file); }}/></label>}</div>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
