@@ -681,7 +681,9 @@ delivered_by: deliveryByMessage[m.id] || []
       setConversationList(current => current.map(c => c.id === incoming.conversation_id ? { ...c, lastMessageAt: incoming.created_at } : c).sort((a,b) => (b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0) - (a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0)));
       if (incoming.sender_id === userId) return;
       const active = selectedConversation?.id === incoming.conversation_id;
-      if (!active) setUnreadCounts(old => ({ ...old, [incoming.conversation_id]: (old[incoming.conversation_id] || 0) + 1 }));
+      // Re-read the database-backed count instead of incrementing locally. This avoids
+      // duplicate counts when more than one realtime listener receives the same message.
+      if (!active) void loadUnreadCounts();
       if (notificationPermission === 'granted' && !active && document.visibilityState !== 'visible') {
         const convo = conversationList.find(c => c.id === incoming.conversation_id);
         void supabase.from('profiles').select('nickname').eq('id', incoming.sender_id).maybeSingle().then(({data}) => {
@@ -691,7 +693,7 @@ delivered_by: deliveryByMessage[m.id] || []
       if (active) void loadChatMessages(incoming.conversation_id);
     }).subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [supabase, userId, selectedConversation?.id, notificationPermission, conversationList, loadChatMessages]);
+  }, [supabase, userId, selectedConversation?.id, notificationPermission, conversationList, loadChatMessages, loadUnreadCounts]);
   useEffect(() => {
     if (!supabase || !userId || !selectedConversation) { setChatMessages([]); return; }
     
@@ -708,7 +710,19 @@ delivered_by: deliveryByMessage[m.id] || []
           const { data: sender } = await supabase.from('profiles').select('nickname,avatar_url').eq('id', incoming.sender_id).maybeSingle();
           const enriched = { ...decodeChatMessage(incoming), sender_nickname: sender?.nickname || (incoming.sender_id === userId ? 'You' : 'Member'), sender_avatar_url: sender?.avatar_url || null };
           setChatMessages(old => old.some(m => m.id === enriched.id) ? old : [...old, enriched]);
+          if (incoming.sender_id !== userId && document.visibilityState === 'visible') {
+            void markMessagesDelivered(selectedConversation.id);
+            void markConversationRead(selectedConversation.id);
+          }
         })();
+      })
+      // Receipt rows are stored separately from messages, so subscribe to both tables
+      // and reload the active chat to update sent/delivered/read ticks in real time.
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reads' }, () => {
+        void loadChatMessages(selectedConversation.id);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_deliveries' }, () => {
+        void loadChatMessages(selectedConversation.id);
       }).subscribe();
     return () => { void supabase.removeChannel(channel); };
   
