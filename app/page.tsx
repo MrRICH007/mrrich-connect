@@ -1095,7 +1095,17 @@ delivered_by: deliveryByMessage[m.id] || []
       .rc-person-card, .rc-group-row-wrap, .rc-request-card, .rc-conversation-row, .rc-primary, .rc-secondary, .rc-icon-btn, .rc-bottom-item { transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease; }
       .rc-person-card:active, .rc-group-row-wrap:active, .rc-request-card:active, .rc-conversation-row:active, .rc-primary:active, .rc-secondary:active, .rc-icon-btn:active, .rc-bottom-item:active { transform: scale(.985); }
       .rc-shell { touch-action: pan-y; overflow-x: clip; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
-      .rc-swipe-stage { position: relative; min-height: calc(100dvh - 82px); transform: translate3d(0,0,0); will-change: transform; backface-visibility: hidden; }
+      
+
+.rc-swipe-stage {
+  position: relative;
+  min-height: calc(100dvh - 82px);
+  transform: translate3d(0,0,0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+
       .rc-swipe-stage.is-swiping { transition: transform 105ms cubic-bezier(.18,.75,.2,1); }
       .rc-shell { position: relative; }
       .rc-swipe-stage > header, .rc-swipe-stage > section { backface-visibility: hidden; }
