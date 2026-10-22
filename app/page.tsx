@@ -831,13 +831,29 @@ delivered_by: deliveryByMessage[m.id] || []
     setPageSwipeAnimating(false);
   }
 
+  
   function handlePageTouchMove(e: TouchEvent<HTMLElement>) {
     const start = pageSwipeStart.current;
     const touch = e.changedTouches[0];
     if (!start || !touch) return;
+
     const dx = touch.clientX - start.x;
     const dy = touch.clientY - start.y;
+
     if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
+
+    // Prevent movement beyond the first and last navigation pages.
+    if (start.kind === 'page') {
+      const currentIndex = NAV_ITEMS.findIndex(item => item.name === tab);
+      const atFirstPage = currentIndex <= 0;
+      const atLastPage = currentIndex >= NAV_ITEMS.length - 1;
+
+      if ((atFirstPage && dx > 0) || (atLastPage && dx < 0)) {
+        setPageSwipeOffset(0);
+        return;
+      }
+    }
+
     const limit = Math.max(180, window.innerWidth * 0.82);
     setPageSwipeOffset(Math.max(-limit, Math.min(limit, dx)));
   }
@@ -846,45 +862,55 @@ delivered_by: deliveryByMessage[m.id] || []
     const start = pageSwipeStart.current;
     pageSwipeStart.current = null;
     const touch = e.changedTouches[0];
-    if (!start || !touch) { setPageSwipeOffset(0); return; }
+
+    if (!start || !touch) {
+      setPageSwipeOffset(0);
+      return;
+    }
+
     const dx = touch.clientX - start.x;
     const dy = touch.clientY - start.y;
-    const horizontal = Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy) * 1.15;
-    if (!horizontal) { setPageSwipeOffset(0); return; }
+    const horizontal =
+      Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy) * 1.15;
 
+    if (!horizontal) {
+      setPageSwipeOffset(0);
+      return;
+    }
+
+    // Preserve the existing chat swipe-back behavior.
     if (start.kind === 'chat' && dx > 0) {
       setPageSwipeAnimating(true);
       setPageSwipeOffset(Math.max(window.innerWidth, dx + 60));
+
       window.setTimeout(() => {
         closeConversationWithMotion();
         setPageSwipeOffset(0);
         setPageSwipeAnimating(false);
       }, 100);
+
       return;
     }
 
     const currentIndex = NAV_ITEMS.findIndex(item => item.name === tab);
-    const nextIndex = dx < 0 ? Math.min(NAV_ITEMS.length - 1, currentIndex + 1) : Math.max(0, currentIndex - 1);
-    if (nextIndex === currentIndex) { setPageSwipeOffset(0); return; }
-    setPageSwipeAnimating(true);
-    const pageWidth = Math.max(window.innerWidth, Math.abs(dx) + 80);
-    setPageSwipeOffset(dx < 0 ? -pageWidth : pageWidth);
-    // Swap the active page while the stage is off-screen, then let the incoming page
-    // slide back into the same viewport boundary rather than briefly flashing a blank gap.
-    window.setTimeout(() => {
-      setTab(NAV_ITEMS[nextIndex].name);
-      setShowProfile(false);
-      setShowGroup(false);
-      setShowEmojiPicker(false);
-      setPageSwipeOffset(dx < 0 ? pageWidth : -pageWidth);
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          setPageSwipeOffset(0);
-          window.setTimeout(() => setPageSwipeAnimating(false), 150);
-        });
-      });
-    }, 105);
+    const nextIndex = dx < 0 ? currentIndex + 1 : currentIndex - 1;
+
+    // Never navigate past the first or last tab.
+    if (nextIndex < 0 || nextIndex >= NAV_ITEMS.length) {
+      setPageSwipeOffset(0);
+      setPageSwipeAnimating(false);
+      return;
+    }
+
+    // Switch immediately to avoid the delayed off-screen swap and blank flash.
+    setTab(NAV_ITEMS[nextIndex].name);
+    setShowProfile(false);
+    setShowGroup(false);
+    setShowEmojiPicker(false);
+    setPageSwipeOffset(0);
+    setPageSwipeAnimating(false);
   }
+
 
   function openProfileEditor() {
     if (!userId) { setStatus('Sign in to create your profile.'); return; }
