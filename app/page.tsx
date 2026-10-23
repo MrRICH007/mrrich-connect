@@ -902,13 +902,17 @@ delivered_by: deliveryByMessage[m.id] || []
       return;
     }
 
-    // Switch immediately to avoid the delayed off-screen swap and blank flash.
-    setTab(NAV_ITEMS[nextIndex].name);
-    setShowProfile(false);
-    setShowGroup(false);
-    setShowEmojiPicker(false);
-    setPageSwipeOffset(0);
-    setPageSwipeAnimating(false);
+    // Animate the shared track to the neighboring panel, then commit the tab.
+    setPageSwipeAnimating(true);
+    setPageSwipeOffset(dx < 0 ? -window.innerWidth : window.innerWidth);
+    window.setTimeout(() => {
+      setTab(NAV_ITEMS[nextIndex].name);
+      setShowProfile(false);
+      setShowGroup(false);
+      setShowEmojiPicker(false);
+      setPageSwipeOffset(0);
+      setPageSwipeAnimating(false);
+    }, 125);
   }
 
 
@@ -935,7 +939,7 @@ delivered_by: deliveryByMessage[m.id] || []
   });
 
   return <main className="rc-shell" onTouchStart={handlePageTouchStart} onTouchMove={handlePageTouchMove} onTouchEnd={handlePageTouchEnd}>
-    <div className={`rc-swipe-stage ${pageSwipeAnimating ? 'is-swiping' : ''}`} style={{ transform: `translate3d(${pageSwipeOffset}px,0,0)` }}>
+    {!userId ? <>
     <header className="rc-mobile-header">
       <div className="rc-brand">
         <div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div>
@@ -946,8 +950,7 @@ delivered_by: deliveryByMessage[m.id] || []
         {userId ? <button className="rc-icon-btn" aria-label="Sign out" onClick={signOut}><LogOut size={19}/></button> : <button className="rc-small-login" onClick={() => document.getElementById('rc-email')?.focus()}>Login</button>}
       </div>
     </header>
-
-    {!userId ? <section className="rc-auth-layout">
+    <section className="rc-auth-layout">
       <div className="rc-auth-intro"><span className="rc-eyebrow"><Sparkles size={14}/> YOUR CAMPUS. YOUR COMMUNITY.</span><h1>Find your people.<br/><em>Build your circle.</em></h1><p>Connect with people from your school and community.</p><div className="rc-auth-symbol"><MessageCircle size={58}/><Wifi size={25}/></div></div>
       <form className="rc-auth-card" onSubmit={authMode === 'signin' ? signIn : signUp}>
         <span className="rc-eyebrow">WELCOME TO THE NETWORK</span><h2>{authMode === 'signin' ? 'Sign in' : 'Create your account'}</h2>
@@ -970,16 +973,28 @@ delivered_by: deliveryByMessage[m.id] || []
         <button className="rc-secondary rc-full" type="button" onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}>{authMode === 'signin' ? 'Create an account' : 'Already have an account? Sign in'}</button>
         <small className="rc-privacy"><ShieldCheck size={14}/> Full name and phone are private. Email stays in your authentication account.</small>
       </form>
-    </section> : <>
-      <div className="rc-page-heading"><div><span className="rc-eyebrow">{tab === 'Messages' ? 'YOUR INBOX' : tab === 'Discover' ? 'MEET YOUR COMMUNITY' : tab === 'Groups' ? 'YOUR COMMUNITIES' : tab === 'Requests' ? 'NEW CONNECTIONS' : 'YOUR SPACE'}</span><h1>{tab === 'Messages' ? 'Messages' : tab === 'Discover' ? 'Find People Online' : tab === 'Groups' ? 'Find Your Community' : tab === 'Requests' ? 'Message Requests' : 'Your Profile'}</h1></div>
-        {tab === 'Groups' && <button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={17}/> Create group</button>}
-        {tab === 'Discover' && <button className="rc-icon-btn" aria-label="Refresh people" onClick={() => void refreshCommunity()}><RefreshCw size={18}/></button>}
+    </section>
+    </> : <div className="rc-swipe-viewport"><div className={`rc-swipe-stage ${pageSwipeAnimating ? 'is-swiping' : ''}`} style={{ transform: `translate3d(calc(-${(NAV_ITEMS.findIndex(item => item.name === tab) < 0 ? 0 : NAV_ITEMS.findIndex(item => item.name === tab)) * 20}% + ${pageSwipeOffset}px),0,0)` }}>
+      {NAV_ITEMS.map(page => <section className="rc-tab-panel" key={page.name} aria-hidden={page.name !== tab}>
+    <header className="rc-mobile-header">
+      <div className="rc-brand">
+        <div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div>
+        <div className="rc-brand-type"><strong>MR RICH</strong><span>CONNECT</span></div>
+      </div>
+      <div className="rc-header-actions">
+        {userId && <span className="rc-online-pill"><i/> {onlineCount} online</span>}
+        {userId ? <button className="rc-icon-btn" aria-label="Sign out" onClick={signOut}><LogOut size={19}/></button> : <button className="rc-small-login" onClick={() => document.getElementById('rc-email')?.focus()}>Login</button>}
+      </div>
+    </header>
+      <div className="rc-page-heading"><div><span className="rc-eyebrow">{page.name === 'Messages' ? 'YOUR INBOX' : page.name === 'Discover' ? 'MEET YOUR COMMUNITY' : page.name === 'Groups' ? 'YOUR COMMUNITIES' : page.name === 'Requests' ? 'NEW CONNECTIONS' : 'YOUR SPACE'}</span><h1>{page.name === 'Messages' ? 'Messages' : page.name === 'Discover' ? 'Find People Online' : page.name === 'Groups' ? 'Find Your Community' : page.name === 'Requests' ? 'Message Requests' : 'Your Profile'}</h1></div>
+        {page.name === 'Groups' && <button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={17}/> Create group</button>}
+        {page.name === 'Discover' && <button className="rc-icon-btn" aria-label="Refresh people" onClick={() => void refreshCommunity()}><RefreshCw size={18}/></button>}
       </div>
 
       {!configured && <div className="rc-notice"><ShieldCheck size={18}/><span>Supabase is not configured. Add your project URL and public key to your Render environment variables.</span></div>}
       {status && <div className={`rc-toast rc-toast-${statusType}`} role={statusType === 'error' ? 'alert' : 'status'}>{status}<button aria-label="Dismiss notice" onClick={() => setStatus('')}><X size={14}/></button></div>}
 
-      {tab === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''} ${chatExiting ? 'chat-exiting' : ''}`}>
+      {page.name === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''} ${chatExiting ? 'chat-exiting' : ''}`}>
         <aside className="rc-conversation-list"><div className="rc-list-heading"><div><h2>Conversations</h2><p>Private and group chats</p></div><button type="button" className="rc-icon-btn rc-notification-toggle" onClick={() => void enableMessageNotifications()} title="Enable message notifications" aria-label="Enable message notifications"><Bell size={17}/></button></div>
           {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => { setSelectedConversation(convo); void markConversationRead(convo.id); setReplyTo(null); }}><span className="rc-conversation-avatar">{convo.avatarUrl ? <img src={convo.avatarUrl} alt=""/> : convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span className="rc-conversation-copy"><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span>{(unreadCounts[convo.id] || 0) > 0 && <span className="rc-unread-badge">{unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}</span>}</button>)}
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
@@ -1041,7 +1056,7 @@ delivered_by: deliveryByMessage[m.id] || []
         </section>
       </section>}
 
-      {tab === 'Discover' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>People you may know</h2><p>Search members and find people from your community.</p></div><button className="rc-text-btn" onClick={() => void refreshCommunity()}>Refresh <RefreshCw size={14}/></button></div>
+      {page.name === 'Discover' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>People you may know</h2><p>Search members and find people from your community.</p></div><button className="rc-text-btn" onClick={() => void refreshCommunity()}>Refresh <RefreshCw size={14}/></button></div>
         <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr)',gap:12,marginBottom:20}}>
           <label style={{display:'flex',alignItems:'center',gap:10,background:'#12141c',border:'1px solid #292d3a',borderRadius:14,padding:'0 14px',minHeight:48}}>
             <Search size={18} color="#9ca4b8"/>
@@ -1061,15 +1076,16 @@ delivered_by: deliveryByMessage[m.id] || []
         {discoverProfiles.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>{discoverQuery || discoverFilter !== 'all' ? 'No matching members' : 'No people to show yet'}</h2><p>{discoverQuery || discoverFilter !== 'all' ? 'Try a different search or filter. Search currently checks the members loaded by Discover.' : 'New members will appear here when they create a profile.'}</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}{(discoverQuery || discoverFilter !== 'all') && <button className="rc-secondary" onClick={() => { setDiscoverQuery(''); setDiscoverFilter('all'); }}>Clear search and filters</button>}</div>}
       </section>}
 
-      {tab === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <label className="rc-edit-group-avatar"><Pencil size={14}/><span>Change image</span><input type="file" accept="image/*" style={{display:'none'}} onChange={e => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; void changeExistingGroupAvatar(g, file); }}/></label>}</div>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
+      {page.name === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <label className="rc-edit-group-avatar"><Pencil size={14}/><span>Change image</span><input type="file" accept="image/*" style={{display:'none'}} onChange={e => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; void changeExistingGroupAvatar(g, file); }}/></label>}</div>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
 
-      {tab === 'Requests' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Message requests</h2><p>Accept a request to open a private conversation.</p></div><button className="rc-text-btn" onClick={() => void loadIncomingRequests()}><RefreshCw size={14}/> Refresh</button></div>
+      {page.name === 'Requests' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Message requests</h2><p>Accept a request to open a private conversation.</p></div><button className="rc-text-btn" onClick={() => void loadIncomingRequests()}><RefreshCw size={14}/> Refresh</button></div>
         {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card rc-request-slim" key={request.id}><div className="rc-request-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><div className="rc-request-details"><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation.</p><small>{new Date(request.created_at).toLocaleDateString()}</small></div></div><div className="rc-request-actions"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p><button className="rc-secondary" onClick={() => void loadIncomingRequests()}><RefreshCw size={15}/> Refresh requests</button></div>}</section>}
 
-      {tab === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{[...profiles].sort((a,b)=>(b.total_online_seconds||0)-(a.total_online_seconds||0)).slice(0,5).map((p,i)=><div className="rc-group-row" key={p.id}><span className="rc-group-icon">#{i+1}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small>{p.premium_status === 'active' && p.premium_title ? p.premium_title : 'Community member'}</small></span><span className="rc-arrow">{Math.floor((p.total_online_seconds||0)/3600)}h</span></div>)}</div></section>}</section>}
-    </>}
+      {page.name === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{[...profiles].sort((a,b)=>(b.total_online_seconds||0)-(a.total_online_seconds||0)).slice(0,5).map((p,i)=><div className="rc-group-row" key={p.id}><span className="rc-group-icon">#{i+1}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small>{p.premium_status === 'active' && p.premium_title ? p.premium_title : 'Community member'}</small></span><span className="rc-arrow">{Math.floor((p.total_online_seconds||0)/3600)}h</span></div>)}</div></section>}</section>}
 
-    </div>
+      </section>)}
+    </div></div>}
+
 
     <footer className="rc-footer"><span>© {new Date().getFullYear()} MR RICH CONNECT</span><span><ShieldCheck size={13}/> Your campus. Your community.</span></footer>
 
@@ -1097,18 +1113,30 @@ delivered_by: deliveryByMessage[m.id] || []
       .rc-shell { touch-action: pan-y; overflow-x: clip; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
       
 
+.rc-swipe-viewport {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
 .rc-swipe-stage {
+  display: flex;
+  align-items: stretch;
+  width: 500%;
   position: relative;
   min-height: calc(100dvh - 82px);
-  transform: translate3d(0,0,0);
   will-change: transform;
   backface-visibility: hidden;
 }
-
-
-      .rc-swipe-stage.is-swiping { transition: transform 105ms cubic-bezier(.18,.75,.2,1); }
-      .rc-shell { position: relative; }
-      .rc-swipe-stage > header, .rc-swipe-stage > section { backface-visibility: hidden; }
+.rc-tab-panel {
+  flex: 0 0 20%;
+  width: 20%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  backface-visibility: hidden;
+}
+.rc-swipe-stage.is-swiping { transition: transform 125ms cubic-bezier(.18,.75,.2,1); }
+.rc-shell { position: relative; }
       .rc-bottom-nav { position: fixed !important; bottom: 0; z-index: 60; padding-bottom: max(8px, env(safe-area-inset-bottom)); transform: translate3d(0,0,0); }
       @media (prefers-reduced-motion: reduce) { .rc-swipe-stage { transition: none !important; } }
       @media (prefers-reduced-motion: reduce) { .rc-content-section, .rc-profile-page, .rc-messages-layout, .rc-messages-layout.has-chat .rc-chat-panel, .rc-messages-layout.chat-exiting .rc-chat-panel { animation: none !important; transition: none !important; } }
