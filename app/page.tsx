@@ -1087,7 +1087,7 @@ delivered_by: deliveryByMessage[m.id] || []
     </div></div>}
 
 
-    <footer className="rc-footer"><span>© {new Date().getFullYear()} MR RICH CONNECT</span><span><ShieldCheck size={13}/> Your campus. Your community.</span></footer>
+    {tab !== 'Messages' && <footer className="rc-footer"><span>© {new Date().getFullYear()} MR RICH CONNECT</span><span><ShieldCheck size={13}/> Your campus. Your community.</span></footer>}
 
     {userId && !selectedConversation && <nav className="rc-bottom-nav" aria-label="Main navigation">{NAV_ITEMS.map(item => <button key={item.name} className={`rc-bottom-item ${tab === item.name ? 'active' : ''}`} onClick={() => { setTab(item.name); setShowProfile(false); setShowGroup(false); setShowEmojiPicker(false); }}><span className="rc-bottom-icon"><item.icon size={24} strokeWidth={tab === item.name ? 2.5 : 2}/>{item.name === 'Requests' && requests > 0 && <i className="rc-nav-badge">{requests}</i>}</span><span className="rc-bottom-label">{item.name === 'My Profile' ? 'Profile' : item.name}</span></button>)}</nav>}
 
@@ -1123,7 +1123,7 @@ delivered_by: deliveryByMessage[m.id] || []
   align-items: stretch;
   width: 500%;
   position: relative;
-  min-height: calc(100dvh - 82px);
+  min-height: 0;
   will-change: transform;
   backface-visibility: hidden;
 }
