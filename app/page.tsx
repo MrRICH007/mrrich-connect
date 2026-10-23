@@ -1137,6 +1137,36 @@ delivered_by: deliveryByMessage[m.id] || []
 }
 .rc-swipe-stage.is-swiping { transition: transform 125ms cubic-bezier(.18,.75,.2,1); }
 .rc-shell { position: relative; }
+      /* The mobile chat overlay lives inside a transformed swipe track. Keep it
+         sized and positioned against its own page panel, not the 500%-wide track. */
+      @media (max-width: 800px) {
+        .rc-tab-panel { position: relative; }
+        .rc-messages-layout.has-chat {
+          position: absolute !important;
+          inset: calc(76px + var(--rc-visual-offset, 0px)) 0 auto 0 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          height: calc(var(--rc-visual-height, 100dvh) - 76px - var(--rc-visual-offset, 0px)) !important;
+          max-height: calc(var(--rc-visual-height, 100dvh) - 76px - var(--rc-visual-offset, 0px)) !important;
+          min-width: 0 !important;
+          overflow: hidden !important;
+        }
+        html.rc-keyboard-open .rc-messages-layout.has-chat {
+          inset: 0 0 auto 0 !important;
+          height: var(--rc-visual-height, 100dvh) !important;
+          max-height: var(--rc-visual-height, 100dvh) !important;
+        }
+        .rc-messages-layout.has-chat .rc-chat-panel,
+        .rc-messages-layout.has-chat .rc-composer-wrap,
+        .rc-messages-layout.has-chat .rc-composer {
+          width: 100% !important;
+          max-width: 100% !important;
+          min-width: 0 !important;
+          box-sizing: border-box !important;
+        }
+        .rc-messages-layout.has-chat .rc-composer-wrap { overflow: visible; }
+        .rc-messages-layout.has-chat .rc-composer { overflow: hidden; }
+      }
       .rc-bottom-nav { position: fixed !important; bottom: 0; z-index: 60; padding-bottom: max(8px, env(safe-area-inset-bottom)); transform: translate3d(0,0,0); }
       @media (prefers-reduced-motion: reduce) { .rc-swipe-stage { transition: none !important; } }
       @media (prefers-reduced-motion: reduce) { .rc-content-section, .rc-profile-page, .rc-messages-layout, .rc-messages-layout.has-chat .rc-chat-panel, .rc-messages-layout.chat-exiting .rc-chat-panel { animation: none !important; transition: none !important; } }
