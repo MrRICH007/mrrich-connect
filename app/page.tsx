@@ -975,7 +975,11 @@ delivered_by: deliveryByMessage[m.id] || []
       </form>
     </section>
     </> : <div className="rc-swipe-viewport"><div className={`rc-swipe-stage ${pageSwipeAnimating ? 'is-swiping' : ''}`} style={{ transform: `translate3d(calc(-${(NAV_ITEMS.findIndex(item => item.name === tab) < 0 ? 0 : NAV_ITEMS.findIndex(item => item.name === tab)) * 20}% + ${pageSwipeOffset}px),0,0)` }}>
-      {NAV_ITEMS.map(page => <section className="rc-tab-panel" key={page.name} aria-hidden={page.name !== tab}>
+      {NAV_ITEMS.map((page, pageIndex) => {
+        const activeIndex = NAV_ITEMS.findIndex(item => item.name === tab);
+        const isActive = page.name === tab;
+        const isSwipeNeighbor = (pageSwipeOffset < 0 && pageIndex === activeIndex + 1) || (pageSwipeOffset > 0 && pageIndex === activeIndex - 1);
+        return <section className={`rc-tab-panel ${isActive || isSwipeNeighbor ? 'rc-panel-visible' : 'rc-panel-hidden'}`} key={page.name} aria-hidden={!isActive}>
     <header className="rc-mobile-header">
       <div className="rc-brand">
         <div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div>
@@ -1083,7 +1087,8 @@ delivered_by: deliveryByMessage[m.id] || []
 
       {page.name === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{[...profiles].sort((a,b)=>(b.total_online_seconds||0)-(a.total_online_seconds||0)).slice(0,5).map((p,i)=><div className="rc-group-row" key={p.id}><span className="rc-group-icon">#{i+1}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small>{p.premium_status === 'active' && p.premium_title ? p.premium_title : 'Community member'}</small></span><span className="rc-arrow">{Math.floor((p.total_online_seconds||0)/3600)}h</span></div>)}</div></section>}</section>}
 
-      </section>)}
+      </section>;
+      })}
     </div></div>}
 
 
@@ -1110,7 +1115,7 @@ delivered_by: deliveryByMessage[m.id] || []
       .rc-messages-layout.chat-exiting .rc-chat-panel { animation: rc-chat-swipe-out 160ms ease-in both; pointer-events: none; }
       .rc-person-card, .rc-group-row-wrap, .rc-request-card, .rc-conversation-row, .rc-primary, .rc-secondary, .rc-icon-btn, .rc-bottom-item { transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease; }
       .rc-person-card:active, .rc-group-row-wrap:active, .rc-request-card:active, .rc-conversation-row:active, .rc-primary:active, .rc-secondary:active, .rc-icon-btn:active, .rc-bottom-item:active { transform: scale(.985); }
-      .rc-shell { touch-action: pan-y; overflow-x: clip; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+      .rc-shell { touch-action: pan-y; overflow-x: clip; padding-bottom: 0 !important; min-height: 100dvh; }
       
 
 .rc-swipe-viewport {
@@ -1120,7 +1125,7 @@ delivered_by: deliveryByMessage[m.id] || []
 }
 .rc-swipe-stage {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   width: 500%;
   position: relative;
   min-height: 0;
@@ -1134,6 +1139,11 @@ delivered_by: deliveryByMessage[m.id] || []
   box-sizing: border-box;
   overflow-wrap: anywhere;
   backface-visibility: hidden;
+}
+.rc-tab-panel.rc-panel-hidden { height: 0 !important; overflow: hidden !important; }
+.rc-tab-panel.rc-panel-visible { height: auto; min-height: 0; }
+@media (max-width: 800px) {
+  .rc-swipe-viewport:has(.rc-messages-layout.has-chat) { min-height: 100dvh; }
 }
 .rc-swipe-stage.is-swiping { transition: transform 125ms cubic-bezier(.18,.75,.2,1); }
 .rc-shell { position: relative; }
