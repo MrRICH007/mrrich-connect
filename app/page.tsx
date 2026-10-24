@@ -79,6 +79,7 @@ const NAV_ITEMS = [
   { name: 'Groups', icon: Users, hint: 'Find Your Community' },
   { name: 'Requests', icon: Bell, hint: 'Your Message Requests' },
   { name: 'My Profile', icon: UserRound, hint: 'Your Profile' },
+  { name: 'Premium', icon: Crown, hint: 'Unlock Premium Membership' },
 ];
 const EMOJIS = ['😀','😃','😄','😁','😆','😅','😂','🥹','😊','😍','🥰','😘','😎','🤔','🙌','👏','🙏','💙','❤️','🔥','✨','🎉','👍','👋','💯','😭','🤣','🤝','💬','🌟','😴','🥳'];
 
@@ -132,6 +133,7 @@ export default function Home() {
   const [authReady, setAuthReady] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [premiumBusy, setPremiumBusy] = useState(false);
 
   // Keep the mobile chat aligned with the visible viewport when the keyboard opens.
   useEffect(() => {
@@ -379,6 +381,68 @@ export default function Home() {
     setStatus(error ? error.message : 'Registration submitted. Confirm your email, then sign in. Run the profile-fields SQL migration so the database creates the separate public and private records.');
     if (!error) setAuthMode('signin');
   }
+  async function startPremiumPayment() {
+    if (!supabase || !userId) { setStatus('Sign in before purchasing Premium.'); return; }
+    setPremiumBusy(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Your sign-in session expired. Sign in again.');
+      const response = await fetch('/api/premium/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.authorizationUrl) throw new Error(result.error || 'Could not start Premium payment.');
+      window.location.assign(result.authorizationUrl);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not start Premium payment.');
+      setPremiumBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!supabase || !userId || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('premium') !== 'payment') return;
+    const reference = params.get('reference') || params.get('trxref');
+    if (!reference) {
+      setStatus('Payment return received, but no payment reference was provided.');
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) throw new Error('Sign in again to verify your payment.');
+        const response = await fetch('/api/premium/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ reference }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success) throw new Error(result.error || 'Payment verification failed.');
+        if (cancelled) return;
+        setStatus('Payment verified! Your Premium membership is active.');
+        await loadProfile(userId);
+      } catch (error) {
+        if (!cancelled) setStatus(error instanceof Error ? error.message : 'Payment verification failed. If you paid, contact support.');
+      } finally {
+        if (!cancelled) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('premium');
+          url.searchParams.delete('reference');
+          url.searchParams.delete('trxref');
+          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [supabase, userId, loadProfile]);
+
   async function signOut() {
     if (supabase) await supabase.auth.signOut();
     setStatus('Signed out.'); setTab('Messages'); setSelectedConversation(null);
@@ -974,7 +1038,7 @@ delivered_by: deliveryByMessage[m.id] || []
         <small className="rc-privacy"><ShieldCheck size={14}/> Full name and phone are private. Email stays in your authentication account.</small>
       </form>
     </section>
-    </> : <div className="rc-swipe-viewport"><div className={`rc-swipe-stage ${pageSwipeAnimating ? 'is-swiping' : ''}`} style={{ transform: `translate3d(calc(-${(NAV_ITEMS.findIndex(item => item.name === tab) < 0 ? 0 : NAV_ITEMS.findIndex(item => item.name === tab)) * 20}% + ${pageSwipeOffset}px),0,0)` }}>
+    </> : <div className="rc-swipe-viewport"><div className={`rc-swipe-stage ${pageSwipeAnimating ? 'is-swiping' : ''}`} style={{ transform: `translate3d(calc(-${(NAV_ITEMS.findIndex(item => item.name === tab) < 0 ? 0 : NAV_ITEMS.findIndex(item => item.name === tab)) * (100 / NAV_ITEMS.length)}% + ${pageSwipeOffset}px),0,0)` }}>
       {NAV_ITEMS.map((page, pageIndex) => {
         const activeIndex = NAV_ITEMS.findIndex(item => item.name === tab);
         const isActive = page.name === tab;
@@ -990,7 +1054,7 @@ delivered_by: deliveryByMessage[m.id] || []
         {userId ? <button className="rc-icon-btn" aria-label="Sign out" onClick={signOut}><LogOut size={19}/></button> : <button className="rc-small-login" onClick={() => document.getElementById('rc-email')?.focus()}>Login</button>}
       </div>
     </header>
-      <div className="rc-page-heading"><div><span className="rc-eyebrow">{page.name === 'Messages' ? 'YOUR INBOX' : page.name === 'Discover' ? 'MEET YOUR COMMUNITY' : page.name === 'Groups' ? 'YOUR COMMUNITIES' : page.name === 'Requests' ? 'NEW CONNECTIONS' : 'YOUR SPACE'}</span><h1>{page.name === 'Messages' ? 'Messages' : page.name === 'Discover' ? 'Find People Online' : page.name === 'Groups' ? 'Find Your Community' : page.name === 'Requests' ? 'Message Requests' : 'Your Profile'}</h1></div>
+      <div className="rc-page-heading"><div><span className="rc-eyebrow">{page.name === 'Messages' ? 'YOUR INBOX' : page.name === 'Discover' ? 'MEET YOUR COMMUNITY' : page.name === 'Groups' ? 'YOUR COMMUNITIES' : page.name === 'Requests' ? 'NEW CONNECTIONS' : page.name === 'Premium' ? 'MEMBERSHIP' : 'YOUR SPACE'}</span><h1>{page.name === 'Messages' ? 'Messages' : page.name === 'Discover' ? 'Find People Online' : page.name === 'Groups' ? 'Find Your Community' : page.name === 'Requests' ? 'Message Requests' : page.name === 'Premium' ? 'Premium Membership' : 'Your Profile'}</h1></div>
         {page.name === 'Groups' && <button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={17}/> Create group</button>}
         {page.name === 'Discover' && <button className="rc-icon-btn" aria-label="Refresh people" onClick={() => void refreshCommunity()}><RefreshCw size={18}/></button>}
       </div>
@@ -1087,6 +1151,28 @@ delivered_by: deliveryByMessage[m.id] || []
 
       {page.name === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{[...profiles].sort((a,b)=>(b.total_online_seconds||0)-(a.total_online_seconds||0)).slice(0,5).map((p,i)=><div className="rc-group-row" key={p.id}><span className="rc-group-icon">#{i+1}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small>{p.premium_status === 'active' && p.premium_title ? p.premium_title : 'Community member'}</small></span><span className="rc-arrow">{Math.floor((p.total_online_seconds||0)/3600)}h</span></div>)}</div></section>}</section>}
 
+      {page.name === 'Premium' && <section className="rc-content-section rc-premium-page">
+        <div className="rc-profile-card" style={{ maxWidth: 620, margin: '0 auto', padding: 28 }}>
+          <div className="rc-empty-icon" style={{ margin: '0 auto 16px' }}><Crown size={30}/></div>
+          <span className="rc-eyebrow">MR RICH CONNECT MEMBERSHIP</span>
+          <h2 style={{ fontSize: 30, margin: '12px 0' }}>Go Premium</h2>
+          <p>Stand out in the community with your Premium membership.</p>
+          <div style={{ margin: '24px 0', padding: 20, border: '1px solid rgba(96,165,250,.35)', borderRadius: 16 }}>
+            <div style={{ fontSize: 34, fontWeight: 800, color: '#60a5fa' }}>₦1,500 <span style={{ fontSize: 15, fontWeight: 500 }}> / month</span></div>
+            <p style={{ marginBottom: 0 }}>One month of Premium membership.</p>
+          </div>
+          <ul style={{ textAlign: 'left', lineHeight: 2, paddingLeft: 22 }}>
+            <li>Premium Member title on your profile</li>
+            <li>Distinct Premium status in the community</li>
+            <li>Secure payment through Paystack</li>
+          </ul>
+          {profileForm && profileExists && profileForm.nickname && <p className="rc-muted">Signed in as @{nickname}</p>}
+          {profiles.find(p => p.id === userId)?.premium_status === 'active'
+            ? <div className="rc-notice"><Crown size={18}/><span>Your Premium membership is active{profiles.find(p => p.id === userId)?.premium_title ? ` — ${profiles.find(p => p.id === userId)?.premium_title}` : ''}.</span></div>
+            : <button className="rc-primary rc-full" disabled={premiumBusy} onClick={() => void startPremiumPayment()}><Crown size={17}/>{premiumBusy ? 'Connecting to Paystack…' : 'Upgrade to Premium — ₦1,500'}</button>}
+          <p className="rc-muted" style={{ fontSize: 12, marginTop: 14 }}>Your membership activates only after Paystack confirms successful payment.</p>
+        </div>
+      </section>}
       </section>;
       })}
     </div></div>}
@@ -1126,15 +1212,15 @@ delivered_by: deliveryByMessage[m.id] || []
 .rc-swipe-stage {
   display: flex;
   align-items: flex-start;
-  width: 500%;
+  width: 600%;
   position: relative;
   min-height: 0;
   will-change: transform;
   backface-visibility: hidden;
 }
 .rc-tab-panel {
-  flex: 0 0 20%;
-  width: 20%;
+  flex: 0 0 16.666667%;
+  width: 16.666667%;
   min-width: 0;
   box-sizing: border-box;
   overflow-wrap: anywhere;
