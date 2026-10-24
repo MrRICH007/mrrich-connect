@@ -321,58 +321,106 @@ export default function Home() {
     return () => { alive = false; listener.subscription.unsubscribe(); };
   }, [supabase, loadProfile]);
 
+  
   useEffect(() => {
     if (!supabase || !userId) {
       setOnlineCount(0);
+      setOnlineUserIds([]);
       return;
     }
 
     let active = true;
-    // Heartbeats run every 30 seconds. A 3-minute freshness window tolerates
-    // ordinary background-tab throttling while eventually clearing abandoned sessions.
+    let pulseInProgress = false;
+
     const HEARTBEAT_INTERVAL_MS = 30_000;
-    const ONLINE_WINDOW_MS = 3 * 60_000;
+    const ONLINE_WINDOW_MS = 90_000;
 
     const sendHeartbeat = async () => {
-      const { error } = await supabase.rpc('heartbeat_user_presence');
-      if (error) console.warn('Could not update online heartbeat:', error.message);
+      const isVisible = document.visibilityState === 'visible';
+
+      const { error } = await supabase.rpc('heartbeat_user_presence', {
+        p_is_visible: isVisible,
+      });
+
+      if (error) {
+        console.warn('Could not update online heartbeat:', error.message);
+      }
     };
 
     const refreshOnlineCount = async () => {
-      const cutoff = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
+      const cutoff = new Date(
+        Date.now() - ONLINE_WINDOW_MS
+      ).toISOString();
+
       const { data, error } = await supabase
         .from('user_presence')
-        .select('user_id,last_seen_at')
+        .select('user_id,last_seen_at,is_visible')
+        .eq('is_visible', true)
         .gte('last_seen_at', cutoff);
 
       if (error) {
         console.warn('Could not refresh online count:', error.message);
         return;
       }
+
       if (!active) return;
-      const uniqueUsers = new Set((data ?? []).map(row => row.user_id).filter(Boolean));
+
+      const uniqueUsers = new Set(
+        (data ?? []).map(row => row.user_id).filter(Boolean)
+      );
+
       setOnlineUserIds([...uniqueUsers]);
       setOnlineCount(uniqueUsers.size);
     };
 
     const pulse = async () => {
-      await sendHeartbeat();
-      await refreshOnlineCount();
+      if (!active || pulseInProgress) return;
+
+      pulseInProgress = true;
+
+      try {
+        await sendHeartbeat();
+        await refreshOnlineCount();
+      } finally {
+        pulseInProgress = false;
+      }
     };
 
+    // Immediately report whether this tab is visible.
     void pulse();
-    const intervalId = window.setInterval(() => { void pulse(); }, HEARTBEAT_INTERVAL_MS);
-    const refreshWhenActive = () => {
-      if (document.visibilityState === 'visible') void pulse();
+
+    const intervalId = window.setInterval(() => {
+      void pulse();
+    }, HEARTBEAT_INTERVAL_MS);
+
+    const refreshOnVisibilityChange = () => {
+      // Report both transitions: visible and hidden.
+      void pulse();
     };
-    window.addEventListener('focus', refreshWhenActive);
-    document.addEventListener('visibilitychange', refreshWhenActive);
+
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void pulse();
+      }
+    };
+
+    document.addEventListener(
+      'visibilitychange',
+      refreshOnVisibilityChange
+    );
+
+    window.addEventListener('focus', refreshOnFocus);
 
     return () => {
       active = false;
       window.clearInterval(intervalId);
-      window.removeEventListener('focus', refreshWhenActive);
-      document.removeEventListener('visibilitychange', refreshWhenActive);
+
+      document.removeEventListener(
+        'visibilitychange',
+        refreshOnVisibilityChange
+      );
+
+      window.removeEventListener('focus', refreshOnFocus);
     };
   }, [supabase, userId]);
 
