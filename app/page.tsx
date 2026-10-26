@@ -6,7 +6,7 @@ import { createClient } from '../lib/supabase';
 import {
   Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck,
   Users, UserRound, Wifi, Pencil, Plus, Send, Smile, ArrowLeft, RefreshCw,
-  X, Sparkles, Zap, ArrowDown
+  X, Sparkles, Zap, ArrowDown, Store, Settings, Check
 } from 'lucide-react';
 
 type Profile = {
@@ -53,6 +53,10 @@ type CommunityGroup = {
   conversation_id: string | null;
   avatar_url: string | null;
   created_by: string;
+  member_limit?: number | null;
+  allowed_levels?: string[] | null;
+  allowed_schools?: string[] | null;
+  members_can_message?: boolean | null;
 };
 
 type AdCampaign = {
@@ -71,6 +75,10 @@ type Conversation = {
   otherUserId?: string;
   avatarUrl?: string | null;
   lastMessageAt?: string | null;
+  lastMessagePreview?: string;
+  lastMessageSenderId?: string | null;
+  lastMessageRead?: boolean;
+  lastMessageDelivered?: boolean;
 };
 
 const NAV_ITEMS = [
@@ -123,6 +131,8 @@ export default function Home() {
   const [showProfile, setShowProfile] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [showGroup, setShowGroup] = useState(false);
+  const [settingsGroup, setSettingsGroup] = useState<CommunityGroup | null>(null);
+  const [groupSettingsForm, setGroupSettingsForm] = useState({ member_limit: 'unlimited', allowed_levels: [] as string[], allowed_schools: [] as string[], members_can_message: true });
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [chatExiting, setChatExiting] = useState(false);
   const pageSwipeStart = useRef<{ x: number; y: number; kind: 'page' | 'chat' } | null>(null);
@@ -224,7 +234,7 @@ export default function Home() {
         .eq('recipient_id', userId).eq('status', 'pending');
       setRequests(req?.length ?? 0);
     }
-    const { data: grp } = await supabase.from('groups').select('id,name,conversation_id,avatar_url,created_by').limit(30);
+    const { data: grp } = await supabase.from('groups').select('id,name,conversation_id,avatar_url,created_by,member_limit,allowed_levels,allowed_schools,members_can_message').limit(30);
     if (grp) setGroups(grp as CommunityGroup[]);
     const { data: ads } = await supabase.from('ad_campaigns').select('id,title,media_type,media_path,target_url,expires_at').eq('is_enabled', true).lte('starts_at', new Date().toISOString()).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(5);
     if (ads) setActiveAds(ads as AdCampaign[]);
@@ -558,6 +568,38 @@ export default function Home() {
     setStatus('Group image updated!');
   }
 
+
+  function openGroupSettings(group: CommunityGroup) {
+    setSettingsGroup(group);
+    setGroupSettingsForm({
+      member_limit: group.member_limit ? String(group.member_limit) : 'unlimited',
+      allowed_levels: group.allowed_levels ?? [],
+      allowed_schools: group.allowed_schools ?? [],
+      members_can_message: group.members_can_message !== false
+    });
+  }
+
+  async function saveGroupSettings(e: FormEvent) {
+    e.preventDefault();
+    const group = settingsGroup;
+    if (!group || !supabase || (group.created_by !== userId && !isAdmin)) return;
+    const memberLimit = groupSettingsForm.member_limit === 'unlimited' ? null : Number(groupSettingsForm.member_limit);
+    const settings = {
+      member_limit: memberLimit,
+      allowed_levels: groupSettingsForm.allowed_levels,
+      allowed_schools: groupSettingsForm.allowed_schools,
+      members_can_message: groupSettingsForm.members_can_message
+    };
+    const { error } = await supabase.from('groups').update(settings).eq('id', group.id);
+    if (error) {
+      setStatus(`Could not save group settings: ${error.message}. If these columns are missing, run the supplied SQL migration first.`);
+      return;
+    }
+    setGroups(old => old.map(g => g.id === group.id ? { ...g, ...settings } : g));
+    setSettingsGroup(null);
+    setStatus('Group settings saved. Join restrictions also need the matching database join-function update to be enforced securely.');
+  }
+
   async function createGroup(e: FormEvent) {
     e.preventDefault();
     if (!supabase || !userId || !groupName.trim()) return;
@@ -645,9 +687,20 @@ export default function Home() {
       nicknameById = new Map((otherProfiles ?? []).map((p: { id: string; nickname: string }) => [p.id, p.nickname]));
       avatarById = new Map((otherProfiles ?? []).map((p: { id: string; avatar_url: string | null }) => [p.id, p.avatar_url]));
     }
-    const { data: recentMessages } = await supabase.from('messages').select('conversation_id,created_at').in('conversation_id', ids).is('deleted_at', null).order('created_at', { ascending: false });
-    const latestByConversation = new Map<string, string>();
-    for (const message of recentMessages ?? []) if (!latestByConversation.has(message.conversation_id)) latestByConversation.set(message.conversation_id, message.created_at);
+    const { data: recentMessages } = await supabase.from('messages').select('id,conversation_id,created_at,body,sender_id').in('conversation_id', ids).is('deleted_at', null).order('created_at', { ascending: false });
+    const latestByConversation = new Map<string, { id: string; created_at: string; body: string; sender_id: string }>();
+    for (const message of recentMessages ?? []) if (!latestByConversation.has(message.conversation_id)) latestByConversation.set(message.conversation_id, message);
+    const latestMine = [...latestByConversation.values()].filter(m => m.sender_id === userId).map(m => m.id);
+    let readIds = new Set<string>();
+    let deliveredIds = new Set<string>();
+    if (latestMine.length) {
+      const [{ data: reads }, { data: deliveries }] = await Promise.all([
+        supabase.from('message_reads').select('message_id,user_id').in('message_id', latestMine).neq('user_id', userId),
+        supabase.from('message_deliveries').select('message_id,user_id').in('message_id', latestMine).neq('user_id', userId)
+      ]);
+      readIds = new Set((reads ?? []).map((r: {message_id:string}) => r.message_id));
+      deliveredIds = new Set((deliveries ?? []).map((r: {message_id:string}) => r.message_id));
+    }
     const mapped: Conversation[] = (convs ?? []).map((c: { id: string; title: string | null; kind: string }) => {
       const other = (allMembers ?? []).find((m: { conversation_id: string; user_id: string }) => m.conversation_id === c.id && m.user_id !== userId);
       const isGroup = c.kind === 'group';
@@ -657,7 +710,11 @@ export default function Home() {
         kind: isGroup ? ('group' as const) : ('person' as const),
         otherUserId: other?.user_id,
         avatarUrl: isGroup ? (groups.find(g => g.conversation_id === c.id)?.avatar_url ?? null) : avatarById.get(other?.user_id ?? '') ?? null,
-        lastMessageAt: latestByConversation.get(c.id) ?? null
+        lastMessageAt: latestByConversation.get(c.id)?.created_at ?? null,
+        lastMessagePreview: (latestByConversation.get(c.id)?.body || '').replace(/^\[\[RC_REPLY\]\].*?\n/s, '').replace(/\s+/g, ' ').trim().slice(0, 42),
+        lastMessageSenderId: latestByConversation.get(c.id)?.sender_id ?? null,
+        lastMessageRead: latestByConversation.get(c.id)?.sender_id === userId && readIds.has(latestByConversation.get(c.id)?.id || ''),
+        lastMessageDelivered: latestByConversation.get(c.id)?.sender_id === userId && deliveredIds.has(latestByConversation.get(c.id)?.id || '')
       };
     }).sort((a, b) => (b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0) - (a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0));
     setConversationList(mapped);
@@ -947,7 +1004,7 @@ delivered_by: deliveryByMessage[m.id] || []
     // Allow swipes to begin anywhere over the conversation list, including on a row;
     // normal taps still open that conversation because navigation only happens after a clear horizontal drag.
     if (target.closest('input, textarea, select, [contenteditable="true"], .rc-message-row, .rc-bottom-nav, .rc-modal, .rc-modal-backdrop') ||
-        (target.closest('button') && !inConversationList)) {
+        (target.closest('button') && !inConversationList && !target.closest('.rc-group-row'))) {
       pageSwipeStart.current = null;
       return;
     }
@@ -1054,6 +1111,8 @@ delivered_by: deliveryByMessage[m.id] || []
   const discoverProfiles = profiles.filter(p => {
     if (p.id === userId) return false;
     const query = discoverQuery.trim().toLocaleLowerCase();
+    const alreadyConnected = conversationList.some(c => c.kind === 'person' && c.otherUserId === p.id);
+    if (alreadyConnected && !query) return false;
     const searchableText = [p.nickname, p.school, p.college, p.department, p.level, p.bio]
       .filter(Boolean).join(' ').toLocaleLowerCase();
     if (query && !searchableText.includes(query)) return false;
@@ -1129,7 +1188,7 @@ delivered_by: deliveryByMessage[m.id] || []
 
       {page.name === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''} ${chatExiting ? 'chat-exiting' : ''}`}>
         <aside className="rc-conversation-list">
-          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => { setSelectedConversation(convo); void markConversationRead(convo.id); setReplyTo(null); }}><span className="rc-conversation-avatar">{convo.avatarUrl ? <img src={convo.avatarUrl} alt=""/> : convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span className="rc-conversation-copy"><strong>{convo.title}</strong><small>{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></span>{(unreadCounts[convo.id] || 0) > 0 && <span className="rc-unread-badge">{unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}</span>}</button>)}
+          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => { setSelectedConversation(convo); void markConversationRead(convo.id); setReplyTo(null); }}><span className="rc-conversation-avatar">{convo.avatarUrl ? <img src={convo.avatarUrl} alt=""/> : convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span className="rc-conversation-copy"><strong>{convo.title}</strong><small>{convo.lastMessagePreview ? <>{convo.lastMessagePreview.length >= 42 ? `${convo.lastMessagePreview.slice(0, 39)}...` : convo.lastMessagePreview}{convo.lastMessageSenderId === userId && <> <span className={`rc-preview-ticks ${convo.lastMessageRead ? 'is-read' : ''}`}>{convo.lastMessageRead ? '✓✓' : convo.lastMessageDelivered ? '✓✓' : '✓'}</span></>}</> : 'No messages yet'}</small></span>{(unreadCounts[convo.id] || 0) > 0 && <span className="rc-unread-badge">{unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}</span>}</button>)}
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
@@ -1205,18 +1264,19 @@ delivered_by: deliveryByMessage[m.id] || []
           <p className="rc-muted" style={{margin:0,fontSize:12}}>{discoverProfiles.length} member{discoverProfiles.length === 1 ? '' : 's'} found</p>
         </div>
         {activeAds.length > 0 && <section className="rc-ad-feed" aria-label="Sponsored community announcements"><div className="rc-section-title"><div><h2>Community spotlight</h2><p>Promotions and announcements</p></div></div><div className="rc-people-grid">{activeAds.map(ad => <article className="rc-person-card rc-ad-card" key={ad.id}><span className="rc-eyebrow">SPONSORED</span><h3>{ad.title}</h3>{ad.media_type === 'image' ? <img src={ad.media_path} alt={ad.title} style={{width:'100%',maxHeight:220,objectFit:'cover',borderRadius:12}}/> : <video src={ad.media_path} controls playsInline style={{width:'100%',maxHeight:220,borderRadius:12}}/>}{ad.target_url && <a href={ad.target_url} target="_blank" rel="noreferrer" className="rc-primary">Learn more</a>}<small>Expires {new Date(ad.expires_at).toLocaleDateString()}</small></article>)}</div></section>}
-        <div className="rc-people-grid">{discoverProfiles.map(p => <article className="rc-person-card rc-discover-person" key={p.id}><div className="rc-discover-main"><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div></div><div className="rc-discover-details"><h3>@{p.nickname} {onlineUserIds.includes(p.id) && <span title="Online now" aria-label="Online now" style={{display:'inline-block',width:8,height:8,borderRadius:'50%',background:'#32d296',verticalAlign:'middle',marginLeft:5}}/>}</h3><p className="rc-discover-level-college">{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small><span className="rc-premium-badge" style={{marginTop:6,display:'inline-flex'}}>{getExperienceTitle(p.total_online_seconds)}</span>{p.premium_status === 'active' && <span className="rc-premium-badge"><Crown size={10}/> PREMIUM</span>}</div></div><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor((p.total_online_seconds || 0) / 3600)}h online</span><button className="rc-primary rc-connect" onClick={() => void sendRequest(p.id)}>Connect <Plus size={15}/></button></div></article>)}</div>
+        <div className="rc-people-grid">{discoverProfiles.map(p => <article className="rc-person-card rc-discover-person" key={p.id}><div className="rc-discover-main"><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div></div><div className="rc-discover-details"><h3>@{p.nickname} {onlineUserIds.includes(p.id) && <span title="Online now" aria-label="Online now" style={{display:'inline-block',width:8,height:8,borderRadius:'50%',background:'#32d296',verticalAlign:'middle',marginLeft:5}}/>}</h3><p className="rc-discover-level-college">{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small><span className="rc-premium-badge" style={{marginTop:6,display:'inline-flex'}}>{getExperienceTitle(p.total_online_seconds)}</span>{p.premium_status === 'active' && <span className="rc-premium-badge"><Crown size={10}/> PREMIUM</span>}</div></div><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor((p.total_online_seconds || 0) / 3600)}h online</span>{conversationList.some(c => c.kind === 'person' && c.otherUserId === p.id) ? <button className="rc-primary rc-connect" onClick={() => { const convo = conversationList.find(c => c.kind === 'person' && c.otherUserId === p.id); if (convo) { setSelectedConversation(convo); setTab('Messages'); setReplyTo(null); void markConversationRead(convo.id); } }}>Message <MessageCircle size={15}/></button> : <button className="rc-primary rc-connect" onClick={() => void sendRequest(p.id)}>Connect <Plus size={15}/></button>}</div></article>)}</div>
         {discoverProfiles.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>{discoverQuery || discoverFilter !== 'all' ? 'No matching members' : 'No people to show yet'}</h2><p>{discoverQuery || discoverFilter !== 'all' ? 'Try a different search or filter. Search currently checks the members loaded by Discover.' : 'New members will appear here when they create a profile.'}</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}{(discoverQuery || discoverFilter !== 'all') && <button className="rc-secondary" onClick={() => { setDiscoverQuery(''); setDiscoverFilter('all'); }}>Clear search and filters</button>}</div>}
       </section>}
 
-      {page.name === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <label className="rc-edit-group-avatar"><Pencil size={14}/><span>Change image</span><input type="file" accept="image/*" style={{display:'none'}} onChange={e => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; void changeExistingGroupAvatar(g, file); }}/></label>}</div>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
+      {page.name === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <button className="rc-edit-group-avatar" onClick={() => openGroupSettings(g)}><Settings size={15}/><span>Settings</span></button>}</div>)}</div>{groups.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
 
       {page.name === 'Requests' && <section className="rc-content-section">
         {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card rc-request-slim" key={request.id}><div className="rc-request-top"><div className="rc-avatar rc-avatar-large">{request.sender_nickname[0]?.toUpperCase() || 'M'}</div><div className="rc-request-details"><h3>@{request.sender_nickname}</h3><p>Wants to start a private conversation.</p><small>{new Date(request.created_at).toLocaleDateString()}</small></div></div><div className="rc-request-actions"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p></div>}</section>}
 
-      {page.name === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><div className="rc-lifetime-summary"><strong className="rc-experience-title">{getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds)}</strong><strong className="rc-lifetime-hours">{Math.floor((profiles.find(p => p.id === userId)?.total_online_seconds || 0) / 3600)} <span>lifetime hours</span></strong></div><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{[...profiles].sort((a,b)=>(b.total_online_seconds||0)-(a.total_online_seconds||0)).slice(0,5).map((p,i)=><div className="rc-group-row" key={p.id}><span className="rc-group-icon">#{i+1}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small>{getExperienceTitle(p.total_online_seconds)}{p.premium_status === 'active' && p.premium_title ? ` · ${p.premium_title}` : ''}</small></span><span className="rc-arrow">{Math.floor((p.total_online_seconds||0)/3600)}h</span></div>)}</div></section>}</section>}
+      {page.name === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p><div className="rc-lifetime-summary"><strong className="rc-experience-title">{getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds)}</strong><strong className="rc-lifetime-hours">{Math.floor((profiles.find(p => p.id === userId)?.total_online_seconds || 0) / 3600)} <span>lifetime hours</span></strong></div><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{(() => { const ranked = [...profiles].sort((a,b)=>(b.total_online_seconds||0)-(a.total_online_seconds||0)); const top = ranked.slice(0,10); const meIndex = ranked.findIndex(p => p.id === userId); if (meIndex >= 10 && meIndex >= 0) top.push(ranked[meIndex]); return top.map(p => { const rank = ranked.findIndex(r => r.id === p.id) + 1; return <div className={`rc-group-row ${p.id === userId ? 'rc-current-rank' : ''}`} key={p.id}><span className="rc-group-icon">#{rank > 999 ? '999+' : rank}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small>{getExperienceTitle(p.total_online_seconds)}{p.premium_status === 'active' && p.premium_title ? ` · ${p.premium_title}` : ''}</small></span><span className="rc-arrow">{Math.floor((p.total_online_seconds||0)/3600)}h</span></div>; }); })()}</div></section>}</section>}
 
       {page.name === 'Premium' && <section className="rc-content-section rc-premium-page">
+        <button className="rc-secondary rc-premium-back" onClick={() => setTab('My Profile')}><ArrowLeft size={16}/> Back to profile</button>
         <div className="rc-profile-card" style={{ maxWidth: 620, margin: '0 auto', padding: 28 }}>
           <div className="rc-empty-icon" style={{ margin: '0 auto 16px' }}><Crown size={30}/></div>
           <span className="rc-eyebrow">MR RICH CONNECT MEMBERSHIP</span>
@@ -1245,7 +1305,7 @@ delivered_by: deliveryByMessage[m.id] || []
 
     {tab !== 'Messages' && <footer className="rc-footer"><span>© {new Date().getFullYear()} MR RICH CONNECT</span><span><ShieldCheck size={13}/> Your campus. Your community.</span></footer>}
 
-    {userId && !selectedConversation && <nav className="rc-bottom-nav" aria-label="Main navigation">{NAV_ITEMS.filter(item => item.name !== 'Premium').map(item => <button key={item.name} className={`rc-bottom-item ${tab === item.name ? 'active' : ''}`} onClick={() => { setTab(item.name); setShowProfile(false); setShowGroup(false); setShowEmojiPicker(false); }}><span className="rc-bottom-icon"><item.icon size={24} strokeWidth={tab === item.name ? 2.5 : 2}/>{item.name === 'Requests' && requests > 0 && <i className="rc-nav-badge">{requests}</i>}</span><span className="rc-bottom-label">{item.name === 'My Profile' ? 'Profile' : item.name}</span></button>)}</nav>}
+    {userId && !selectedConversation && <nav className="rc-bottom-nav" aria-label="Main navigation">{NAV_ITEMS.filter(item => item.name !== 'Premium').map(item => <button key={item.name} className={`rc-bottom-item ${tab === item.name ? 'active' : ''}`} onClick={() => { setTab(item.name); setShowProfile(false); setShowGroup(false); setShowEmojiPicker(false); }}><span className="rc-bottom-icon"><item.icon size={24} strokeWidth={tab === item.name ? 2.5 : 2}/>{item.name === 'Requests' && requests > 0 && <i className="rc-nav-badge">{requests > 99 ? '99+' : requests}</i>}{item.name === 'Messages' && Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0) > 0 && <i className="rc-nav-badge">{Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0) > 99 ? '99+' : Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0)}</i>}</span><span className="rc-bottom-label">{item.name === 'My Profile' ? 'Profile' : item.name}</span></button>)}</nav>}
 
     {userId && tab === 'My Profile' && !selectedConversation && !showProfile && !showGroup && !marketplaceOpen && <button className="rc-floating-premium" onClick={() => setTab('Premium')}><Crown size={17}/> Premium</button>}
     {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && <button
@@ -1257,8 +1317,8 @@ delivered_by: deliveryByMessage[m.id] || []
       onPointerCancel={() => { marketplaceDrag.current = null; }}
       onClick={() => { if (marketplaceWasDragged.current) { marketplaceWasDragged.current = false; return; } setMarketplaceOpen(true); }}
       aria-label="Open Marketplace"
-    ><Hash size={17}/> Marketplace</button>}
-    {marketplaceOpen && <div className="rc-marketplace-screen"><button className="rc-icon-btn rc-marketplace-back" onClick={() => setMarketplaceOpen(false)} aria-label="Back"><ArrowLeft size={19}/></button><div className="rc-marketplace-message"><div className="rc-empty-icon"><Hash size={30}/></div><h1>Marketplace coming soon</h1><p>We’re preparing something useful for the MR RICH CONNECT community.</p><button className="rc-primary" onClick={() => setMarketplaceOpen(false)}>Back to MR RICH CONNECT</button></div></div>}
+    ><Store size={22}/></button>}
+    {marketplaceOpen && <div className="rc-marketplace-screen"><button className="rc-icon-btn rc-marketplace-back" onClick={() => setMarketplaceOpen(false)} aria-label="Back"><ArrowLeft size={19}/></button><div className="rc-marketplace-message"><div className="rc-empty-icon"><Store size={30}/></div><h1>Marketplace coming soon</h1><p>We’re preparing something useful for the MR RICH CONNECT community.</p><button className="rc-primary" onClick={() => setMarketplaceOpen(false)}>Back to MR RICH CONNECT</button></div></div>}
 
     {showProfile && <div className="rc-modal-backdrop" onClick={() => { setShowProfile(false); setEditingProfile(false); }}><form className="rc-modal" onSubmit={saveProfile} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => { setShowProfile(false); setEditingProfile(false); }} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">YOUR PUBLIC IDENTITY</span><h2>{editingProfile ? 'Edit profile' : 'Create your profile'}</h2><p className="rc-muted">Public details are visible to members. Private details are only readable by your own account.</p><label>Nickname<input required maxLength={24} value={profileForm.nickname} onChange={e => setProfileForm({...profileForm, nickname:e.target.value})} placeholder="@yournickname"/></label><label>Level<input value={profileForm.level} onChange={e => setProfileForm({...profileForm, level:e.target.value})} placeholder="e.g. 200 level"/></label><label>College<input value={profileForm.college} onChange={e => setProfileForm({...profileForm, college:e.target.value})} placeholder="Your college"/></label><label>School<input value={profileForm.school} onChange={e => setProfileForm({...profileForm, school:e.target.value})} placeholder="Your school or university"/></label>
 <label>Department<input value={profileForm.department} onChange={e => setProfileForm({...profileForm, department:e.target.value})} placeholder="Your department"/></label>
@@ -1268,6 +1328,7 @@ delivered_by: deliveryByMessage[m.id] || []
 <label>Full name<input value={profileForm.full_name} onChange={e => setProfileForm({...profileForm, full_name:e.target.value})} placeholder="Your real name"/></label>
 <label>Phone number<input type="tel" value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone:e.target.value})} placeholder="Private phone number"/></label>
 <div className="rc-privacy"><ShieldCheck size={15}/> Email is kept in your authentication account and isn't shown publicly. Full name and phone are stored separately.</div><button className="rc-primary rc-full" type="submit">Save profile</button></form></div>}
+    {settingsGroup && <div className="rc-modal-backdrop" onClick={() => setSettingsGroup(null)}><form className="rc-modal" onSubmit={saveGroupSettings} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setSettingsGroup(null)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">GROUP ADMINISTRATION</span><h2>{settingsGroup.name} settings</h2><label>Change group image<input type="file" accept="image/*" onChange={e => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; void changeExistingGroupAvatar(settingsGroup, file); }}/></label><label>Member limit<select value={groupSettingsForm.member_limit} onChange={e => setGroupSettingsForm({...groupSettingsForm, member_limit:e.target.value})}>{[100,200,300,400,500,600,700,800,900,1000].map(n => <option key={n} value={String(n)}>{n} members</option>)}<option value="unlimited">Unlimited</option></select></label><fieldset><legend>Allowed user levels</legend><p className="rc-muted">Leave all unchecked to allow every level.</p>{['100','200','300','400','500','Graduate'].map(level => <label className="rc-setting-check" key={level}><input type="checkbox" checked={groupSettingsForm.allowed_levels.includes(level)} onChange={e => setGroupSettingsForm({...groupSettingsForm, allowed_levels:e.target.checked ? [...groupSettingsForm.allowed_levels, level] : groupSettingsForm.allowed_levels.filter(v => v !== level)})}/>{level}</label>)}</fieldset><fieldset><legend>Allowed schools</legend><p className="rc-muted">Leave all unchecked to allow every school.</p>{[...new Set(profiles.map(p => p.school?.trim()).filter((v): v is string => !!v))].sort().map(school => <label className="rc-setting-check" key={school}><input type="checkbox" checked={groupSettingsForm.allowed_schools.includes(school)} onChange={e => setGroupSettingsForm({...groupSettingsForm, allowed_schools:e.target.checked ? [...groupSettingsForm.allowed_schools, school] : groupSettingsForm.allowed_schools.filter(v => v !== school)})}/>{school}</label>)}</fieldset><label className="rc-setting-check"><input type="checkbox" checked={groupSettingsForm.members_can_message} onChange={e => setGroupSettingsForm({...groupSettingsForm, members_can_message:e.target.checked})}/> Allow members to send messages (otherwise admin only)</label><button className="rc-primary rc-full" type="submit">Save group settings</button></form></div>}
     {showGroup && <div className="rc-modal-backdrop" onClick={() => setShowGroup(false)}><form className="rc-modal" onSubmit={createGroup} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setShowGroup(false)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="rc-muted">Start a space around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><label>Group image (optional)<input type="file" accept="image/*" onChange={e => void uploadGroupAvatar(e.target.files?.[0])} disabled={groupAvatarUploading}/></label>{groupAvatarUploading && <p className="rc-muted">Uploading group image…</p>}{groupAvatarUrl && <div className="rc-avatar-preview"><img src={groupAvatarUrl} alt="Group avatar preview"/><button type="button" className="rc-secondary" onClick={() => setGroupAvatarUrl('')}>Remove image</button></div>}<button className="rc-primary rc-full" type="submit" disabled={groupAvatarUploading}>{groupAvatarUploading ? 'Uploading…' : 'Create group'}</button></form></div>}
     {!authReady && <div className="rc-loading" aria-label="Loading"/>}
     <style jsx global>{`
@@ -1350,12 +1411,22 @@ delivered_by: deliveryByMessage[m.id] || []
       .rc-page-subtitle { margin: 6px 0 0; color: var(--rc-muted, #9caecb); font-size: 13px; }
       .rc-heading-notification { flex: 0 0 auto; margin-left: auto; }
       .rc-lifetime-summary { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; margin:14px 0; text-align:center; }
-      .rc-experience-title { color:#32d296; font-weight:800; line-height:1.25; }
+      .rc-experience-title, .rc-discover-details .rc-premium-badge { color:#32d296; font-weight:800; line-height:1.25; }
       .rc-lifetime-hours { color:#32d296; font-weight:800; line-height:1.3; }
       .rc-lifetime-hours span { color:#fff; font-weight:500; }
+      .rc-premium-back { margin-bottom:14px; }
+      .rc-unread-badge, .rc-nav-badge { background:#facc15 !important; color:#172033 !important; font-weight:800; }
+      .rc-conversation-copy small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+      .rc-preview-ticks { color:#94a3b8; font-weight:800; white-space:nowrap; margin-left:3px; } .rc-preview-ticks.is-read { color:#facc15; }
+      .rc-current-rank { border:1px solid rgba(96,165,250,.5); border-radius:12px; }
+
+      .rc-edit-group-avatar { display:inline-flex; align-items:center; gap:6px; margin:7px 0 0 52px; padding:8px 11px; border:1px solid rgba(96,165,250,.35); border-radius:10px; background:#102b58; color:#fff; font-weight:700; cursor:pointer; }
+      .rc-modal fieldset { border:1px solid rgba(148,163,184,.25); border-radius:12px; padding:12px; margin:8px 0 14px; } .rc-modal legend { padding:0 6px; font-weight:700; } .rc-setting-check { display:flex !important; align-items:center; gap:9px; margin:9px 0 !important; } .rc-setting-check input { width:auto !important; } .rc-modal select { width:100%; padding:12px; border-radius:10px; background:#0b1730; color:#fff; border:1px solid rgba(148,163,184,.3); }
+      .rc-preview-ticks { color:#94a3b8; font-weight:800; white-space:nowrap; } .rc-preview-ticks.is-read { color:#facc15; }
+      .rc-current-rank { border:1px solid rgba(96,165,250,.5); border-radius:12px; }
       .rc-floating-premium, .rc-floating-marketplace { position:fixed; z-index:55; display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid rgba(96,165,250,.55); border-radius:999px; background:#102b58; color:#fff; padding:11px 15px; font-weight:700; box-shadow:0 8px 28px rgba(0,0,0,.3); touch-action:none; }
       .rc-floating-premium { right:16px; bottom:calc(86px + env(safe-area-inset-bottom)); }
-      .rc-floating-marketplace { right:16px; bottom:calc(140px + env(safe-area-inset-bottom)); cursor:grab; }
+      .rc-floating-marketplace { right:16px; bottom:calc(140px + env(safe-area-inset-bottom)); cursor:grab; background:#facc15; color:#172033; border-color:#fde047; width:48px; height:48px; padding:0; border-radius:16px; }
       .rc-floating-marketplace:active { cursor:grabbing; }
       .rc-marketplace-screen { position:fixed; inset:0; z-index:100; background:#071326; color:#fff; display:flex; align-items:center; justify-content:center; padding:24px; }
       .rc-marketplace-back { position:absolute; top:calc(18px + env(safe-area-inset-top)); left:18px; }
