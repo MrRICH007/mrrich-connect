@@ -711,7 +711,7 @@ export default function Home() {
         otherUserId: other?.user_id,
         avatarUrl: isGroup ? (groups.find(g => g.conversation_id === c.id)?.avatar_url ?? null) : avatarById.get(other?.user_id ?? '') ?? null,
         lastMessageAt: latestByConversation.get(c.id)?.created_at ?? null,
-        lastMessagePreview: (latestByConversation.get(c.id)?.body || '').replace(/^\[\[RC_REPLY\]\].*?\n/s, '').replace(/\s+/g, ' ').trim().slice(0, 42),
+        lastMessagePreview: (latestByConversation.get(c.id)?.body || '').replace(/^\[\[RC_REPLY\]\][\s\S]*?\n/, '').replace(/\s+/g, ' ').trim().slice(0, 42),
         lastMessageSenderId: latestByConversation.get(c.id)?.sender_id ?? null,
         lastMessageRead: latestByConversation.get(c.id)?.sender_id === userId && readIds.has(latestByConversation.get(c.id)?.id || ''),
         lastMessageDelivered: latestByConversation.get(c.id)?.sender_id === userId && deliveredIds.has(latestByConversation.get(c.id)?.id || '')
