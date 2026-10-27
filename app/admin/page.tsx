@@ -15,7 +15,74 @@ export default function AdminPage(){
  useEffect(()=>{if(!allowed||!token)return;let alive=true;const timer=setTimeout(()=>{request(`/api/admin/users?q=${encodeURIComponent(query)}`).then(d=>alive&&setUsers(d.users||[])).catch(e=>alive&&setError(e.message));},180);return()=>{alive=false;clearTimeout(timer)}},[allowed,token,query]);
  useEffect(()=>{if(!allowed||!token)return;let alive=true;const timer=setTimeout(()=>{request(`/api/admin/groups?q=${encodeURIComponent(groupQuery)}`).then(d=>alive&&setGroups(d.groups||[])).catch(e=>alive&&setError(e.message));},180);return()=>{alive=false;clearTimeout(timer)}},[allowed,token,groupQuery]);
  useEffect(()=>{if(allowed&&token)request('/api/admin/ads').then(d=>setAds(d.ads||[])).catch(e=>setError(e.message));},[allowed,token]);
- async function userAction(u:UserRow,action:'premium'|'block'|'delete',value?:string|boolean){if(action==='delete'&&!confirm(`Permanently delete @${u.nickname}? This cannot be undone.`))return;if(action==='block'&&!confirm(`${value?'Block':'Unblock'} @${u.nickname}?`))return;setBusy(u.id);setError('');try{if(action==='delete'){await request(`/api/admin/users/${u.id}`,{method:'DELETE'});setUsers(old=>old.filter(x=>x.id!==u.id));setNotice('User account deleted.')}else{await request(`/api/admin/users/${u.id}`,{method:'PATCH',body:JSON.stringify({action,value})});setUsers(old=>old.map(x=>x.id===u.id?{...x,...(action==='premium'?{premium_status:value}:{is_blocked:value})}:x));setNotice('User updated.')}}catch(e:any){setError(e.message)}finally{setBusy(null)}}
+ 
+async function userAction(
+  u: UserRow,
+  action: 'premium' | 'block' | 'delete',
+  value?: string | boolean
+) {
+  if (
+    action === 'delete' &&
+    !confirm(`Permanently delete @${u.nickname}? This cannot be undone.`)
+  ) return;
+
+  if (
+    action === 'block' &&
+    !confirm(`${value ? 'Block' : 'Unblock'} @${u.nickname}?`)
+  ) return;
+
+  setBusy(u.id);
+  setError('');
+
+  try {
+    if (action === 'delete') {
+      await request(`/api/admin/users/${u.id}`, {
+        method: 'DELETE'
+      });
+
+      setUsers(old => old.filter(x => x.id !== u.id));
+      setNotice('User account deleted.');
+    } else {
+      if (action === 'premium' && value !== 'active' && value !== 'inactive') {
+        throw new Error('Invalid Premium status.');
+      }
+
+      if (action === 'block' && typeof value !== 'boolean') {
+        throw new Error('Invalid block status.');
+      }
+
+      await request(`/api/admin/users/${u.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action, value })
+      });
+
+      setUsers(old =>
+        old.map(x => {
+          if (x.id !== u.id) return x;
+
+          if (action === 'premium') {
+            return {
+              ...x,
+              premium_status: value as string
+            };
+          }
+
+          return {
+            ...x,
+            is_blocked: value as boolean
+          };
+        })
+      );
+
+      setNotice('User updated.');
+    }
+  } catch (e: any) {
+    setError(e.message || 'The user update failed.');
+  } finally {
+    setBusy(null);
+  }
+}
+
  async function groupAction(g:GroupRow,action:'save'|'delete'){if(action==='delete'&&!confirm(`Delete group “${g.name}” and its conversation?`))return;setBusy(g.id);try{if(action==='delete'){await request(`/api/admin/groups/${g.id}`,{method:'DELETE'});setGroups(old=>old.filter(x=>x.id!==g.id));setNotice('Group deleted.')}else{const name=prompt('Group name',g.name);if(name===null)return;const limit=prompt('Member limit (leave blank for unlimited)',g.member_limit?String(g.member_limit):'');const levels=prompt('Allowed levels, comma separated (blank = any)',(g.allowed_levels||[]).join(','));const schools=prompt('Allowed schools, comma separated (blank = any)',(g.allowed_schools||[]).join(','));const canMessage=confirm('Allow regular members to send messages? OK = yes, Cancel = admins only.');const premium=confirm('Make this a Premium-only group?');await request(`/api/admin/groups/${g.id}`,{method:'PATCH',body:JSON.stringify({name:name.trim(),member_limit:limit.trim()?Number(limit):null,allowed_levels:levels.split(',').map(x=>x.trim()).filter(Boolean),allowed_schools:schools.split(',').map(x=>x.trim()).filter(Boolean),members_can_message:canMessage,is_premium_only:premium})});setGroups(old=>old.map(x=>x.id===g.id?{...x,name:name.trim(),member_limit:limit.trim()?Number(limit):null,allowed_levels:levels.split(',').map(x=>x.trim()).filter(Boolean),allowed_schools:schools.split(',').map(x=>x.trim()).filter(Boolean),members_can_message:canMessage,is_premium_only:premium}:x));setNotice('Group settings saved.')}}catch(e:any){setError(e.message)}finally{setBusy(null)}}
  async function uploadAd(e:React.FormEvent){e.preventDefault();if(!adImage){setError('Choose an advert image first.');return}setBusy('ad');try{const form=new FormData();form.set('image',adImage);form.set('title',adTitle);form.set('target_url',adUrl);form.set('expires_at',new Date(adExpiry).toISOString());const data=await request('/api/admin/ads',{method:'POST',body:form});setAds(old=>[data.ad,...old]);setAdTitle('');setAdUrl('');setAdExpiry('');setAdImage(null);setNotice('Advert uploaded and published.')}catch(e:any){setError(e.message)}finally{setBusy(null)}}
  const css=`*{box-sizing:border-box}body{margin:0}.admin{min-height:100dvh;background:#070b16;color:#eef4ff;padding:22px 14px 50px;font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1050px;margin:auto}.top{display:flex;align-items:center;gap:12px;margin-bottom:22px}.brand{font-weight:850;letter-spacing:.04em}.sub{color:#8e9bb6;font-size:13px;margin-top:4px}.panel{background:#0d1426;border:1px solid #1b2b49;border-radius:16px;padding:16px;margin-bottom:14px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.btn{border:1px solid #263b60;background:#111e36;color:#dce9ff;border-radius:10px;padding:10px 12px;font-weight:650;cursor:pointer}.btn.active,.primary{background:#245bdb;border-color:#3978ff;color:white}.danger{border-color:#713447;color:#ffb8c6}.search{width:100%;background:#070e1d;border:1px solid #2a3c5d;color:white;border-radius:11px;padding:13px;font:inherit;margin:6px 0 12px}.user{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}.name{font-weight:800;font-size:16px}.muted{color:#a2aec5;font-size:13px;line-height:1.55;overflow-wrap:anywhere}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.pill{display:inline-block;border:1px solid #24467b;background:#10234a;color:#9ec5ff;border-radius:30px;padding:3px 8px;font-size:11px;margin:4px 4px 0 0}.grid{display:grid;grid-template-columns:1fr;gap:10px}.field{display:grid;gap:6px;font-size:13px;color:#aebbd3}.field input{min-width:0;background:#070e1d;color:white;border:1px solid #2a3c5d;border-radius:9px;padding:11px;font:inherit}.preview{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:#050914}.alert{padding:12px;border-radius:10px;background:#311725;color:#ffc1cf;margin:10px 0}.success{padding:12px;border-radius:10px;background:#102b29;color:#a8f5d6;margin:10px 0}@media(min-width:700px){.admin{padding:32px}.user{grid-template-columns:minmax(0,1fr) auto;align-items:start}.grid{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}}`;
