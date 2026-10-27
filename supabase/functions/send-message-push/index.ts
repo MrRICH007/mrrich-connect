@@ -49,7 +49,10 @@ Deno.serve(async (req) => {
       !message?.conversation_id ||
       !message?.sender_id
     ) {
-      return new Response('Ignored', { status: 200 });
+      return new Response('Ignored', {
+        status: 200,
+        headers: corsHeaders,
+      });
     }
 
     const admin = createClient(supabaseUrl, serviceKey, {
@@ -75,7 +78,11 @@ Deno.serve(async (req) => {
 
     if (!recipientIds.length) {
       return new Response(
-        JSON.stringify({ message: 'No recipients', delivered: 0, failed: 0 }),
+        JSON.stringify({
+          message: 'No recipients',
+          delivered: 0,
+          failed: 0,
+        }),
         { status: 200, headers: corsHeaders }
       );
     }
@@ -119,9 +126,23 @@ Deno.serve(async (req) => {
       ? `@${sender.nickname}`
       : 'Someone';
 
+    // Prepare a readable preview without internal reply metadata.
+    const rawBody =
+      typeof message.body === 'string' ? message.body : '';
+
+    const messagePreview = rawBody
+      .replace(/^\[\[RC_REPLY\]\][\s\S]*?\n/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 140);
+
     const notification = JSON.stringify({
       title,
-      body: `${senderName} sent you a new message.`,
+      body: messagePreview
+        ? `${senderName}: ${messagePreview}`
+        : `${senderName} sent you a new message.`,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
       tag: `message-${message.id || crypto.randomUUID()}`,
       conversation_id: message.conversation_id,
       url: '/?tab=Messages',
@@ -163,7 +184,10 @@ Deno.serve(async (req) => {
                 );
               }
             } else {
-              console.error('Push delivery failed:', status || error);
+              console.error(
+                'Push delivery failed:',
+                status || error
+              );
             }
           }
         }
@@ -194,3 +218,4 @@ Deno.serve(async (req) => {
     );
   }
 });
+        
