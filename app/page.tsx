@@ -1165,7 +1165,9 @@ delivered_by: deliveryByMessage[m.id] || []
     return true;
   }).sort((a, b) => Number(b.premium_status === 'active') - Number(a.premium_status === 'active'));
 
-  const rankingSeconds = (p: Profile) => Math.max(0, Number(p.total_online_seconds || 0)) * (p.premium_status === 'active' ? 3 : 1);
+  const rankingSeconds = (p: Profile) =>
+  Math.max(0, Number(p.total_online_seconds || 0)) *
+  (p.premium_status === 'active' ? 3 : 1);
 
   return <main className="rc-shell" onTouchStart={handlePageTouchStart} onTouchMove={handlePageTouchMove} onTouchEnd={handlePageTouchEnd}>
     {!userId ? <>
