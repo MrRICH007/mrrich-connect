@@ -247,6 +247,28 @@ export default function Home() {
     if (ads) setActiveAds(ads as AdCampaign[]);
   }, [supabase, userId]);
 
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    const channel = supabase
+      .channel(`rc-groups-live-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, payload => {
+        const updated = (payload.new || payload.old) as Partial<CommunityGroup> | undefined;
+        if (!updated?.id) {
+          void refreshCommunity();
+          return;
+        }
+        setGroups(current => {
+          if (payload.eventType === 'DELETE') return current.filter(group => group.id !== updated.id);
+          const next = payload.new as CommunityGroup;
+          const index = current.findIndex(group => group.id === next.id);
+          if (index < 0) return [...current, next];
+          return current.map(group => group.id === next.id ? { ...group, ...next } : group);
+        });
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [supabase, userId, refreshCommunity]);
+
   const loadIncomingRequests = useCallback(async () => {
     if (!supabase || !userId) { setIncomingRequests([]); return; }
     const { data: rows, error } = await supabase.from('message_requests')
@@ -1197,6 +1219,7 @@ delivered_by: deliveryByMessage[m.id] || []
         {userId ? <button className="rc-icon-btn" aria-label="Sign out" onClick={signOut}><LogOut size={19}/></button> : <button className="rc-small-login" onClick={() => document.getElementById('rc-email')?.focus()}>Login</button>}
       </div>
     </header>
+      {userId && <nav className="rc-desktop-nav" aria-label="Main navigation">{NAV_ITEMS.filter(item => item.name !== 'Premium').map(item => <button key={item.name} className={`rc-desktop-nav-item ${tab === item.name ? 'active' : ''}`} onClick={() => { setTab(item.name); setShowProfile(false); setShowGroup(false); setShowEmojiPicker(false); }}><item.icon size={18} strokeWidth={tab === item.name ? 2.5 : 2}/><span>{item.name === 'My Profile' ? 'Profile' : item.name}</span>{item.name === 'Requests' && requests > 0 && <i className="rc-nav-badge">{requests > 99 ? '99+' : requests}</i>}{item.name === 'Messages' && Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0) > 0 && <i className="rc-nav-badge">{Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0) > 99 ? '99+' : Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0)}</i>}</button>)}</nav>
       <div className={`rc-page-heading ${page.name === 'Messages' || page.name === 'Requests' ? 'rc-simple-page-heading' : ''}`}><div>{!['Messages', 'Requests'].includes(page.name) && <span className="rc-eyebrow">{page.name === 'Discover' ? 'MEET YOUR COMMUNITY' : page.name === 'Groups' ? 'YOUR COMMUNITIES' : page.name === 'Premium' ? 'MEMBERSHIP' : 'YOUR SPACE'}</span>}<h1>{page.name === 'Messages' ? 'Messages' : page.name === 'Discover' ? 'Find People Online' : page.name === 'Groups' ? 'Find Your Community' : page.name === 'Requests' ? 'Message Request' : page.name === 'Premium' ? 'Premium Membership' : 'Your Profile'}</h1>{page.name === 'Requests' && <p className="rc-page-subtitle">Accept a request to open a private conversation.</p>}</div>
         {page.name === 'Messages' && <button type="button" className="rc-icon-btn rc-heading-notification" onClick={() => void enableMessageNotifications()} title="Enable message notifications" aria-label="Enable message notifications"><Bell size={18}/></button>}
         {page.name === 'Messages' && isAdmin && <a href="/admin" className="rc-icon-btn" title="Admin dashboard" aria-label="Admin dashboard"><ShieldCheck size={18}/></a>}
@@ -1305,10 +1328,10 @@ delivered_by: deliveryByMessage[m.id] || []
           <div className="rc-empty-icon" style={{ margin: '0 auto 16px' }}><Crown size={30}/></div>
           <span className="rc-eyebrow">MR RICH CONNECT MEMBERSHIP</span>
           <h2 style={{ fontSize: 30, margin: '12px 0' }}>Go Premium</h2>
-          <p>Stand out in the community with your Premium membership.</p>
+          <p>Pay ₦1,500 for one month (30 days) of MR RICH CONNECT Premium.</p>
           <div style={{ margin: '24px 0', padding: 20, border: '1px solid rgba(96,165,250,.35)', borderRadius: 16 }}>
             <div style={{ fontSize: 34, fontWeight: 800, color: '#60a5fa' }}>₦1,500 <span style={{ fontSize: 15, fontWeight: 500 }}> / month</span></div>
-            <p style={{ marginBottom: 0 }}>One month of Premium membership.</p>
+            <p style={{ marginBottom: 0 }}>Your payment covers 30 days of Premium membership from successful payment confirmation. It is not a lifetime subscription.</p>
           </div>
           <ul style={{ textAlign: 'left', lineHeight: 2, paddingLeft: 22 }}>
             <li>Premium Member title on your profile</li>
