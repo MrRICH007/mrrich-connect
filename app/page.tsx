@@ -1496,5 +1496,6 @@ delivered_by: deliveryByMessage[m.id] || []
       .rc-marketplace-message p { color:#aab9d0; margin:0 0 10px; line-height:1.6; }
       @media (max-width:800px) { .rc-floating-premium { bottom:calc(82px + env(safe-area-inset-bottom)); } .rc-floating-marketplace { bottom:calc(136px + env(safe-area-inset-bottom)); } }
     `}</style>
-  </main>,
+  </main>
+);
 }
