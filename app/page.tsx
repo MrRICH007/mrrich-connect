@@ -1846,28 +1846,27 @@ async function playVoiceNote(message: ChatMessage) {
           color:'#93c5fd',
           cursor:'pointer'
         }}
-      >
+            >
         Edit
       </button>
 
-    
-<button
-  type="button"
-  onClick={() => void deleteOwnMessage(message)}
-  aria-label="Delete your message"
-  style={{
-    marginTop: 6,
-    marginLeft: 6,
-    padding: '4px 8px',
-    borderRadius: 6,
-    border: '1px solid #7f1d1d',
-    background: 'transparent',
-    color: '#fca5a5',
-    cursor: 'pointer'
-  }}
->
-  Delete
-</button>
+      <button
+        type="button"
+        onClick={() => void deleteOwnMessage(message)}
+        aria-label="Delete your message"
+        style={{
+          marginTop: 6,
+          marginLeft: 6,
+          padding: '4px 8px',
+          borderRadius: 6,
+          border: '1px solid #7f1d1d',
+          background: 'transparent',
+          color: '#fca5a5',
+          cursor: 'pointer'
+        }}
+      >
+        Delete
+      </button>
   
     )}
   </>
