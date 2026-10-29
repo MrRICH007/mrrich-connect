@@ -2055,7 +2055,108 @@ async function playVoiceNote(message: ChatMessage) {
             </div>
 
           </div>;
-        })}</div>{showScrollToLatest && <button type="button" className="rc-scroll-latest" onClick={() => scrollChatToLatest('smooth')} aria-label="Scroll to latest message" title="Latest message"><ArrowDown size={20}/></button>}{(() => { const activeGroup = selectedConversation.kind === 'group' ? groups.find(g => g.conversation_id === selectedConversation.id) : null; const isGroupAdmin = !!activeGroup && (activeGroup.created_by === userId || isAdmin); const adminOnly = !!activeGroup && activeGroup.members_can_message === false && !isGroupAdmin; return adminOnly ? <div className="rc-admin-only-notice">Only Admin can Send Messages</div> : <div className="rc-composer-wrap">{replyTo && <div className="rc-reply-preview"><div><strong>Replying to {replyTo.sender_id === userId ? 'yourself' : '@' + (replyTo.sender_nickname || 'Member')}</strong><small>{replyTo.body.slice(0, 110)}{replyTo.body.length > 110 ? '…' : ''}</small></div><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X size={16}/></button></div>}<div className="rc-composer"><button type="button" className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button>
+        })}</div>{showScrollToLatest && <button type="button" className="rc-scroll-latest" onClick={() => scrollChatToLatest('smooth')} aria-label="Scroll to latest message" title="Latest message"><ArrowDown size={20}/></button>}{(() => { const activeGroup = selectedConversation.kind === 'group' ? groups.find(g => g.conversation_id === selectedConversation.id) : null; const isGroupAdmin = !!activeGroup && (activeGroup.created_by === userId || isAdmin); const adminOnly = !!activeGroup && activeGroup.members_can_message === false && !isGroupAdmin; return adminOnly ? <div className="rc-admin-only-notice">Only Admin can Send Messages</div> : <div className="rc-composer-wrap">{replyTo && <div className="rc-reply-preview"><div><strong>Replying to {replyTo.sender_id === userId ? 'yourself' : '@' + (replyTo.sender_nickname || 'Member')}</strong><small>{replyTo.body.slice(0, 110)}{replyTo.body.length > 110 ? '…' : ''}</small></div><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X size={16}/></button></div>}
+{voicePreviewUrl && (
+  <div
+    style={{
+      marginBottom: 12,
+      padding: 14,
+      borderRadius: 16,
+      border: '1px solid rgba(96,165,250,.4)',
+      background: 'linear-gradient(135deg, #101b35, #0b1220)',
+      boxShadow: '0 8px 24px rgba(0,0,0,.18)'
+    }}
+  >
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 12
+    }}>
+      <span style={{
+        width: 42,
+        height: 42,
+        display: 'grid',
+        placeItems: 'center',
+        borderRadius: 13,
+        background: 'rgba(37,99,235,.2)',
+        color: '#93c5fd'
+      }}>
+        <AudioLines size={23} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <strong style={{ color: '#f8fafc' }}>Voice note preview</strong>
+        <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 3 }}>
+          Listen before sending
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={cancelVoicePreview}
+        disabled={voiceBusy}
+        aria-label="Discard voice note"
+        title="Discard voice note"
+        style={{
+          background: 'transparent',
+          border: '1px solid #334155',
+          color: '#fca5a5',
+          borderRadius: 9,
+          padding: 8
+        }}
+      >
+        <Trash2 size={18} />
+      </button>
+    </div>
+
+    <audio
+      controls
+      src={voicePreviewUrl}
+      onLoadedMetadata={e =>
+        setVoicePreviewDuration(e.currentTarget.duration || 0)
+      }
+      style={{ width: '100%', display: 'block', marginBottom: 12 }}
+    />
+
+    <div style={{ display: 'flex', gap: 10 }}>
+      <button
+        type="button"
+        onClick={cancelVoicePreview}
+        disabled={voiceBusy}
+        style={{
+          flex: 1,
+          padding: '11px 14px',
+          borderRadius: 11,
+          border: '1px solid #334155',
+          background: '#111827',
+          color: '#e2e8f0',
+          fontWeight: 600
+        }}
+      >
+        <X size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        onClick={() => void sendVoicePreview()}
+        disabled={voiceBusy || !voicePreviewBlob}
+        style={{
+          flex: 1,
+          padding: '11px 14px',
+          borderRadius: 11,
+          border: '1px solid #2563eb',
+          background: '#2563eb',
+          color: '#fff',
+          fontWeight: 700,
+          opacity: voiceBusy ? 0.65 : 1
+        }}
+      >
+        {voiceBusy ? 'Sending…' : <><Send size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Send voice note</>}
+      </button>
+    </div>
+  </div>
+)}
+  <div className="rc-composer"><button type="button" className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button>
 <button
   type="button"
   onClick={() => isRecordingVoice ? stopVoiceRecording() : void startVoiceRecording()}
