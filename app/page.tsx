@@ -2154,7 +2154,9 @@ async function playVoiceNote(message: ChatMessage) {
         {voiceBusy ? 'Sending…' : <><Send size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Send voice note</>}
       </button>
     </div>
-  </div><div className="rc-composer"><button type="button" className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button>
+  </div>
+  )}
+          <div className="rc-composer"><button type="button" className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button>
 
 <button
   type="button"
