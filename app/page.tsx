@@ -1027,6 +1027,32 @@ delivered_by: deliveryByMessage[m.id] || []
   }
   
 
+  async function blockUser(otherUserId: string, nickname: string) {
+    if (!supabase || !userId || !otherUserId || otherUserId === userId) return;
+
+    const confirmed = window.confirm(
+      `Block @${nickname}? They will not be able to message you.`
+    );
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('user_blocks')
+      .upsert(
+        {
+          blocker_id: userId,
+          blocked_id: otherUserId
+        },
+        { onConflict: 'blocker_id,blocked_id' }
+      );
+
+    if (error) {
+      setStatus(`Could not block user: ${error.message}`);
+      return;
+    }
+
+    setStatus(`@${nickname} blocked.`);
+            }
+  
   const scrollChatToLatest = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const el = chatMessagesRef.current;
     if (!el) return;
