@@ -143,6 +143,11 @@ export default function Home() {
   const [settingsGroup, setSettingsGroup] = useState<CommunityGroup | null>(null);
   const [groupSettingsForm, setGroupSettingsForm] = useState({ member_limit: 'unlimited', allowed_levels: [] as string[], allowed_schools: [] as string[], members_can_message: true });
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+   const [hideActionsConversationId, setHideActionsConversationId] = useState<string | null>(null);
+  const [messageActionsMessageId, setMessageActionsMessageId] = useState<string | null>(null);
+  const conversationHoldTimer = useRef<number | null>(null);
+  const messageHoldTimer = useRef<number | null>(null);
+  const suppressConversationClick = useRef(false);
   const [chatExiting, setChatExiting] = useState(false);
   const pageSwipeStart = useRef<{ x: number; y: number; kind: 'page' | 'chat' } | null>(null);
   const [pageSwipeOffset, setPageSwipeOffset] = useState(0);
@@ -1653,8 +1658,41 @@ async function playVoiceNote(message: ChatMessage) {
       className={`rc-conversation-row ${
         selectedConversation?.id === convo.id ? 'active' : ''
       }`}
-      style={{ flex: 1, minWidth: 0 }}
+            style={{ flex: 1, minWidth: 0, touchAction: 'pan-y' }}
+      onPointerDown={() => {
+        suppressConversationClick.current = false;
+        if (conversationHoldTimer.current !== null) {
+          window.clearTimeout(conversationHoldTimer.current);
+        }
+        conversationHoldTimer.current = window.setTimeout(() => {
+          setHideActionsConversationId(convo.id);
+          suppressConversationClick.current = true;
+        }, 550);
+      }}
+      onPointerUp={() => {
+        if (conversationHoldTimer.current !== null) {
+          window.clearTimeout(conversationHoldTimer.current);
+        }
+        conversationHoldTimer.current = null;
+      }}
+      onPointerLeave={() => {
+        if (conversationHoldTimer.current !== null) {
+          window.clearTimeout(conversationHoldTimer.current);
+        }
+        conversationHoldTimer.current = null;
+      }}
+      onPointerCancel={() => {
+        if (conversationHoldTimer.current !== null) {
+          window.clearTimeout(conversationHoldTimer.current);
+        }
+        conversationHoldTimer.current = null;
+      }}
       onClick={() => {
+        if (suppressConversationClick.current) {
+          suppressConversationClick.current = false;
+          return;
+        }
+        setHideActionsConversationId(null);
         setSelectedConversation(convo);
         void markConversationRead(convo.id);
         setReplyTo(null);
@@ -1707,16 +1745,21 @@ async function playVoiceNote(message: ChatMessage) {
       )}
     </button>
 
-    <button
-      type="button"
-      className="rc-icon-btn"
-      aria-label={`Hide conversation with ${convo.title}`}
-      title="Hide conversation"
-      onClick={() => void hideConversation(convo.id)}
-      style={{ flexShrink: 0 }}
-    >
-      <X size={17} />
-    </button>
+        {hideActionsConversationId === convo.id && (
+      <button
+        type="button"
+        className="rc-icon-btn"
+        aria-label={`Hide conversation with ${convo.title}`}
+        title="Hide conversation"
+        onClick={() => {
+          setHideActionsConversationId(null);
+          void hideConversation(convo.id);
+        }}
+        style={{ flexShrink: 0 }}
+      >
+        <X size={17} />
+      </button>
+    )}
   </div>
 ))}
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
@@ -1752,7 +1795,20 @@ async function playVoiceNote(message: ChatMessage) {
           const mine = message.sender_id === userId;
           const groupChat = selectedConversation.kind === 'group';
           const senderName = mine ? 'You' : `@${message.sender_nickname || 'Member'}`;
-          return <div key={message.id} onTouchStart={e => { touchStartX.current[message.id] = e.changedTouches[0]?.clientX ?? 0; setDraggingMessageId(message.id); }} onTouchMove={e => { const start = touchStartX.current[message.id]; const current = e.changedTouches[0]?.clientX ?? start; if (start !== undefined) setDragOffsets(old => ({...old, [message.id]: Math.max(0, Math.min(72, current - start))})); }} onTouchEnd={e => { const start = touchStartX.current[message.id]; const end = e.changedTouches[0]?.clientX ?? start; if (start !== undefined && end - start > 55) setReplyTo(message); delete touchStartX.current[message.id]; setDraggingMessageId(null); setDragOffsets(old => ({...old, [message.id]: 0})); }} onDoubleClick={() => setReplyTo(message)} title="Swipe right to reply" className={`rc-message-row ${mine ? 'rc-message-mine' : 'rc-message-other'} ${groupChat ? 'rc-message-group' : 'rc-message-private'}`} style={{marginLeft: mine ? '12%' : 0, marginRight: mine ? 0 : '12%'}}>
+          return <div key={message.id} onPointerDown={() => {
+  if (!mine) return;
+  if (messageHoldTimer.current !== null) window.clearTimeout(messageHoldTimer.current);
+  messageHoldTimer.current = window.setTimeout(() => setMessageActionsMessageId(message.id), 550);
+}} onPointerUp={() => {
+  if (messageHoldTimer.current !== null) window.clearTimeout(messageHoldTimer.current);
+  messageHoldTimer.current = null;
+}} onPointerLeave={() => {
+  if (messageHoldTimer.current !== null) window.clearTimeout(messageHoldTimer.current);
+  messageHoldTimer.current = null;
+}} onPointerCancel={() => {
+  if (messageHoldTimer.current !== null) window.clearTimeout(messageHoldTimer.current);
+  messageHoldTimer.current = null;
+}} onTouchStart={e => { touchStartX.current[message.id] = e.changedTouches[0]?.clientX ?? 0; setDraggingMessageId(message.id); }} onTouchMove={e => { const start = touchStartX.current[message.id]; const current = e.changedTouches[0]?.clientX ?? start; if (start !== undefined) setDragOffsets(old => ({...old, [message.id]: Math.max(0, Math.min(72, current - start))})); }} onTouchEnd={e => { const start = touchStartX.current[message.id]; const end = e.changedTouches[0]?.clientX ?? start; if (start !== undefined && end - start > 55) setReplyTo(message); delete touchStartX.current[message.id]; setDraggingMessageId(null); setDragOffsets(old => ({...old, [message.id]: 0})); }} onDoubleClick={() => setReplyTo(message)} title={mine ? "Swipe right to reply; press and hold for message options" : "Swipe right to reply"} className={`rc-message-row ${mine ? 'rc-message-mine' : 'rc-message-other'} ${groupChat ? 'rc-message-group' : 'rc-message-private'}`} style={{marginLeft: mine ? '12%' : (groupChat ? 0 : '6%'), marginRight: mine ? 0 : '12%'}}>
             {!mine && groupChat && <span className="rc-message-avatar">{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt=""/> : (message.sender_nickname?.[0] || 'M').toUpperCase()}</span>}
             <div className={`rc-message-bubble ${mine ? 'mine' : 'other'} ${draggingMessageId === message.id ? 'rc-message-dragging' : ''}`} style={{transform: `translateX(${dragOffsets[message.id] || 0}px)`, transition: draggingMessageId === message.id ? 'none' : 'transform 180ms ease-out'}}>
               {groupChat && <strong className="rc-message-sender" style={{color: mine ? '#ffffff' : nicknameColor(message.sender_id)}}>{senderName}</strong>}
@@ -1828,11 +1884,12 @@ async function playVoiceNote(message: ChatMessage) {
 ) : (
   <div className="rc-message-body">{message.body}</div>
 )}
-    {mine && (
-            <>
+        {mine && messageActionsMessageId === message.id && (
+      <>
         <button
           type="button"
-          onClick={() => {
+                    onClick={() => {
+            setMessageActionsMessageId(null);
             setEditingMessage(message);
             setEditMessageText(message.body);
           }}
@@ -1852,7 +1909,10 @@ async function playVoiceNote(message: ChatMessage) {
 
         <button
           type="button"
-          onClick={() => void deleteOwnMessage(message)}
+                    onClick={() => {
+            setMessageActionsMessageId(null);
+            void deleteOwnMessage(message);
+          }}
           aria-label="Delete your message"
           style={{
             marginTop: 6,
