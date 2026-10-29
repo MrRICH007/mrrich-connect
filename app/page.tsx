@@ -988,6 +988,43 @@ delivered_by: deliveryByMessage[m.id] || []
 
     setStatus('Conversation hidden from your list.');
   }
+
+  
+  async function leaveGroup(groupId: string, groupName: string) {
+    if (!supabase || !userId) return;
+
+    const confirmed = window.confirm(
+      `Leave "${groupName}"? You can rejoin later if the group allows it.`
+    );
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+
+    if (error) {
+      setStatus(`Could not leave group: ${error.message}`);
+      return;
+    }
+
+    const group = groups.find(item => item.id === groupId);
+
+    setGroups(current => current.filter(item => item.id !== groupId));
+
+    if (group?.conversation_id) {
+      setConversationList(current =>
+        current.filter(item => item.id !== group.conversation_id)
+      );
+
+      if (selectedConversation?.id === group.conversation_id) {
+        setSelectedConversation(null);
+      }
+    }
+
+    setStatus(`You left "${groupName}".`);
+  }
   
 
   const scrollChatToLatest = useCallback((behavior: ScrollBehavior = 'smooth') => {
