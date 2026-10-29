@@ -3083,7 +3083,7 @@ async function playVoiceNote(message: ChatMessage) {
           top: 64px !important;
         }
       }
-      /* Final Messages inbox fit: remove the thin gaps above and below the list. */
+      /* Final Messages inbox fit: extend the list down to the bottom navigation. */
       .rc-tab-panel:has(.rc-messages-layout) {
         padding-bottom: 0 !important;
       }
@@ -3101,8 +3101,8 @@ async function playVoiceNote(message: ChatMessage) {
         margin-bottom: 0 !important;
         padding-top: 0 !important;
         padding-bottom: 0 !important;
-        height: calc(var(--rc-visual-height, 100dvh) - 190px) !important;
-        max-height: calc(var(--rc-visual-height, 100dvh) - 190px) !important;
+        height: calc(var(--rc-visual-height, 100dvh) - 145px) !important;
+        max-height: calc(var(--rc-visual-height, 100dvh) - 145px) !important;
         min-height: 0 !important;
       }
       @media (max-width: 800px) {
@@ -3110,8 +3110,8 @@ async function playVoiceNote(message: ChatMessage) {
           margin-bottom: 0 !important;
         }
         .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          height: calc(var(--rc-visual-height, 100dvh) - 190px) !important;
-          max-height: calc(var(--rc-visual-height, 100dvh) - 190px) !important;
+          height: calc(var(--rc-visual-height, 100dvh) - 145px) !important;
+          max-height: calc(var(--rc-visual-height, 100dvh) - 145px) !important;
         }
       }
     `}
