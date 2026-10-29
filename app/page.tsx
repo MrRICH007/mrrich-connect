@@ -3015,6 +3015,74 @@ async function playVoiceNote(message: ChatMessage) {
         bottom:82px !important; margin-left:0 !important; margin-right:0 !important;
         align-self:auto !important; z-index:8 !important;
       }
+
+
+      /* Independent page scrolling: keep the horizontal swipe track, but give
+         every tab its own vertical scroll container so one tab cannot move another. */
+      .rc-swipe-viewport {
+        height: 100dvh !important;
+        min-height: 0 !important;
+        padding-bottom: calc(86px + env(safe-area-inset-bottom)) !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+      }
+      .rc-swipe-stage {
+        height: 100% !important;
+        min-height: 0 !important;
+        align-items: stretch !important;
+      }
+      .rc-tab-panel {
+        height: 100% !important;
+        min-height: 0 !important;
+        max-height: 100% !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior-y: contain !important;
+        touch-action: pan-y !important;
+        padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important;
+        box-sizing: border-box !important;
+      }
+      .rc-tab-panel.rc-panel-hidden {
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+      .rc-tab-panel.rc-panel-visible {
+        height: 100% !important;
+        max-height: 100% !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+      }
+      /* Brand header remains at the top while the active page scrolls. */
+      .rc-tab-panel > .rc-mobile-header {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 75 !important;
+        flex: 0 0 auto !important;
+        background: rgba(5, 11, 24, .97) !important;
+        isolation: isolate !important;
+      }
+      /* Only the Messages page title row is additionally pinned below the brand. */
+      .rc-tab-panel:has(.rc-messages-layout) > .rc-page-heading {
+        position: sticky !important;
+        top: var(--rc-brand-header-height, 68px) !important;
+        z-index: 70 !important;
+        background: rgba(5, 11, 24, .97) !important;
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+        margin-bottom: 8px !important;
+        isolation: isolate !important;
+      }
+      @media (max-width: 800px) {
+        .rc-tab-panel > .rc-mobile-header { min-height: 64px !important; }
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-page-heading {
+          top: 64px !important;
+        }
+      }
     `}
 </style>
   </main>
