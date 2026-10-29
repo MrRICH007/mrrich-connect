@@ -1503,7 +1503,7 @@ async function playVoiceNote(message: ChatMessage) {
       for (const message of pendingMessages) {
         if (!message.media_path) continue;
 
-        const { data, error } = await supabase.storage
+        const { data, error } = await supabase!.storage
           .from('rc-voice-notes')
           .createSignedUrl(message.media_path, 3600);
 
