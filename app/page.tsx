@@ -262,6 +262,8 @@ export default function Home() {
   const [pageSwipeAnimating, setPageSwipeAnimating] = useState(false);
   const [conversationList, setConversationList] = useState<Conversation[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  // Keep recently opened conversations in memory so returning to a chat feels instant.
+  const chatMessageCache = useRef<Record<string, ChatMessage[]>>({});
   const chatMessagesRef = useRef<HTMLDivElement | null>(null);
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
@@ -1001,6 +1003,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const loadChatMessages = useCallback(async (conversationId: string) => {
     if (!supabase || !userId) return;
 
+    // Render cached messages immediately, then refresh them from Supabase in the background.
+    const cachedMessages = chatMessageCache.current[conversationId];
+    if (cachedMessages) setChatMessages(cachedMessages);
+
     const { data, error } = await supabase.from('messages')
       .select('id,conversation_id,sender_id,body,created_at,message_type,media_path')
       .eq('conversation_id', conversationId)
@@ -1069,14 +1075,16 @@ const voiceChunksRef = useRef<Blob[]>([]);
       (senders ?? []).map(p => [p.id, p])
     );
 
-    setChatMessages(rows.map(m => ({
+    const mappedMessages = rows.map(m => ({
       ...m,
       sender_nickname: senderMap.get(m.sender_id)?.nickname
         || (m.sender_id === userId ? 'You' : 'Member'),
       sender_avatar_url: senderMap.get(m.sender_id)?.avatar_url || null,
       read_by: readersByMessage[m.id] || [],
-delivered_by: deliveryByMessage[m.id] || []
-    })));
+      delivered_by: deliveryByMessage[m.id] || []
+    }));
+    chatMessageCache.current[conversationId] = mappedMessages;
+    setChatMessages(mappedMessages);
   }, [supabase, userId]);
 
 async function playVoiceNote(message: ChatMessage) {
@@ -1697,7 +1705,10 @@ async function playVoiceNote(message: ChatMessage) {
   }, [supabase, userId, selectedConversation?.id, notificationPermission, conversationList, loadChatMessages, loadUnreadCounts]);
   useEffect(() => {
     if (!supabase || !userId || !selectedConversation) { setChatMessages([]); return; }
-    
+
+    const cachedMessages = chatMessageCache.current[selectedConversation.id];
+    if (cachedMessages) setChatMessages(cachedMessages);
+    else setChatMessages([]);
     void loadChatMessages(selectedConversation.id);
     if (document.visibilityState === 'visible') {
       void markMessagesDelivered(selectedConversation.id);
@@ -2579,20 +2590,25 @@ async function playVoiceNote(message: ChatMessage) {
       @media (max-width: 800px) {
         .rc-tab-panel { position: relative; }
         .rc-messages-layout.has-chat {
-          position: absolute !important;
-          inset: calc(76px + var(--rc-visual-offset, 0px)) 0 auto 0 !important;
-          width: 100% !important;
-          max-width: 100% !important;
-          height: calc(var(--rc-visual-height, 100dvh) - 76px - var(--rc-visual-offset, 0px)) !important;
-          max-height: calc(var(--rc-visual-height, 100dvh) - 76px - var(--rc-visual-offset, 0px)) !important;
+          position: fixed !important;
+          inset: var(--rc-visual-offset, 0px) 0 auto 0 !important;
+          z-index: 80 !important;
+          width: 100vw !important;
+          max-width: 100vw !important;
+          height: var(--rc-visual-height, 100dvh) !important;
+          max-height: var(--rc-visual-height, 100dvh) !important;
           min-width: 0 !important;
           overflow: hidden !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
         }
         html.rc-keyboard-open .rc-messages-layout.has-chat {
-          inset: 0 0 auto 0 !important;
+          inset: var(--rc-visual-offset, 0px) 0 auto 0 !important;
           height: var(--rc-visual-height, 100dvh) !important;
           max-height: var(--rc-visual-height, 100dvh) !important;
         }
+        .rc-messages-layout.has-chat .rc-conversation-list { display: none !important; }
+        .rc-messages-layout.has-chat .rc-chat-panel { height: 100% !important; min-height: 0 !important; }
         .rc-messages-layout.has-chat .rc-chat-panel,
         .rc-messages-layout.has-chat .rc-composer-wrap,
         .rc-messages-layout.has-chat .rc-composer {
@@ -2721,8 +2737,8 @@ async function playVoiceNote(message: ChatMessage) {
 
       /* Smaller text in both private and group message bubbles. */
       .rc-message-body {
-        font-size: 12.5px !important;
-        line-height: 1.4 !important;
+        font-size: 14px !important;
+        line-height: 1.48 !important;
         overflow-wrap: anywhere;
       }
       .rc-message-sender { font-size: 11px !important; line-height: 1.25 !important; }
@@ -2841,6 +2857,16 @@ async function playVoiceNote(message: ChatMessage) {
       @media (max-width:800px) { .rc-conversation-list { height:calc(var(--rc-visual-height, 100dvh) - 230px) !important; max-height:calc(var(--rc-visual-height, 100dvh) - 230px) !important; } .rc-leave-chat-button { padding:6px 8px; } }
       .rc-conversation-list::-webkit-scrollbar { width: 3px; }
       .rc-conversation-list::-webkit-scrollbar-thumb { background: rgba(147,197,253,.24); border-radius: 99px; }
+
+      /* Final mobile layout fixes: full-screen chat overlay, no dark list mask. */
+      .rc-conversation-list::before, .rc-conversation-list::after { content: none !important; display: none !important; }
+      .rc-conversation-list { background: transparent !important; background-image: none !important; box-shadow: none !important; }
+      .rc-messages-layout:not(.has-chat)::before, .rc-messages-layout:not(.has-chat)::after { content: none !important; display: none !important; }
+      @media (max-width:800px) {
+        .rc-messages-layout.has-chat { transform: none !important; }
+        .rc-messages-layout.has-chat .rc-chat-panel { display:flex !important; flex-direction:column !important; overflow:hidden !important; }
+      }
+
     `}
 </style>
   </main>
