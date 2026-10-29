@@ -799,7 +799,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!supabase || !userId) return;
 
     const { data, error } = await supabase.from('messages')
-      .select('id,conversation_id,sender_id,body,created_at')
+      .select('id,conversation_id,sender_id,body,created_at,message_type,media_path')
       .eq('conversation_id', conversationId)
       .is('deleted_at', null)
       .order('created_at', { ascending: true })
