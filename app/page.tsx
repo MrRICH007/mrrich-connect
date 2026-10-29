@@ -872,6 +872,26 @@ delivered_by: deliveryByMessage[m.id] || []
   async function sendDraft() {
     const body = draftMessage.trim();
     if (!supabase || !userId || !selectedConversation || !body || sendingMessage) return;
+    
+    if (selectedConversation.kind === 'person' && selectedConversation.otherUserId) {
+      const { data: blockRows, error: blockError } = await supabase
+        .from('user_blocks')
+        .select('blocker_id,blocked_id')
+        .or(
+          `and(blocker_id.eq.${userId},blocked_id.eq.${selectedConversation.otherUserId}),and(blocker_id.eq.${selectedConversation.otherUserId},blocked_id.eq.${userId})`
+        );
+
+      if (blockError) {
+        setStatus('Could not verify block status. Message not sent.');
+        return;
+      }
+
+      if (blockRows && blockRows.length > 0) {
+        setStatus('Message not sent. A block is active between these users.');
+        return;
+      }
+    }
+    
     setSendingMessage(true);
     const storedBody = replyTo ? `[[RC_REPLY]]${JSON.stringify({ sender_id: replyTo.sender_id, sender_nickname: replyTo.sender_nickname || (replyTo.sender_id === userId ? 'You' : 'Member'), body: replyTo.body.slice(0, 500) })}\n${body}` : body;
     const { data, error } = await supabase.from('messages').insert({
