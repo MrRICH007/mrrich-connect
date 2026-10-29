@@ -2092,36 +2092,21 @@ async function playVoiceNote(message: ChatMessage) {
     {voiceUrls[message.id] ? (
       <VoiceNotePlayer src={voiceUrls[message.id]} />
     ) : (
-      <div style={{
-        color: '#93c5fd',
-        fontSize: 12,
-        padding: '10px 12px'
-      }}>
+      <div
+        style={{
+          color: '#93c5fd',
+          fontSize: 12,
+          padding: '10px 12px'
+        }}
+      >
         Loading voice note…
       </div>
     )}
   </div>
 ) : (
-
-      <button
-        type="button"
-        onClick={() => void playVoiceNote(message)}
-        style={{
-          padding: '8px 12px',
-          borderRadius: 8,
-          border: '1px solid #2563eb',
-          background: '#172554',
-          color: '#dbeafe',
-          cursor: 'pointer'
-        }}
-      >
-        Load voice note
-      </button>
-    )}
-  </div>
-) : (
   <div className="rc-message-body">{message.body}</div>
 )}
+
         {mine && messageActionsMessageId === message.id && (
       <>
         <button
