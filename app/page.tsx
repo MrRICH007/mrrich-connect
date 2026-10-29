@@ -33,6 +33,8 @@ type ChatMessage = {
   conversation_id: string;
   sender_id: string;
   body: string;
+    message_type?: 'text' | 'voice';
+  media_path?: string | null;
   created_at: string;
   sender_nickname?: string;
   sender_avatar_url?: string | null;
