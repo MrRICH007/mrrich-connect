@@ -696,10 +696,31 @@ const [savingEdit, setSavingEdit] = useState(false);
   
   const loadConversations = useCallback(async () => {
     if (!supabase || !userId) { setConversationList([]); return; }
+    
     const { data: memberships, error: memberError } = await supabase.from('conversation_members')
       .select('conversation_id').eq('user_id', userId);
+    if (memberError) {
+      setStatus(`Could not load conversations: ${memberError.message}`);
+      return;
+    }
+
+    const { data: hiddenRows, error: hiddenError } = await supabase
+      .from('hidden_conversations')
+      .select('conversation_id')
+      .eq('user_id', userId);
+
+    if (hiddenError) {
+      setStatus(`Could not load hidden conversations: ${hiddenError.message}`);
+      return;
+    }
+
+    const hiddenIds = new Set(
+      (hiddenRows ?? []).map((row: { conversation_id: string }) => row.conversation_id)
+    );
+
     if (memberError) { setStatus(`Could not load conversations: ${memberError.message}`); return; }
-    const ids = [...new Set((memberships ?? []).map((m: { conversation_id: string }) => m.conversation_id))];
+        const ids = [...new Set((memberships ?? []).map((m: { conversation_id: string }) => m.conversation_id))]
+      .filter(id => !hiddenIds.has(id));
     if (!ids.length) { setConversationList([]); return; }
     const { data: convs, error: convError } = await supabase.from('conversations')
       .select('id,title,kind').in('id', ids);
