@@ -878,6 +878,37 @@ delivered_by: deliveryByMessage[m.id] || []
     })));
   }, [supabase, userId]);
 
+async function playVoiceNote(message: ChatMessage) {
+  if (!supabase || !message.media_path) {
+    setStatus('Voice note is unavailable.');
+    return;
+  }
+
+  const existingUrl = voiceUrls[message.id];
+
+  if (existingUrl) {
+    setVoiceUrls(old => {
+      const next = { ...old };
+      delete next[message.id];
+      return next;
+    });
+    return;
+  }
+
+  const { data, error } = await supabase.storage
+    .from('rc-voice-notes')
+    .createSignedUrl(message.media_path, 3600);
+
+  if (error || !data?.signedUrl) {
+    setStatus('Could not open voice note. Please try again.');
+    return;
+  }
+
+  setVoiceUrls(old => ({
+    ...old,
+    [message.id]: data.signedUrl
+  }));
+}
   
   async function startVoiceRecording() {
     if (!supabase || !userId || !selectedConversation || voiceBusy || isRecordingVoice) return;
