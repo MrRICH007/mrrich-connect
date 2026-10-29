@@ -1456,7 +1456,88 @@ delivered_by: deliveryByMessage[m.id] || []
 
       {page.name === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''} ${chatExiting ? 'chat-exiting' : ''}`}>
         <aside className="rc-conversation-list">
-          {conversationList.map(convo => <button key={convo.id} className={`rc-conversation-row ${selectedConversation?.id === convo.id ? 'active' : ''}`} onClick={() => { setSelectedConversation(convo); void markConversationRead(convo.id); setReplyTo(null); }}><span className="rc-conversation-avatar">{convo.avatarUrl ? <img src={convo.avatarUrl} alt=""/> : convo.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</span><span className="rc-conversation-copy"><strong>{convo.title}</strong><small>{convo.lastMessagePreview ? <>{convo.lastMessagePreview.length >= 42 ? `${convo.lastMessagePreview.slice(0, 39)}...` : convo.lastMessagePreview}{convo.lastMessageSenderId === userId && <> <span className={`rc-preview-ticks ${convo.lastMessageRead ? 'is-read' : ''}`}>{convo.lastMessageRead ? '✓✓' : convo.lastMessageDelivered ? '✓✓' : '✓'}</span></>}</> : 'No messages yet'}</small></span>{(unreadCounts[convo.id] || 0) > 0 && <span className="rc-unread-badge">{unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}</span>}</button>)}
+          {conversationList.map(convo => (
+  <div
+    key={convo.id}
+    className="rc-conversation-row-wrap"
+    style={{
+      display: 'flex',
+      alignItems: 'stretch',
+      gap: 6,
+      marginBottom: 6,
+    }}
+  >
+    <button
+      type="button"
+      className={`rc-conversation-row ${
+        selectedConversation?.id === convo.id ? 'active' : ''
+      }`}
+      style={{ flex: 1, minWidth: 0 }}
+      onClick={() => {
+        setSelectedConversation(convo);
+        void markConversationRead(convo.id);
+        setReplyTo(null);
+      }}
+    >
+      <span className="rc-conversation-avatar">
+        {convo.avatarUrl ? (
+          <img src={convo.avatarUrl} alt="" />
+        ) : convo.kind === 'group' ? (
+          <Users size={20} />
+        ) : (
+          <MessageCircle size={20} />
+        )}
+      </span>
+
+      <span className="rc-conversation-copy">
+        <strong>{convo.title}</strong>
+        <small>
+          {convo.lastMessagePreview ? (
+            <>
+              {convo.lastMessagePreview.length >= 42
+                ? `${convo.lastMessagePreview.slice(0, 39)}...`
+                : convo.lastMessagePreview}
+              {convo.lastMessageSenderId === userId && (
+                <span
+                  className={`rc-preview-ticks ${
+                    convo.lastMessageRead ? 'is-read' : ''
+                  }`}
+                >
+                  {convo.lastMessageRead
+                    ? '✓✓'
+                    : convo.lastMessageDelivered
+                      ? '✓✓'
+                      : '✓'}
+                </span>
+              )}
+            </>
+          ) : (
+            'No messages yet'
+          )}
+        </small>
+      </span>
+
+      {(unreadCounts[convo.id] || 0) > 0 && (
+        <span className="rc-unread-badge">
+          {unreadCounts[convo.id] > 99
+            ? '99+'
+            : unreadCounts[convo.id]}
+        </span>
+      )}
+    </button>
+
+    <button
+      type="button"
+      className="rc-icon-btn"
+      aria-label={`Hide conversation with ${convo.title}`}
+      title="Hide conversation"
+      onClick={() => void hideConversation(convo.id)}
+      style={{ flexShrink: 0 }}
+    >
+      <X size={17} />
+    </button>
+  </div>
+))}
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
