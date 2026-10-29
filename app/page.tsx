@@ -3244,6 +3244,89 @@ async function playVoiceNote(message: ChatMessage) {
         max-width: 100% !important;
         box-sizing: border-box !important;
       }
+      /* Correct swipe-track sizing: the track is intentionally six viewports wide.
+         Do not cap its width to the screen or each page will occupy only a fraction. */
+      .rc-swipe-viewport {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+      }
+      .rc-swipe-stage {
+        width: 600% !important;
+        max-width: none !important;
+        flex: 0 0 600% !important;
+      }
+      .rc-tab-panel {
+        flex: 0 0 16.6666667% !important;
+        width: 16.6666667% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+      }
+      /* Let each page reach behind the fixed bottom navigation; the nav itself
+         stays above the content and provides the visible lower boundary. */
+      .rc-tab-panel,
+      .rc-tab-panel.rc-panel-visible {
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+      }
+      .rc-bottom-nav {
+        position: fixed !important;
+        z-index: 120 !important;
+      }
+      /* Inbox fills the full width and the vertical space below the Messages
+         heading. The bottom nav overlays the list instead of leaving a black gap. */
+      @media (max-width: 800px) {
+        .rc-tab-panel:has(.rc-messages-layout) {
+          display: flex !important;
+          flex-direction: column !important;
+          width: 16.6666667% !important;
+          height: 100dvh !important;
+          max-height: 100dvh !important;
+          overflow: hidden !important;
+          padding: 0 !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-mobile-header {
+          flex: 0 0 64px !important;
+          height: 64px !important;
+          min-height: 64px !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-page-heading {
+          flex: 0 0 auto !important;
+          margin: 0 !important;
+          padding: 8px 14px !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-messages-layout:not(.has-chat) {
+          display: flex !important;
+          flex: 1 1 0 !important;
+          min-height: 0 !important;
+          height: auto !important;
+          max-height: none !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow: hidden !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+          position: relative !important;
+          inset: auto !important;
+          flex: 1 1 0 !important;
+          display: block !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          height: auto !important;
+          max-height: none !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          padding: 0 2px 0 !important;
+          box-sizing: border-box !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          background: transparent !important;
+          z-index: 1 !important;
+        }
+      }
       /* Group and private chat content must never exceed the visible viewport width. */
       .rc-messages-layout.has-chat {
         width: 100% !important;
