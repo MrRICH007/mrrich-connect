@@ -864,7 +864,47 @@ delivered_by: deliveryByMessage[m.id] || []
     setDraftMessage('');
     setReplyTo(null);
     setShowEmojiPicker(false);
+  } 
+  
+  async function saveEditedMessage() {
+    const body = editMessageText.trim();
+
+    if (!supabase || !userId || !editingMessage || !body || savingEdit) return;
+    if (editingMessage.sender_id !== userId) return;
+
+    setSavingEdit(true);
+
+    const { data, error } = await supabase
+      .from('messages')
+      .update({
+        body,
+        edited_at: new Date().toISOString()
+      })
+      .eq('id', editingMessage.id)
+      .eq('sender_id', userId)
+      .select('id,body,edited_at')
+      .single();
+
+    setSavingEdit(false);
+
+    if (error) {
+      setStatus(`Message edit failed: ${error.message}`);
+      return;
+    }
+
+    setChatMessages(old =>
+      old.map(message =>
+        message.id === editingMessage.id
+          ? { ...message, body: data.body }
+          : message
+      )
+    );
+
+    setEditingMessage(null);
+    setEditMessageText('');
+    setStatus('Message updated.');
   }
+  
 
   const scrollChatToLatest = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const el = chatMessagesRef.current;
