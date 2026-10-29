@@ -3197,6 +3197,108 @@ async function playVoiceNote(message: ChatMessage) {
           z-index: auto !important;
         }
       }
+
+
+      /* Final viewport fit: remove artificial bottom padding on every tab.
+         The fixed navigation overlays the bottom edge instead of leaving a black strip. */
+      html, body, #__next {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+      }
+      .rc-shell, .rc-swipe-viewport, .rc-swipe-stage, .rc-tab-panel,
+      .rc-content-section, .rc-profile-page, .rc-messages-layout,
+      .rc-chat-panel, .rc-chat-header, .rc-chat-empty, .rc-composer-wrap,
+      .rc-composer {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      .rc-swipe-viewport {
+        height: 100dvh !important;
+        padding-bottom: 0 !important;
+        overflow: hidden !important;
+      }
+      .rc-swipe-stage {
+        height: 100% !important;
+        min-height: 0 !important;
+      }
+      .rc-tab-panel,
+      .rc-tab-panel.rc-panel-visible {
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        overscroll-behavior-x: none !important;
+      }
+      .rc-tab-panel.rc-panel-hidden { overflow: hidden !important; }
+      .rc-content-section, .rc-profile-page, .rc-messages-layout {
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+      }
+      .rc-bottom-nav {
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      /* Group and private chat content must never exceed the visible viewport width. */
+      .rc-messages-layout.has-chat {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+      }
+      .rc-messages-layout.has-chat .rc-chat-panel {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+      }
+      .rc-chat-header, .rc-chat-empty, .rc-composer-wrap, .rc-composer,
+      .rc-reply-preview, .rc-message-row, .rc-message-bubble {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .rc-chat-empty {
+        width: 100% !important;
+        overflow-x: hidden !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+      .rc-message-row {
+        width: auto !important;
+        flex-shrink: 1 !important;
+        overflow-wrap: anywhere !important;
+      }
+      .rc-message-bubble {
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+      .rc-composer-wrap, .rc-composer { width: 100% !important; overflow-x: hidden !important; }
+      @media (max-width: 800px) {
+        .rc-tab-panel:has(.rc-messages-layout) {
+          height: calc(100dvh - 76px - env(safe-area-inset-bottom)) !important;
+          max-height: calc(100dvh - 76px - env(safe-area-inset-bottom)) !important;
+          padding-bottom: 0 !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-messages-layout:not(.has-chat) {
+          flex: 1 1 0 !important;
+          min-height: 0 !important;
+          padding-bottom: 0 !important;
+          margin-bottom: 0 !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) .rc-conversation-list {
+          padding-bottom: 0 !important;
+          margin-bottom: 0 !important;
+        }
+      }
+
     `}
 </style>
   </main>
