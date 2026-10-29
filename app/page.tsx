@@ -932,6 +932,41 @@ delivered_by: deliveryByMessage[m.id] || []
 
     setStatus('Message deleted.');
   }
+
+  
+  async function hideConversation(conversationId: string) {
+    if (!supabase || !userId) return;
+
+    const confirmed = window.confirm(
+      'Hide this conversation from your Messages list?'
+    );
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('hidden_conversations')
+      .upsert(
+        {
+          user_id: userId,
+          conversation_id: conversationId
+        },
+        { onConflict: 'user_id,conversation_id' }
+      );
+
+    if (error) {
+      setStatus(`Could not hide conversation: ${error.message}`);
+      return;
+    }
+
+    setConversationList(current =>
+      current.filter(convo => convo.id !== conversationId)
+    );
+
+    if (selectedConversation?.id === conversationId) {
+      setSelectedConversation(null);
+    }
+
+    setStatus('Conversation hidden from your list.');
+  }
   
 
   const scrollChatToLatest = useCallback((behavior: ScrollBehavior = 'smooth') => {
