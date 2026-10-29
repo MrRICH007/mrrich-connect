@@ -2154,9 +2154,23 @@ async function playVoiceNote(message: ChatMessage) {
         {voiceBusy ? 'Sending…' : <><Send size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Send voice note</>}
       </button>
     </div>
+  </div>}{voicePreviewUrl && (
+  <div style={{marginBottom:12,padding:14,borderRadius:16,border:'1px solid rgba(96,165,250,.4)',background:'linear-gradient(135deg,#101b35,#0b1220)'}}>
+    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+      <span style={{width:42,height:42,display:'grid',placeItems:'center',borderRadius:13,background:'rgba(37,99,235,.2)',color:'#93c5fd'}}><AudioLines size={23}/></span>
+      <div style={{flex:1,minWidth:0}}>
+        <strong style={{color:'#f8fafc'}}>Voice note preview</strong>
+        <div style={{color:'#94a3b8',fontSize:12,marginTop:3}}>Listen before sending</div>
+      </div>
+      <button type="button" onClick={cancelVoicePreview} disabled={voiceBusy} aria-label="Discard voice note" style={{background:'transparent',border:'1px solid #334155',color:'#fca5a5',borderRadius:9,padding:8}}><Trash2 size={18}/></button>
+    </div>
+    <audio controls src={voicePreviewUrl} onLoadedMetadata={e=>setVoicePreviewDuration(e.currentTarget.duration||0)} style={{width:'100%',display:'block',marginBottom:12}}/>
+    <div style={{display:'flex',gap:10}}>
+      <button type="button" onClick={cancelVoicePreview} disabled={voiceBusy} style={{flex:1,padding:'11px 14px',borderRadius:11,border:'1px solid #334155',background:'#111827',color:'#e2e8f0',fontWeight:600}}><X size={16} style={{verticalAlign:'middle',marginRight:6}}/>Cancel</button>
+      <button type="button" onClick={()=>void sendVoicePreview()} disabled={voiceBusy||!voicePreviewBlob} style={{flex:1,padding:'11px 14px',borderRadius:11,border:'1px solid #2563eb',background:'#2563eb',color:'#fff',fontWeight:700,opacity:voiceBusy?.65:1}}>{voiceBusy?'Sending…':<><Send size={16} style={{verticalAlign:'middle',marginRight:6}}/>Send voice note</>}</button>
+    </div>
   </div>
-)}
-  <div className="rc-composer"><button type="button" className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button>
+)}<div className="rc-composer"><button type="button" className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button>
 <button
   type="button"
   onClick={() => isRecordingVoice ? stopVoiceRecording() : void startVoiceRecording()}
