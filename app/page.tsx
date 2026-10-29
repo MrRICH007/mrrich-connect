@@ -111,6 +111,112 @@ function getExperienceTitle(totalOnlineSeconds: number | null | undefined): stri
 }
 
 
+function VoiceNotePlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const formatTime = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
+    return `${mins}:${secs}`;
+  };
+
+  const togglePlayback = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (audio.paused) {
+      try {
+        await audio.play();
+      } catch {
+        setPlaying(false);
+      }
+    } else {
+      audio.pause();
+    }
+  };
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      width: '100%', minWidth: 220, maxWidth: 320,
+      padding: '10px 12px', borderRadius: 14,
+      border: '1px solid rgba(96,165,250,.35)',
+      background: 'linear-gradient(135deg,#101b35,#0b1220)',
+      color: '#e2e8f0'
+    }}>
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={e =>
+          setDuration(Number.isFinite(e.currentTarget.duration)
+            ? e.currentTarget.duration : 0)
+        }
+        onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime)}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false);
+          setCurrentTime(0);
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={() => void togglePlayback()}
+        aria-label={playing ? 'Pause voice note' : 'Play voice note'}
+        style={{
+          width: 40, height: 40, flexShrink: 0,
+          display: 'grid', placeItems: 'center',
+          border: '1px solid #2563eb', borderRadius: '50%',
+          background: '#1d4ed8', color: '#fff'
+        }}
+      >
+        {playing
+          ? <Pause size={18} fill="currentColor" />
+          : <Play size={18} fill="currentColor" />}
+      </button>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <input
+          type="range"
+          min={0}
+          max={duration || 0}
+          step={0.1}
+          value={Math.min(currentTime, duration || 0)}
+          disabled={!duration}
+          aria-label="Seek voice note"
+          onChange={e => {
+            const audio = audioRef.current;
+            if (!audio) return;
+            audio.currentTime = Number(e.currentTarget.value);
+            setCurrentTime(audio.currentTime);
+          }}
+          style={{
+            width: '100%', display: 'block',
+            accentColor: '#60a5fa'
+          }}
+        />
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          color: '#93c5fd', fontSize: 11,
+          fontVariantNumeric: 'tabular-nums'
+        }}>
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+
+      <AudioLines size={18} color="#60a5fa" />
+    </div>
+  );
+}
+
+
 export default function Home() {
   const [supabase] = useState(() => { try { return createClient(); } catch { return null; } });
   const [email, setEmail] = useState('');
