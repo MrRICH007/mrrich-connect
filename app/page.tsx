@@ -2135,7 +2135,7 @@ async function playVoiceNote(message: ChatMessage) {
   ) : null;
 })()}
 </header><div ref={chatMessagesRef}
-           onScroll={handleChatScroll} className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
+           onScroll={handleChatScroll} className={`rc-chat-empty ${chatMessages.length === 0 ? 'is-empty' : ''}`} style={{display:'flex', flexDirection:'column', alignItems: chatMessages.length ? 'stretch' : 'center', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
           const mine = message.sender_id === userId;
           const groupChat = selectedConversation.kind === 'group';
           const senderName = mine ? 'You' : `@${message.sender_nickname || 'Member'}`;
@@ -2866,6 +2866,100 @@ async function playVoiceNote(message: ChatMessage) {
         .rc-messages-layout.has-chat { transform: none !important; }
         .rc-messages-layout.has-chat .rc-chat-panel { display:flex !important; flex-direction:column !important; overflow:hidden !important; }
       }
+
+
+      /* Final inbox/chat polish: stable scrolling, centered empty state and campus texture. */
+      @media (max-width: 800px) {
+        .rc-messages-layout:not(.has-chat) {
+          height: auto !important;
+          min-height: 0 !important;
+          overflow: visible !important;
+          background: transparent !important;
+        }
+        .rc-conversation-list {
+          height: auto !important;
+          max-height: calc(100svh - 275px) !important;
+          min-height: 120px !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain !important;
+          padding-bottom: 20px !important;
+          margin-bottom: 0 !important;
+          background: transparent !important;
+          border: 0 !important;
+          box-shadow: none !important;
+        }
+        .rc-messages-layout:not(.has-chat),
+        .rc-messages-layout:not(.has-chat) .rc-conversation-list,
+        .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {
+          background-color: transparent !important;
+        }
+      }
+      /* Keep the private-conversation label on its own line even for long nicknames. */
+      .rc-conversation-copy {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        justify-content: center !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+      }
+      .rc-conversation-copy > strong {
+        display: block !important;
+        flex: 0 0 auto !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      .rc-conversation-copy > .rc-conversation-kind {
+        display: block !important;
+        flex: 0 0 auto !important;
+        align-self: stretch !important;
+        width: 100% !important;
+        margin: 2px 0 3px !important;
+        white-space: normal !important;
+        line-height: 1.2 !important;
+      }
+      .rc-chat-panel {
+        position: relative !important;
+        isolation: isolate !important;
+        background-color: #08111f !important;
+        background-image: linear-gradient(180deg, rgba(8,17,31,.97), rgba(11,20,34,.98)) !important;
+      }
+      .rc-chat-panel::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 0 !important;
+        pointer-events: none !important;
+        opacity: .24 !important;
+        background-image:
+          radial-gradient(ellipse at 18% 20%, rgba(190,198,211,.16) 0 1px, transparent 1.8px),
+          radial-gradient(ellipse at 78% 62%, rgba(190,198,211,.12) 0 1px, transparent 2px),
+          repeating-linear-gradient(135deg, transparent 0 35px, rgba(186,196,211,.045) 36px 37px, transparent 38px 74px),
+          repeating-linear-gradient(45deg, transparent 0 58px, rgba(186,196,211,.035) 59px 60px, transparent 61px 116px),
+          linear-gradient(90deg, transparent 0 18%, rgba(148,163,184,.04) 18.2% 18.5%, transparent 18.7% 100%);
+        background-size: 118px 118px, 164px 164px, auto, auto, auto;
+      }
+      .rc-chat-panel > * { position: relative; z-index: 1; }
+      .rc-chat-header, .rc-composer-wrap { background-color: rgba(7,16,30,.94) !important; }
+      .rc-chat-empty.is-empty {
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        padding: 20px 18px !important;
+      }
+      .rc-chat-empty.is-empty > svg,
+      .rc-chat-empty.is-empty > .rc-empty-icon {
+        display: block !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        align-self: center !important;
+      }
+      .rc-chat-empty.is-empty > strong,
+      .rc-chat-empty.is-empty > p { width: 100%; text-align: center !important; }
+      .rc-chat-empty.is-empty > p { margin-top: 0; }
 
     `}
 </style>
