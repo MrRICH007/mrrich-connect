@@ -727,7 +727,6 @@ const voiceChunksRef = useRef<Blob[]>([]);
       (hiddenRows ?? []).map((row: { conversation_id: string }) => row.conversation_id)
     );
 
-    if (memberError) { setStatus(`Could not load conversations: ${memberError.message}`); return; }
         const ids = [...new Set((memberships ?? []).map((m: { conversation_id: string }) => m.conversation_id))]
       .filter(id => !hiddenIds.has(id));
     if (!ids.length) { setConversationList([]); return; }
