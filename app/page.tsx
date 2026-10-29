@@ -2103,8 +2103,7 @@ async function playVoiceNote(message: ChatMessage) {
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
-          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={closeConversationWithMotion} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar">{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small>
-</div>
+          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={closeConversationWithMotion} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar">{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><div className="rc-chat-header-copy"><strong>{selectedConversation.title}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'Private conversation'}</small></div>
 {selectedConversation.kind === 'person' && selectedConversation.otherUserId && (
   <button
     type="button"
@@ -2961,6 +2960,61 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-chat-empty.is-empty > p { width: 100%; text-align: center !important; }
       .rc-chat-empty.is-empty > p { margin-top: 0; }
 
+      /* Final correction: extend the inbox viewport downwards to shrink the dark gap. */
+      @media (max-width: 800px) {
+        .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+          height: calc(100dvh - 205px) !important;
+          max-height: calc(100dvh - 205px) !important;
+          min-height: 180px !important;
+          padding-bottom: 8px !important;
+          margin-bottom: 0 !important;
+          overflow-y: auto !important;
+          background: transparent !important;
+          background-color: transparent !important;
+          box-shadow: none !important;
+        }
+      }
+
+      /* Match private and group conversation title stacks; reserve room for Block/Leave. */
+      .rc-chat-header { display:flex !important; align-items:center !important; gap:10px !important; }
+      .rc-chat-header-copy {
+        display:flex !important; flex:1 1 auto !important; flex-direction:column !important;
+        align-items:flex-start !important; justify-content:center !important;
+        min-width:0 !important; max-width:100% !important; overflow:hidden !important;
+        gap:2px !important; line-height:1.2 !important;
+      }
+      .rc-chat-header-copy > strong {
+        display:block !important; width:100% !important; min-width:0 !important;
+        overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important;
+      }
+      .rc-chat-header-copy > small { display:block !important; width:100% !important; white-space:normal !important; line-height:1.2 !important; }
+      .rc-chat-header-copy + button { flex:0 0 auto !important; }
+
+      /* Visible dark-ash campus geometry, using CSS only (no image assets). */
+      .rc-chat-panel {
+        background-color:#292d33 !important;
+        background-image:linear-gradient(180deg, #292d33 0%, #22272e 52%, #292d33 100%) !important;
+      }
+      .rc-chat-panel::before {
+        opacity:.72 !important;
+        background-image:
+          repeating-linear-gradient(135deg, transparent 0 27px, rgba(205,211,220,.16) 28px 29px, transparent 30px 58px),
+          repeating-linear-gradient(45deg, transparent 0 43px, rgba(205,211,220,.11) 44px 45px, transparent 46px 88px),
+          linear-gradient(90deg, transparent 0 13%, rgba(205,211,220,.12) 13.2% 13.6%, transparent 13.8% 31%, rgba(205,211,220,.08) 31.2% 31.5%, transparent 31.7% 100%),
+          radial-gradient(circle at 18% 22%, rgba(210,216,224,.19) 0 1.2px, transparent 2px),
+          radial-gradient(circle at 78% 68%, rgba(210,216,224,.15) 0 1.2px, transparent 2px) !important;
+        background-size: auto, auto, auto, 76px 76px, 102px 102px !important;
+      }
+      .rc-chat-empty { background:transparent !important; background-color:transparent !important; }
+      .rc-chat-header, .rc-composer-wrap { background-color:rgba(26,30,36,.88) !important; }
+
+      /* Keep the jump-to-latest control anchored to the right above the composer. */
+      .rc-chat-panel { position:relative !important; }
+      .rc-scroll-latest {
+        position:absolute !important; right:16px !important; left:auto !important;
+        bottom:82px !important; margin-left:0 !important; margin-right:0 !important;
+        align-self:auto !important; z-index:8 !important;
+      }
     `}
 </style>
   </main>
