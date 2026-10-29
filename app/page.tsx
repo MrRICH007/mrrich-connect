@@ -3109,9 +3109,28 @@ async function playVoiceNote(message: ChatMessage) {
         .rc-tab-panel:has(.rc-messages-layout) > .rc-page-heading {
           margin-bottom: 0 !important;
         }
-        .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          height: calc(var(--rc-visual-height, 100dvh) - 145px) !important;
-          max-height: calc(var(--rc-visual-height, 100dvh) - 145px) !important;
+        /* Fill the entire usable space between the pinned Messages heading and bottom nav.
+           This removes the leftover black strip instead of merely increasing list height. */
+        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+          position: fixed !important;
+          top: 145px !important;
+          bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+          left: 0 !important;
+          right: 0 !important;
+          width: auto !important;
+          height: auto !important;
+          max-height: none !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          padding: 0 2px 8px !important;
+          box-sizing: border-box !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          background: transparent !important;
+          background-color: transparent !important;
+          border: 0 !important;
+          box-shadow: none !important;
+          z-index: 20 !important;
         }
       }
     `}
