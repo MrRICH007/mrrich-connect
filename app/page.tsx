@@ -1803,7 +1803,35 @@ async function playVoiceNote(message: ChatMessage) {
   </div>
 ) : (
   <>
-    <div className="rc-message-body">{message.body}</div>
+    {message.message_type === 'voice' ? (
+  <div style={{ minWidth: 220, maxWidth: '100%' }}>
+    <div style={{ marginBottom: 8 }}>🎤 Voice note</div>
+    {voiceUrls[message.id] ? (
+      <audio
+        controls
+        src={voiceUrls[message.id]}
+        style={{ width: '100%', maxWidth: 280 }}
+      />
+    ) : (
+      <button
+        type="button"
+        onClick={() => void playVoiceNote(message)}
+        style={{
+          padding: '8px 12px',
+          borderRadius: 8,
+          border: '1px solid #2563eb',
+          background: '#172554',
+          color: '#dbeafe',
+          cursor: 'pointer'
+        }}
+      >
+        Load voice note
+      </button>
+    )}
+  </div>
+) : (
+  <div className="rc-message-body">{message.body}</div>
+)}
     {mine && (
       <button
         type="button"
