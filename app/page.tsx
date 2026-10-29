@@ -3133,6 +3133,70 @@ async function playVoiceNote(message: ChatMessage) {
           z-index: 20 !important;
         }
       }
+      /* Final layout correction: the Messages page uses a vertical flex layout.
+         The inbox itself takes every pixel between the fixed headings and nav;
+         avoid fixed positioning because the horizontal swipe stage is transformed. */
+      @media (max-width: 800px) {
+        .rc-tab-panel:has(.rc-messages-layout) {
+          display: flex !important;
+          flex-direction: column !important;
+          height: calc(100dvh - 76px - env(safe-area-inset-bottom)) !important;
+          max-height: calc(100dvh - 76px - env(safe-area-inset-bottom)) !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+          padding: 0 !important;
+          box-sizing: border-box !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-mobile-header {
+          position: relative !important;
+          top: auto !important;
+          flex: 0 0 64px !important;
+          height: 64px !important;
+          min-height: 64px !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-page-heading {
+          position: relative !important;
+          top: auto !important;
+          flex: 0 0 auto !important;
+          margin: 0 !important;
+          padding: 8px 14px !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-messages-layout:not(.has-chat) {
+          display: flex !important;
+          flex: 1 1 0 !important;
+          flex-direction: column !important;
+          width: 100% !important;
+          height: auto !important;
+          max-height: none !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          box-sizing: border-box !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+          position: relative !important;
+          inset: auto !important;
+          display: flex !important;
+          flex: 1 1 0 !important;
+          flex-direction: column !important;
+          width: 100% !important;
+          height: auto !important;
+          max-height: none !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          padding: 0 2px 8px !important;
+          box-sizing: border-box !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          overscroll-behavior-y: contain !important;
+          background: transparent !important;
+          border: 0 !important;
+          box-shadow: none !important;
+          z-index: auto !important;
+        }
+      }
     `}
 </style>
   </main>
