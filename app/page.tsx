@@ -904,6 +904,34 @@ delivered_by: deliveryByMessage[m.id] || []
     setEditMessageText('');
     setStatus('Message updated.');
   }
+
+  
+  async function deleteOwnMessage(message: ChatMessage) {
+    if (!supabase || !userId || message.sender_id !== userId) return;
+
+    const confirmed = window.confirm('Delete this message? This removes it for everyone in the conversation.');
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', message.id)
+      .eq('sender_id', userId);
+
+    if (error) {
+      setStatus(`Message deletion failed: ${error.message}`);
+      return;
+    }
+
+    setChatMessages(old => old.filter(item => item.id !== message.id));
+
+    if (editingMessage?.id === message.id) {
+      setEditingMessage(null);
+      setEditMessageText('');
+    }
+
+    setStatus('Message deleted.');
+  }
   
 
   const scrollChatToLatest = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -1365,6 +1393,26 @@ delivered_by: deliveryByMessage[m.id] || []
       >
         Edit
       </button>
+
+    
+<button
+  type="button"
+  onClick={() => void deleteOwnMessage(message)}
+  aria-label="Delete your message"
+  style={{
+    marginTop: 6,
+    marginLeft: 6,
+    padding: '4px 8px',
+    borderRadius: 6,
+    border: '1px solid #7f1d1d',
+    background: 'transparent',
+    color: '#fca5a5',
+    cursor: 'pointer'
+  }}
+>
+  Delete
+</button>
+  
     )}
   </>
 )}
