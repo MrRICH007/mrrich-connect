@@ -3083,6 +3083,37 @@ async function playVoiceNote(message: ChatMessage) {
           top: 64px !important;
         }
       }
+      /* Final Messages inbox fit: remove the thin gaps above and below the list. */
+      .rc-tab-panel:has(.rc-messages-layout) {
+        padding-bottom: 0 !important;
+      }
+      .rc-tab-panel:has(.rc-messages-layout) > .rc-page-heading {
+        margin-bottom: 0 !important;
+      }
+      .rc-messages-layout:not(.has-chat) {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+      }
+      .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        height: calc(var(--rc-visual-height, 100dvh) - 190px) !important;
+        max-height: calc(var(--rc-visual-height, 100dvh) - 190px) !important;
+        min-height: 0 !important;
+      }
+      @media (max-width: 800px) {
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-page-heading {
+          margin-bottom: 0 !important;
+        }
+        .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+          height: calc(var(--rc-visual-height, 100dvh) - 190px) !important;
+          max-height: calc(var(--rc-visual-height, 100dvh) - 190px) !important;
+        }
+      }
     `}
 </style>
   </main>
