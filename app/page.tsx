@@ -234,6 +234,7 @@ export default function Home() {
   const [statusType, setStatusType] = useState<'success' | 'error' | 'info'>('info');
   const [tab, setTab] = useState('Messages');
   const [requests, setRequests] = useState(0);
+  const [sentRequestRecipientIds, setSentRequestRecipientIds] = useState<string[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([]);
   const [requestBusy, setRequestBusy] = useState<string | null>(null);
   const [groups, setGroups] = useState<CommunityGroup[]>([]);
@@ -294,6 +295,65 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const marketplaceWasDragged = useRef(false);
 
   // Keep the mobile chat aligned with the visible viewport when the keyboard opens.
+  const internalHistoryRef = useRef<Array<{ tab: string; conversationId: string | null }>>([]);
+  const conversationListRef = useRef<Conversation[]>([]);
+  conversationListRef.current = conversationList;
+  const internalHistorySignatureRef = useRef('');
+  const skipInternalHistoryPushRef = useRef(false);
+
+  useEffect(() => {
+    const currentSignature = `${tab}|${selectedConversation?.id || ''}`;
+    internalHistoryRef.current = [{ tab, conversationId: selectedConversation?.id || null }];
+    internalHistorySignatureRef.current = currentSignature;
+    window.history.pushState({ mrRichConnectInternal: true }, '', window.location.href);
+
+    const handleBack = () => {
+      const stack = internalHistoryRef.current;
+      if (stack.length > 1) stack.pop();
+      else stack[0] = { tab: 'Messages', conversationId: null };
+      const previous = stack[stack.length - 1] || { tab: 'Messages', conversationId: null };
+      const targetSignature = `${previous.tab}|${previous.conversationId || ''}`;
+      skipInternalHistoryPushRef.current = targetSignature !== internalHistorySignatureRef.current;
+      if (previous.conversationId) {
+        const previousConversation = conversationListRef.current.find(item => item.id === previous.conversationId);
+        if (previousConversation) {
+          setTab('Messages');
+          setSelectedConversation(previousConversation);
+        } else {
+          setSelectedConversation(null);
+          setTab(previous.tab || 'Messages');
+        }
+      } else {
+        setSelectedConversation(null);
+        setTab(previous.tab || 'Messages');
+      }
+      setShowProfile(false);
+      setShowGroup(false);
+      setShowEmojiPicker(false);
+      setMarketplaceOpen(false);
+      setHideActionsConversationId(null);
+      setMessageActionsMessageId(null);
+      window.history.pushState({ mrRichConnectInternal: true }, '', window.location.href);
+    };
+    window.addEventListener('popstate', handleBack);
+    return () => window.removeEventListener('popstate', handleBack);
+  // Install once; the history handler reads current navigation from the refs below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const signature = `${tab}|${selectedConversation?.id || ''}`;
+    if (skipInternalHistoryPushRef.current) {
+      skipInternalHistoryPushRef.current = false;
+      internalHistorySignatureRef.current = signature;
+      return;
+    }
+    if (signature === internalHistorySignatureRef.current) return;
+    internalHistorySignatureRef.current = signature;
+    internalHistoryRef.current.push({ tab, conversationId: selectedConversation?.id || null });
+    window.history.pushState({ mrRichConnectInternal: true }, '', window.location.href);
+  }, [tab, selectedConversation?.id]);
+
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
@@ -366,6 +426,11 @@ const voiceChunksRef = useRef<Blob[]>([]);
       const { data: req } = await supabase.from('message_requests').select('id')
         .eq('recipient_id', userId).eq('status', 'pending');
       setRequests(req?.length ?? 0);
+      const { data: sentRequests } = await supabase.from('message_requests')
+        .select('recipient_id,status').eq('sender_id', userId);
+      setSentRequestRecipientIds([...new Set((sentRequests || []).filter((item: {recipient_id: string; status: string | null}) => item.status !== 'declined').map((item: {recipient_id: string}) => item.recipient_id))]);
+    } else {
+      setSentRequestRecipientIds([]);
     }
     const { data: grp } = await supabase.from('groups').select('id,name,conversation_id,avatar_url,created_by,member_limit,allowed_levels,allowed_schools,members_can_message').limit(30);
     if (grp) setGroups(grp as CommunityGroup[]);
@@ -692,7 +757,9 @@ const voiceChunksRef = useRef<Blob[]>([]);
   async function sendRequest(recipient: string) {
     if (!supabase || !userId || recipient === userId) return;
     const { error } = await supabase.from('message_requests').insert({ sender_id: userId, recipient_id: recipient });
-    setStatus(error ? error.message : 'Message request sent. You can chat after it is accepted.');
+    if (error) { setStatus(error.message); return; }
+    setSentRequestRecipientIds(old => old.includes(recipient) ? old : [...old, recipient]);
+    setStatus('Message request sent. You can chat after it is accepted.');
   }
   async function uploadGroupAvatar(file?: File) {
     if (!file || !supabase || !userId) return;
@@ -1784,6 +1851,7 @@ async function playVoiceNote(message: ChatMessage) {
     if (p.id === userId) return false;
     const query = discoverQuery.trim().toLocaleLowerCase();
     const alreadyConnected = conversationList.some(c => c.kind === 'person' && c.otherUserId === p.id);
+    if (sentRequestRecipientIds.includes(p.id)) return false;
     if (alreadyConnected && !query) return false;
     const searchableText = [p.nickname, p.school, p.college, p.department, p.level, p.bio]
       .filter(Boolean).join(' ').toLocaleLowerCase();
@@ -1858,7 +1926,7 @@ async function playVoiceNote(message: ChatMessage) {
         {userId ? <button className="rc-icon-btn" aria-label="Sign out" onClick={signOut}><LogOut size={19}/></button> : <button className="rc-small-login" onClick={() => document.getElementById('rc-email')?.focus()}>Login</button>}
       </div>
     </header>
-      <div className={`rc-page-heading ${page.name === 'Messages' || page.name === 'Requests' ? 'rc-simple-page-heading' : ''}`}><div>{!['Messages', 'Requests'].includes(page.name) && <span className="rc-eyebrow">{page.name === 'Discover' ? 'MEET YOUR COMMUNITY' : page.name === 'Groups' ? 'YOUR COMMUNITIES' : page.name === 'Premium' ? 'MEMBERSHIP' : 'YOUR SPACE'}</span>}<h1>{page.name === 'Messages' ? 'Messages' : page.name === 'Discover' ? 'Find People Online' : page.name === 'Groups' ? 'Find Your Community' : page.name === 'Requests' ? 'Message Request' : page.name === 'Premium' ? 'Premium Membership' : 'Your Profile'}</h1>{page.name === 'Requests' && <p className="rc-page-subtitle">Accept a request to open a private conversation.</p>}</div>
+      <div className={`rc-page-heading ${['Messages', 'Requests', 'Discover', 'Groups', 'My Profile'].includes(page.name) ? 'rc-simple-page-heading' : ''}`}><div>{page.name === 'Premium' && <span className="rc-eyebrow">MEMBERSHIP</span>}<h1>{page.name === 'Messages' ? 'Messages' : page.name === 'Discover' ? 'Find People Online' : page.name === 'Groups' ? 'Groups' : page.name === 'Requests' ? 'Message Request' : page.name === 'Premium' ? 'Premium Membership' : 'Your Profile'}</h1>{page.name === 'Requests' && <p className="rc-page-subtitle">Accept a request to open a private conversation.</p>}{page.name === 'Groups' && <p className="rc-page-subtitle">Spaces for courses, clubs and shared interests.</p>}</div>
         {page.name === 'Messages' && <button type="button" className="rc-icon-btn rc-heading-notification" onClick={() => void enableMessageNotifications()} title="Enable message notifications" aria-label="Enable message notifications"><Bell size={18}/></button>}
         {page.name === 'Messages' && isAdmin && <a href="/admin" className="rc-icon-btn" title="Admin dashboard" aria-label="Admin dashboard"><ShieldCheck size={18}/></a>}
         {page.name === 'Requests' && <button className="rc-icon-btn" aria-label="Refresh message requests" onClick={() => void loadIncomingRequests()}><RefreshCw size={18}/></button>}
@@ -1896,7 +1964,7 @@ async function playVoiceNote(message: ChatMessage) {
           window.clearTimeout(conversationHoldTimer.current);
         }
         conversationHoldTimer.current = window.setTimeout(() => {
-          setHideActionsConversationId(convo.id);
+          setHideActionsConversationId(current => current === convo.id ? null : convo.id);
           suppressConversationClick.current = true;
         }, 550);
       }}
@@ -1941,6 +2009,7 @@ async function playVoiceNote(message: ChatMessage) {
 
       <span className="rc-conversation-copy">
         <strong>{convo.title}</strong>
+        <span className="rc-conversation-kind">{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</span>
         <small>
           {convo.lastMessagePreview ? (
             <>
@@ -2029,7 +2098,7 @@ async function playVoiceNote(message: ChatMessage) {
           return <div key={message.id} onPointerDown={() => {
   if (!mine) return;
   if (messageHoldTimer.current !== null) window.clearTimeout(messageHoldTimer.current);
-  messageHoldTimer.current = window.setTimeout(() => setMessageActionsMessageId(message.id), 550);
+  messageHoldTimer.current = window.setTimeout(() => setMessageActionsMessageId(current => current === message.id ? null : message.id), 550);
 }} onPointerUp={() => {
   if (messageHoldTimer.current !== null) window.clearTimeout(messageHoldTimer.current);
   messageHoldTimer.current = null;
@@ -2346,7 +2415,7 @@ async function playVoiceNote(message: ChatMessage) {
         {discoverProfiles.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>{discoverQuery || discoverFilter !== 'all' ? 'No matching members' : 'No people to show yet'}</h2><p>{discoverQuery || discoverFilter !== 'all' ? 'Try a different search or filter. Search currently checks the members loaded by Discover.' : 'New members will appear here when they create a profile.'}</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}{(discoverQuery || discoverFilter !== 'all') && <button className="rc-secondary" onClick={() => { setDiscoverQuery(''); setDiscoverFilter('all'); }}>Clear search and filters</button>}</div>}
       </section>}
 
-      {page.name === 'Groups' && <section className="rc-content-section"><div className="rc-section-title"><div><h2>Groups</h2><p>Spaces for courses, clubs and shared interests.</p></div></div><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <button className="rc-edit-group-avatar" aria-label={`Settings for ${g.name}`} title="Group settings" onClick={() => openGroupSettings(g)}><Settings size={17}/>
+      {page.name === 'Groups' && <section className="rc-content-section"><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <button className="rc-edit-group-avatar" aria-label={`Settings for ${g.name}`} title="Group settings" onClick={() => openGroupSettings(g)}><Settings size={17}/>
 </button>}
 <button
   type="button"
@@ -2650,7 +2719,59 @@ async function playVoiceNote(message: ChatMessage) {
         line-height: 1.35;
         white-space: pre-wrap;
       }
-    `}</style>
+      /* Reflective glass conversation cards, with no shared enclosing panel. */
+      .rc-messages-layout:not(.has-chat) { padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important; background: transparent !important; border: 0 !important; box-shadow: none !important; }
+      .rc-conversation-list {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        padding: 4px 2px calc(112px + env(safe-area-inset-bottom)) !important;
+        overflow-y: auto !important;
+        overscroll-behavior-y: contain;
+        scrollbar-gutter: stable;
+      }
+      .rc-conversation-row-wrap { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+      .rc-conversation-row {
+        position: relative !important;
+        overflow: hidden !important;
+        background: linear-gradient(128deg, rgba(255,255,255,.105) 0%, rgba(148,163,184,.045) 34%, rgba(37,99,235,.065) 70%, rgba(255,255,255,.025) 100%) !important;
+        border: 1px solid rgba(191,219,254,.22) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.17), inset 0 -1px 0 rgba(96,165,250,.07), 0 5px 16px rgba(0,0,0,.12) !important;
+        backdrop-filter: blur(16px) saturate(135%);
+        -webkit-backdrop-filter: blur(16px) saturate(135%);
+      }
+      .rc-conversation-row::before {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(112deg, transparent 8%, rgba(255,255,255,.11) 24%, rgba(255,255,255,.025) 37%, transparent 52%);
+        opacity: .9;
+      }
+      .rc-conversation-row > * { position: relative; z-index: 1; }
+      .rc-conversation-row.active { background: linear-gradient(125deg, rgba(147,197,253,.17), rgba(37,99,235,.12), rgba(255,255,255,.035)) !important; }
+      .rc-conversation-kind { display:block; color:#93c5fd; font-size:10px; line-height:1.2; margin:1px 0 3px; }
+      .rc-conversation-copy small { line-height:1.3; }
+      .rc-page-heading.rc-simple-page-heading { margin-top: 0 !important; padding-top: 2px !important; }
+      .rc-page-heading.rc-simple-page-heading h1 { margin-top: 0 !important; }
+      .rc-toast {
+        position: fixed !important;
+        top: max(12px, calc(env(safe-area-inset-top) + 8px)) !important;
+        bottom: auto !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: min( calc(100vw - 24px), 520px) !important;
+        max-width: calc(100vw - 24px) !important;
+        max-height: min(34dvh, 220px) !important;
+        overflow-y: auto !important;
+        overflow-wrap: anywhere !important;
+        z-index: 9999 !important;
+        box-sizing: border-box !important;
+      }
+      .rc-swipe-viewport { padding-bottom: calc(86px + env(safe-area-inset-bottom)); box-sizing: border-box; }
+      .rc-tab-panel.rc-panel-visible { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+      .rc-conversation-list::-webkit-scrollbar { width: 3px; }
+      .rc-conversation-list::-webkit-scrollbar-thumb { background: rgba(147,197,253,.24); border-radius: 99px; }
+    `}
+</style>
   </main>
 );
 }
