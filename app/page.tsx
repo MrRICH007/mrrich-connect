@@ -238,6 +238,7 @@ export default function Home() {
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([]);
   const [requestBusy, setRequestBusy] = useState<string | null>(null);
   const [groups, setGroups] = useState<CommunityGroup[]>([]);
+  const [joinedGroupIds, setJoinedGroupIds] = useState<string[]>([]);
   const [activeAds, setActiveAds] = useState<AdCampaign[]>([]);
   const [groupName, setGroupName] = useState('');
   const [groupAvatarUrl, setGroupAvatarUrl] = useState('');
@@ -408,6 +409,20 @@ const voiceChunksRef = useRef<Blob[]>([]);
     }
   }
 
+  function formatConversationTimestamp(value?: string | null) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const now = new Date();
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
   function nicknameColor(id: string) {
     const palette = ['#7dd3fc', '#f9a8d4', '#c4b5fd', '#86efac', '#fcd34d', '#fda4af', '#a5b4fc', '#67e8f9', '#fdba74', '#d9f99d'];
     let hash = 0;
@@ -434,6 +449,12 @@ const voiceChunksRef = useRef<Blob[]>([]);
     }
     const { data: grp } = await supabase.from('groups').select('id,name,conversation_id,avatar_url,created_by,member_limit,allowed_levels,allowed_schools,members_can_message').limit(30);
     if (grp) setGroups(grp as CommunityGroup[]);
+    if (userId) {
+      const { data: memberships } = await supabase.from('group_members').select('group_id').eq('user_id', userId);
+      setJoinedGroupIds([...new Set((memberships ?? []).map((row: { group_id: string }) => row.group_id))]);
+    } else {
+      setJoinedGroupIds([]);
+    }
     const { data: ads } = await supabase.from('ad_campaigns').select('id,title,media_type,media_path,target_url,expires_at').eq('is_enabled', true).lte('starts_at', new Date().toISOString()).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(5);
     if (ads) setActiveAds(ads as AdCampaign[]);
   }, [supabase, userId]);
@@ -1473,16 +1494,21 @@ async function playVoiceNote(message: ChatMessage) {
     }
 
     const group = groups.find(item => item.id === groupId);
-
-    setGroups(current => current.filter(item => item.id !== groupId));
+    setJoinedGroupIds(current => current.filter(id => id !== groupId));
 
     if (group?.conversation_id) {
-      setConversationList(current =>
-        current.filter(item => item.id !== group.conversation_id)
-      );
-
-      if (selectedConversation?.id === group.conversation_id) {
-        setSelectedConversation(null);
+      // Remove the user's conversation membership as well, so the group chat no longer
+      // appears in their inbox or delivers new conversation messages to this account.
+      const { error: conversationMemberError } = await supabase
+        .from('conversation_members')
+        .delete()
+        .eq('conversation_id', group.conversation_id)
+        .eq('user_id', userId);
+      setConversationList(current => current.filter(item => item.id !== group.conversation_id));
+      if (selectedConversation?.id === group.conversation_id) setSelectedConversation(null);
+      if (conversationMemberError) {
+        setStatus(`You left the group, but could not fully disconnect its chat: ${conversationMemberError.message}`);
+        return;
       }
     }
 
@@ -2036,13 +2062,14 @@ async function playVoiceNote(message: ChatMessage) {
         </small>
       </span>
 
-      {(unreadCounts[convo.id] || 0) > 0 && (
-        <span className="rc-unread-badge">
-          {unreadCounts[convo.id] > 99
-            ? '99+'
-            : unreadCounts[convo.id]}
-        </span>
-      )}
+      <span className="rc-conversation-meta">
+        {(unreadCounts[convo.id] || 0) > 0 && (
+          <span className="rc-unread-badge">
+            {unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}
+          </span>
+        )}
+        {convo.lastMessageAt && <small className="rc-conversation-timestamp">{formatConversationTimestamp(convo.lastMessageAt)}</small>}
+      </span>
     </button>
 
         {hideActionsConversationId === convo.id && (
@@ -2090,6 +2117,12 @@ async function playVoiceNote(message: ChatMessage) {
     Block
   </button>
 )}
+{selectedConversation.kind === 'group' && (() => {
+  const activeGroup = groups.find(group => group.conversation_id === selectedConversation.id);
+  return activeGroup && joinedGroupIds.includes(activeGroup.id) ? (
+    <button type="button" className="rc-leave-chat-button" onClick={() => void leaveGroup(activeGroup.id, activeGroup.name)} title="Leave this group">Leave</button>
+  ) : null;
+})()}
 </header><div ref={chatMessagesRef}
            onScroll={handleChatScroll} className="rc-chat-empty" style={{display:'flex', flexDirection:'column', alignItems:'stretch', gap:'12px', overflowY:'auto', justifyContent: chatMessages.length ? 'flex-start' : 'center'}}>{chatMessages.length === 0 ? <><MessageCircle size={28}/><strong>Your chat starts here</strong><p>Send the first message to begin.</p></> : chatMessages.map(message => {
           const mine = message.sender_id === userId;
@@ -2415,9 +2448,9 @@ async function playVoiceNote(message: ChatMessage) {
         {discoverProfiles.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>{discoverQuery || discoverFilter !== 'all' ? 'No matching members' : 'No people to show yet'}</h2><p>{discoverQuery || discoverFilter !== 'all' ? 'Try a different search or filter. Search currently checks the members loaded by Discover.' : 'New members will appear here when they create a profile.'}</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}{(discoverQuery || discoverFilter !== 'all') && <button className="rc-secondary" onClick={() => { setDiscoverQuery(''); setDiscoverFilter('all'); }}>Clear search and filters</button>}</div>}
       </section>}
 
-      {page.name === 'Groups' && <section className="rc-content-section"><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setSelectedConversation({id: conversationId || g.conversation_id!, title:g.name,kind:'group'}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <button className="rc-edit-group-avatar" aria-label={`Settings for ${g.name}`} title="Group settings" onClick={() => openGroupSettings(g)}><Settings size={17}/>
+      {page.name === 'Groups' && <section className="rc-content-section"><div className="rc-group-list">{groups.map(g => <div className="rc-group-row-wrap" key={g.id}><button className="rc-group-row" onClick={() => { void (async () => { if (!supabase) return; if (!g.conversation_id) { setStatus('This group does not have a chat yet. Ask its owner to recreate it after the SQL migration.'); return; } const { data: conversationId, error } = await supabase.rpc('join_group_with_conversation', { p_group_id: g.id }); if (error) { setStatus(`Could not join group: ${error.message}`); return; } setJoinedGroupIds(current => current.includes(g.id) ? current : [...current, g.id]); const joinedConversationId = conversationId || g.conversation_id!; await supabase.from('hidden_conversations').delete().eq('user_id', userId).eq('conversation_id', joinedConversationId); setSelectedConversation({id: joinedConversationId, title:g.name,kind:'group',avatarUrl:g.avatar_url}); setTab('Messages'); await loadConversations(); })(); }}><span className="rc-group-icon">{g.avatar_url ? <img src={g.avatar_url} alt=""/> : <Users size={22}/>}</span><span className="rc-group-info"><strong>{g.name}</strong><small>MR RICH CONNECT community</small></span><span className="rc-arrow">→</span></button>{(g.created_by === userId || isAdmin) && <button className="rc-edit-group-avatar" aria-label={`Settings for ${g.name}`} title="Group settings" onClick={() => openGroupSettings(g)}><Settings size={17}/>
 </button>}
-<button
+{joinedGroupIds.includes(g.id) && <button
   type="button"
   onClick={() => void leaveGroup(g.id, g.name)}
   aria-label={`Leave ${g.name}`}
@@ -2435,7 +2468,7 @@ async function playVoiceNote(message: ChatMessage) {
   }}
 >
   Leave
-</button>
+</button>}
 </div>)}</div>{groups.length === 0 &&
 <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>No groups yet</h2><p>Create the first group for your community.</p><button className="rc-primary" onClick={() => setShowGroup(true)}><Plus size={16}/> Create group</button></div>}</section>}
 
@@ -2768,6 +2801,44 @@ async function playVoiceNote(message: ChatMessage) {
       }
       .rc-swipe-viewport { padding-bottom: calc(86px + env(safe-area-inset-bottom)); box-sizing: border-box; }
       .rc-tab-panel.rc-panel-visible { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+      /* Keep the inbox independently scrollable while leaving room for the fixed bottom navigation. */
+      .rc-messages-layout:not(.has-chat) { display: block !important; min-height: 0 !important; overflow: visible !important; }
+      .rc-conversation-list {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0 !important;
+        box-sizing: border-box !important;
+        height: calc(var(--rc-visual-height, 100dvh) - 220px) !important;
+        max-height: calc(var(--rc-visual-height, 100dvh) - 220px) !important;
+        min-height: 140px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-y !important;
+        overscroll-behavior-y: contain !important;
+        scrollbar-gutter: stable;
+        padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+      }
+      .rc-conversation-row-wrap, .rc-empty-conversations { flex: 0 0 auto !important; }
+      .rc-conversation-row { touch-action: pan-y !important; }
+      .rc-conversation-copy { display:flex !important; flex:1 1 auto !important; min-width:0 !important; flex-direction:column !important; align-items:flex-start !important; text-align:left !important; }
+      .rc-conversation-copy strong { display:block !important; width:100%; text-align:left !important; }
+      .rc-conversation-kind { display:block !important; width:100%; text-align:left !important; margin-top:2px !important; }
+      .rc-conversation-meta { flex:0 0 auto; align-self:stretch; display:flex; flex-direction:column; align-items:flex-end; justify-content:flex-start; gap:5px; min-width:34px; padding-top:1px; margin-left:4px; }
+      .rc-conversation-timestamp { display:block; color:rgba(219,234,254,.72); font-size:9.5px !important; line-height:1.15; white-space:nowrap; font-variant-numeric:tabular-nums; }
+      .rc-leave-chat-button { flex:0 0 auto; margin-left:auto; padding:7px 10px; border:1px solid rgba(248,113,113,.42); border-radius:9px; background:rgba(127,29,29,.13); color:#fca5a5; font-size:12px; font-weight:700; cursor:pointer; }
+      /* iOS-style liquid glass: soft frosted translucency, glossy edge and a light sweep. */
+      .rc-conversation-row {
+        background: linear-gradient(145deg, rgba(255,255,255,.13) 0%, rgba(235,244,255,.055) 23%, rgba(30,58,95,.14) 58%, rgba(255,255,255,.035) 100%) !important;
+        border: 1px solid rgba(226,238,255,.25) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.24), inset 0 -1px 0 rgba(255,255,255,.045), 0 7px 20px rgba(0,0,0,.16) !important;
+        backdrop-filter: blur(22px) saturate(155%);
+        -webkit-backdrop-filter: blur(22px) saturate(155%);
+      }
+      .rc-conversation-row::before { background: linear-gradient(112deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,.035) 17%, transparent 39%, transparent 70%, rgba(191,219,254,.035) 100%) !important; opacity:1 !important; }
+      .rc-conversation-row::after { content:""; position:absolute; left:10%; right:10%; top:0; height:1px; pointer-events:none; background:linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent); }
+      .rc-conversation-row.active { background:linear-gradient(145deg, rgba(191,219,254,.19), rgba(59,130,246,.13) 54%, rgba(255,255,255,.055)) !important; }
+      @media (max-width:800px) { .rc-conversation-list { height:calc(var(--rc-visual-height, 100dvh) - 230px) !important; max-height:calc(var(--rc-visual-height, 100dvh) - 230px) !important; } .rc-leave-chat-button { padding:6px 8px; } }
       .rc-conversation-list::-webkit-scrollbar { width: 3px; }
       .rc-conversation-list::-webkit-scrollbar-thumb { background: rgba(147,197,253,.24); border-radius: 99px; }
     `}
