@@ -1302,7 +1302,73 @@ delivered_by: deliveryByMessage[m.id] || []
             <div className={`rc-message-bubble ${mine ? 'mine' : 'other'} ${draggingMessageId === message.id ? 'rc-message-dragging' : ''}`} style={{transform: `translateX(${dragOffsets[message.id] || 0}px)`, transition: draggingMessageId === message.id ? 'none' : 'transform 180ms ease-out'}}>
               {groupChat && <strong className="rc-message-sender" style={{color: mine ? '#ffffff' : nicknameColor(message.sender_id)}}>{senderName}</strong>}
               {message.reply_to && <div className="rc-replied-message"><strong style={{color: nicknameColor(message.reply_to.sender_id)}}>{message.reply_to.sender_id === userId ? 'You' : '@' + message.reply_to.sender_nickname}</strong><span>{message.reply_to.body.slice(0, 220)}{message.reply_to.body.length > 220 ? '…' : ''}</span></div>}
-              <div className="rc-message-body">{message.body}</div>
+              
+{editingMessage?.id === message.id ? (
+  <div style={{display:'flex',flexDirection:'column',gap:8,minWidth:0}}>
+    <textarea
+      value={editMessageText}
+      onChange={e => setEditMessageText(e.target.value)}
+      aria-label="Edit message"
+      rows={3}
+      maxLength={5000}
+      style={{
+        width:'100%',
+        boxSizing:'border-box',
+        padding:10,
+        borderRadius:10,
+        background:'#0b1220',
+        color:'#fff',
+        border:'1px solid #2563eb',
+        resize:'vertical'
+      }}
+    />
+    <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+      <button
+        type="button"
+        onClick={() => {
+          setEditingMessage(null);
+          setEditMessageText('');
+        }}
+        disabled={savingEdit}
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={() => void saveEditedMessage()}
+        disabled={!editMessageText.trim() || savingEdit}
+      >
+        {savingEdit ? 'Saving…' : 'Save edit'}
+      </button>
+    </div>
+  </div>
+) : (
+  <>
+    <div className="rc-message-body">{message.body}</div>
+    {mine && (
+      <button
+        type="button"
+        onClick={() => {
+          setEditingMessage(message);
+          setEditMessageText(message.body);
+        }}
+        aria-label="Edit your message"
+        style={{
+          marginTop:6,
+          padding:'4px 8px',
+          borderRadius:6,
+          border:'1px solid #2563eb',
+          background:'transparent',
+          color:'#93c5fd',
+          cursor:'pointer'
+        }}
+      >
+        Edit
+      </button>
+    )}
+  </>
+)}
+              
               
               <small className="rc-message-time">
                 {new Date(message.created_at).toLocaleTimeString([], {
