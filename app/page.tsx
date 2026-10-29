@@ -2039,7 +2039,7 @@ async function playVoiceNote(message: ChatMessage) {
 }} onPointerCancel={() => {
   if (messageHoldTimer.current !== null) window.clearTimeout(messageHoldTimer.current);
   messageHoldTimer.current = null;
-}} onTouchStart={e => { touchStartX.current[message.id] = e.changedTouches[0]?.clientX ?? 0; setDraggingMessageId(message.id); }} onTouchMove={e => { const start = touchStartX.current[message.id]; const current = e.changedTouches[0]?.clientX ?? start; if (start !== undefined) setDragOffsets(old => ({...old, [message.id]: Math.max(0, Math.min(72, current - start))})); }} onTouchEnd={e => { const start = touchStartX.current[message.id]; const end = e.changedTouches[0]?.clientX ?? start; if (start !== undefined && end - start > 55) setReplyTo(message); delete touchStartX.current[message.id]; setDraggingMessageId(null); setDragOffsets(old => ({...old, [message.id]: 0})); }} onDoubleClick={() => setReplyTo(message)} title={mine ? "Swipe right to reply; press and hold for message options" : "Swipe right to reply"} className={`rc-message-row ${mine ? 'rc-message-mine' : 'rc-message-other'} ${groupChat ? 'rc-message-group' : 'rc-message-private'}`} style={{marginLeft: mine ? '12%' : (groupChat ? 0 : '3%'), marginRight: mine ? 0 : '6%'}}>
+}} onTouchStart={e => { touchStartX.current[message.id] = e.changedTouches[0]?.clientX ?? 0; setDraggingMessageId(message.id); }} onTouchMove={e => { const start = touchStartX.current[message.id]; const current = e.changedTouches[0]?.clientX ?? start; if (start !== undefined) setDragOffsets(old => ({...old, [message.id]: Math.max(0, Math.min(72, current - start))})); }} onTouchEnd={e => { const start = touchStartX.current[message.id]; const end = e.changedTouches[0]?.clientX ?? start; if (start !== undefined && end - start > 55) setReplyTo(message); delete touchStartX.current[message.id]; setDraggingMessageId(null); setDragOffsets(old => ({...old, [message.id]: 0})); }} onContextMenu={e => { e.preventDefault(); }} onDoubleClick={() => setReplyTo(message)} title={mine ? "Swipe right to reply; press and hold for message options" : "Swipe right to reply"} className={`rc-message-row ${mine ? 'rc-message-mine' : 'rc-message-other'} ${groupChat ? 'rc-message-group' : 'rc-message-private'}`} style={{marginLeft: mine ? '12%' : (groupChat ? 0 : '3%'), marginRight: mine ? 0 : '6%'}}>
             {!mine && groupChat && <span className="rc-message-avatar">{message.sender_avatar_url ? <img src={message.sender_avatar_url} alt=""/> : (message.sender_nickname?.[0] || 'M').toUpperCase()}</span>}
             <div className={`rc-message-bubble ${mine ? 'mine' : 'other'} ${draggingMessageId === message.id ? 'rc-message-dragging' : ''}`} style={{transform: `translateX(${dragOffsets[message.id] || 0}px)`, transition: draggingMessageId === message.id ? 'none' : 'transform 180ms ease-out'}}>
               {groupChat && <strong className="rc-message-sender" style={{color: mine ? '#ffffff' : nicknameColor(message.sender_id)}}>{senderName}</strong>}
@@ -2322,7 +2322,7 @@ async function playVoiceNote(message: ChatMessage) {
 >
   {voiceBusy ? '…' : isRecordingVoice ? <Square size={19} fill="currentColor" /> : <Mic size={21} />}
 </button>
-<input name="chat-message" type="text" autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} inputMode="text" enterKeyHint="send" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); setShowEmojiPicker(false); }} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); setShowEmojiPicker(false); }} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -2537,6 +2537,119 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-marketplace-message h1 { margin:0; font-size:clamp(26px,5vw,38px); }
       .rc-marketplace-message p { color:#aab9d0; margin:0 0 10px; line-height:1.6; }
       @media (max-width:800px) { .rc-floating-premium { bottom:calc(82px + env(safe-area-inset-bottom)); } .rc-floating-marketplace { bottom:calc(136px + env(safe-area-inset-bottom)); } }
+
+      /* Slim glass panels for each conversation in the Messages list. */
+      .rc-conversation-row-wrap { margin-bottom: 7px !important; }
+      .rc-conversation-row {
+        border: 1px solid rgba(147,197,253,.18) !important;
+        border-radius: 12px !important;
+        background: rgba(148,163,184,.055) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 10px 11px !important;
+        min-height: 64px;
+      }
+      .rc-conversation-row.active {
+        border-color: rgba(96,165,250,.52) !important;
+        background: rgba(37,99,235,.13) !important;
+      }
+      .rc-conversation-copy strong { font-size: 13px !important; }
+      .rc-conversation-copy small { font-size: 11px !important; }
+
+      /* Compact, left-aligned quoted/replied-to message previews. */
+      .rc-replied-message {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        gap: 1px !important;
+        width: fit-content;
+        max-width: 100%;
+        box-sizing: border-box;
+        margin: 0 0 5px !important;
+        padding: 3px 7px !important;
+        text-align: left !important;
+        line-height: 1.25 !important;
+        border-left: 2px solid #60a5fa;
+        border-radius: 4px 7px 7px 4px;
+        background: rgba(2,6,23,.24);
+      }
+      .rc-replied-message strong,
+      .rc-replied-message span {
+        display: block !important;
+        align-self: stretch;
+        margin: 0 !important;
+        padding: 0 !important;
+        text-align: left !important;
+        font-size: 10.5px !important;
+        line-height: 1.25 !important;
+        overflow-wrap: anywhere;
+      }
+      .rc-reply-preview {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        padding: 4px 8px !important;
+        margin: 0 0 5px !important;
+        border-radius: 8px !important;
+        background: rgba(96,165,250,.09) !important;
+        border-left: 2px solid #60a5fa !important;
+      }
+      .rc-reply-preview > div {
+        display: flex !important;
+        flex: 1;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 1px !important;
+        min-width: 0;
+        text-align: left !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .rc-reply-preview strong, .rc-reply-preview small {
+        display: block !important;
+        text-align: left !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.25 !important;
+      }
+      .rc-reply-preview strong { font-size: 11px !important; }
+      .rc-reply-preview small { font-size: 10.5px !important; }
+
+      /* Smaller text in both private and group message bubbles. */
+      .rc-message-body {
+        font-size: 12.5px !important;
+        line-height: 1.4 !important;
+        overflow-wrap: anywhere;
+      }
+      .rc-message-sender { font-size: 11px !important; line-height: 1.25 !important; }
+      .rc-message-time { font-size: 9.5px !important; }
+      .rc-message-row { -webkit-user-select: none; user-select: none; }
+      .rc-message-row button, .rc-message-row audio, .rc-message-row input {
+        -webkit-user-select: auto;
+        user-select: auto;
+      }
+
+      /* Multiline composer: Enter inserts a newline, the Send button sends. */
+      .rc-composer textarea[name="chat-message"] {
+        flex: 1 1 auto;
+        width: 100%;
+        min-width: 0;
+        min-height: 42px;
+        max-height: 120px;
+        resize: none;
+        overflow-y: auto;
+        box-sizing: border-box;
+        padding: 10px 9px;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        line-height: 1.35;
+        white-space: pre-wrap;
+      }
     `}</style>
   </main>
 );
