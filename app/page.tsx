@@ -876,6 +876,152 @@ delivered_by: deliveryByMessage[m.id] || []
     })));
   }, [supabase, userId]);
 
+  
+  async function startVoiceRecording() {
+    if (!supabase || !userId || !selectedConversation || voiceBusy || isRecordingVoice) return;
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setStatus('Voice recording is not supported by this browser.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      voiceStreamRef.current = stream;
+      voiceChunksRef.current = [];
+
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus'
+      ].find(type => MediaRecorder.isTypeSupported(type));
+
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
+      voiceRecorderRef.current = recorder;
+
+      recorder.ondataavailable = event => {
+        if (event.data.size > 0) voiceChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(voiceChunksRef.current, {
+          type: recorder.mimeType || 'audio/webm'
+        });
+
+        void (async () => {
+          if (!supabase || !userId || !selectedConversation || audioBlob.size === 0) {
+            setStatus('No voice audio was recorded.');
+            setVoiceBusy(false);
+            return;
+          }
+
+          if (audioBlob.size > 15 * 1024 * 1024) {
+            setStatus('Voice note is too large. Please record a shorter note.');
+            setVoiceBusy(false);
+            return;
+          }
+
+          const conversationId = selectedConversation.id;
+          const fileExtension = audioBlob.type.includes('mp4')
+            ? 'm4a'
+            : audioBlob.type.includes('ogg')
+              ? 'ogg'
+              : 'webm';
+          const filePath = `${conversationId}/${userId}/${crypto.randomUUID()}.${fileExtension}`;
+
+          try {
+            const { error: uploadError } = await supabase.storage
+              .from('rc-voice-notes')
+              .upload(filePath, audioBlob, {
+                contentType: audioBlob.type,
+                upsert: false
+              });
+
+            if (uploadError) {
+              setStatus(`Voice upload failed: ${uploadError.message}`);
+              return;
+            }
+
+            const { data, error } = await supabase
+              .from('messages')
+              .insert({
+                conversation_id: conversationId,
+                sender_id: userId,
+                body: '🎤 Voice note',
+                message_type: 'voice',
+                media_path: filePath
+              })
+              .select('id,conversation_id,sender_id,body,created_at,message_type,media_path')
+              .single();
+
+            if (error) {
+              await supabase.storage.from('rc-voice-notes').remove([filePath]);
+              setStatus(`Voice message failed: ${error.message}`);
+              return;
+            }
+
+            const { data: sender } = await supabase
+              .from('profiles')
+              .select('nickname,avatar_url')
+              .eq('id', userId)
+              .maybeSingle();
+
+            setChatMessages(old => [
+              ...old,
+              {
+                ...(data as ChatMessage),
+                sender_nickname: sender?.nickname || 'You',
+                sender_avatar_url: sender?.avatar_url || null,
+                read_by: [],
+                delivered_by: []
+              }
+            ]);
+
+            setConversationList(old =>
+              old.map(c =>
+                c.id === conversationId
+                  ? { ...c, lastMessageAt: data.created_at, lastMessagePreview: '🎤 Voice note' }
+                  : c
+              ).sort((a, b) =>
+                (b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0) -
+                (a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0)
+              )
+            );
+
+            setStatus('Voice note sent.');
+          } catch (error) {
+            setStatus(`Voice note failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          } finally {
+            setVoiceBusy(false);
+          }
+        })();
+      };
+
+      recorder.start();
+      setIsRecordingVoice(true);
+      setStatus('Recording voice note… Tap Stop when finished.');
+    } catch (error) {
+      voiceStreamRef.current?.getTracks().forEach(track => track.stop());
+      voiceStreamRef.current = null;
+      setStatus(`Microphone unavailable: ${error instanceof Error ? error.message : 'Permission denied'}`);
+    }
+  }
+
+  function stopVoiceRecording() {
+    const recorder = voiceRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
+
+    setIsRecordingVoice(false);
+    setVoiceBusy(true);
+    recorder.stop();
+    voiceStreamRef.current?.getTracks().forEach(track => track.stop());
+    voiceStreamRef.current = null;
+            }
+  
   async function sendDraft() {
     const body = draftMessage.trim();
     if (!supabase || !userId || !selectedConversation || !body || sendingMessage) return;
