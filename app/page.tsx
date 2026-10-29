@@ -916,62 +916,8 @@ async function playVoiceNote(message: ChatMessage) {
     [message.id]: data.signedUrl
   }));
 }
+
   
-  async function startVoiceRecording() {
-    if (!supabase || !userId || !selectedConversation || voiceBusy || isRecordingVoice) return;
-
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setStatus('Voice recording is not supported by this browser.');
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      voiceStreamRef.current = stream;
-      voiceChunksRef.current = [];
-
-      const mimeType = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/mp4',
-        'audio/ogg;codecs=opus'
-      ].find(type => MediaRecorder.isTypeSupported(type));
-
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
-
-      voiceRecorderRef.current = recorder;
-
-      recorder.ondataavailable = event => {
-        if (event.data.size > 0) voiceChunksRef.current.push(event.data);
-      };
-
-      recorder.onstop = () => {
-        const audioBlob = new Blob(voiceChunksRef.current, {
-          type: recorder.mimeType || 'audio/webm'
-        });
-
-        void (async () => {
-          if (!supabase || !userId || !selectedConversation || audioBlob.size === 0) {
-            setStatus('No voice audio was recorded.');
-            setVoiceBusy(false);
-            return;
-          }
-
-          if (audioBlob.size > 15 * 1024 * 1024) {
-            setStatus('Voice note is too large. Please record a shorter note.');
-            setVoiceBusy(false);
-            return;
-          }
-
-          const conversationId = selectedConversation.id;
-          const fileExtension = audioBlob.type.includes('mp4')
-            ? 'm4a'
-            : audioBlob.type.includes('ogg')
-              ? 'ogg'
-              : 'webm';
-
   async function startVoiceRecording() {
     if (
       !supabase ||
