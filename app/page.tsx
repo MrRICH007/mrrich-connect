@@ -1482,6 +1482,51 @@ async function playVoiceNote(message: ChatMessage) {
   }
 
   useEffect(() => { if (userId) { void loadConversations(); void loadUnreadCounts(); } }, [userId, loadConversations, loadUnreadCounts]);
+ 
+  useEffect(() => {
+    if (!supabase) return;
+
+    let cancelled = false;
+
+    const pendingMessages = chatMessages.filter(
+      message =>
+        message.message_type === 'voice' &&
+        !!message.media_path &&
+        !voiceUrls[message.id]
+    );
+
+    if (pendingMessages.length === 0) return;
+
+    async function loadVoiceNoteUrls() {
+      const loaded: Record<string, string> = {};
+
+      for (const message of pendingMessages) {
+        if (!message.media_path) continue;
+
+        const { data, error } = await supabase.storage
+          .from('rc-voice-notes')
+          .createSignedUrl(message.media_path, 3600);
+
+        if (!error && data?.signedUrl) {
+          loaded[message.id] = data.signedUrl;
+        }
+      }
+
+      if (cancelled || Object.keys(loaded).length === 0) return;
+
+      setVoiceUrls(previous => ({
+        ...loaded,
+        ...previous
+      }));
+    }
+
+    void loadVoiceNoteUrls();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chatMessages, supabase, voiceUrls]);
+  
   useEffect(() => {
     if (!supabase || !userId) return;
     const channel = supabase.channel(`unread-refresh-${userId}`)
@@ -2041,16 +2086,23 @@ async function playVoiceNote(message: ChatMessage) {
   </div>
 ) : (
   <>
-    {message.message_type === 'voice' ? (
+    
+{message.message_type === 'voice' ? (
   <div style={{ minWidth: 220, maxWidth: '100%' }}>
-    <div style={{ marginBottom: 8 }}>🎤 Voice note</div>
     {voiceUrls[message.id] ? (
-      <audio
-        controls
-        src={voiceUrls[message.id]}
-        style={{ width: '100%', maxWidth: 280 }}
-      />
+      <VoiceNotePlayer src={voiceUrls[message.id]} />
     ) : (
+      <div style={{
+        color: '#93c5fd',
+        fontSize: 12,
+        padding: '10px 12px'
+      }}>
+        Loading voice note…
+      </div>
+    )}
+  </div>
+) : (
+
       <button
         type="button"
         onClick={() => void playVoiceNote(message)}
