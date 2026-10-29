@@ -2171,24 +2171,29 @@ async function playVoiceNote(message: ChatMessage) {
     </div>
   </div>
 )}<div className="rc-composer"><button type="button" className="rc-emoji-toggle" onClick={() => setShowEmojiPicker(v=>!v)} aria-label="Open emoji picker"><Smile size={22}/></button>
+
 <button
   type="button"
   onClick={() => isRecordingVoice ? stopVoiceRecording() : void startVoiceRecording()}
-  disabled={voiceBusy || sendingMessage}
+  disabled={voiceBusy || sendingMessage || !!voicePreviewUrl}
   aria-label={isRecordingVoice ? 'Stop recording' : 'Record voice note'}
-  title={isRecordingVoice ? 'Stop and send voice note' : 'Record voice note'}
+  title={isRecordingVoice ? 'Stop recording' : 'Record voice note'}
   style={{
     border: '1px solid #2563eb',
-    borderRadius: 8,
-    padding: '8px 10px',
+    borderRadius: 12,
+    width: 44,
+    height: 44,
+    display: 'grid',
+    placeItems: 'center',
     background: isRecordingVoice ? '#991b1b' : '#172554',
     color: '#dbeafe',
-    cursor: voiceBusy || sendingMessage ? 'not-allowed' : 'pointer',
-    opacity: voiceBusy || sendingMessage ? 0.6 : 1
+    cursor: voiceBusy || sendingMessage || !!voicePreviewUrl ? 'not-allowed' : 'pointer',
+    opacity: voiceBusy || sendingMessage || !!voicePreviewUrl ? 0.6 : 1
   }}
 >
-  {voiceBusy ? 'Sending…' : isRecordingVoice ? '■ Stop' : '🎤'}
-</button><input name="chat-message" type="text" autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} inputMode="text" enterKeyHint="send" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); setShowEmojiPicker(false); }} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+  {voiceBusy ? '…' : isRecordingVoice ? <Square size={19} fill="currentColor" /> : <Mic size={21} />}
+</button>
+<input name="chat-message" type="text" autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} inputMode="text" enterKeyHint="send" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>setDraftMessage(e.target.value)} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();}}} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); setShowEmojiPicker(false); }} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div>}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
