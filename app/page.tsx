@@ -150,6 +150,9 @@ export default function Home() {
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+ const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+const [editMessageText, setEditMessageText] = useState('');
+const [savingEdit, setSavingEdit] = useState(false);
   const touchStartX = useRef<Record<string, number>>({});
   const [draggingMessageId, setDraggingMessageId] = useState<string | null>(null);
   const [dragOffsets, setDragOffsets] = useState<Record<string, number>>({});
