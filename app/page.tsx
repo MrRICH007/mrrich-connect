@@ -3471,6 +3471,21 @@ async function playVoiceNote(message: ChatMessage) {
         box-sizing: border-box !important;
       }
 
+      /* Final mobile scroll-end correction for the non-Messages tabs.
+         Transparent scroll padding lets the last item clear the fixed nav
+         without adding a black footer, overlay, or extra background panel. */
+      @media (max-width: 800px) {
+        .rc-tab-panel.rc-panel-visible:not(:has(.rc-messages-layout)) {
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          overscroll-behavior-y: contain !important;
+          padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+          scroll-padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+          background: transparent !important;
+        }
+      }
+
     `}
 </style>
   </main>
