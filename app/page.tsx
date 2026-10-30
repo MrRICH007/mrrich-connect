@@ -3471,6 +3471,15 @@ async function playVoiceNote(message: ChatMessage) {
         box-sizing: border-box !important;
       }
 
+      /* Give the Messages conversation list enough transparent scroll space
+         to move its final conversation fully above the fixed bottom navigation. */
+      @media (max-width: 800px) {
+        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+          padding: 0 2px calc(104px + env(safe-area-inset-bottom)) !important;
+          scroll-padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+        }
+      }
+
       /* Final mobile scroll-end correction for the non-Messages tabs.
          Transparent scroll padding lets the last item clear the fixed nav
          without adding a black footer, overlay, or extra background panel. */
