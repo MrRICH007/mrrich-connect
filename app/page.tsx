@@ -7,7 +7,7 @@ import {
   Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck,
   Users, UserRound, Wifi, Pencil, Plus, Send, Smile, ArrowLeft, RefreshCw,
   X, Sparkles, Zap, ArrowDown, Store, Settings, Check,
-  Mic, Square, Play, Pause, AudioLines, Trash2
+  Mic, Square, Play, Pause, AudioLines, Trash2, Share2, Copy, QrCode, UserPlus
 } from 'lucide-react';
 const NIGERIAN_SCHOOLS = [
   'Abia State University','Abubakar Tafawa Balewa University','Achievers University','Adekunle Ajasin University','Adeleke University','Admiralty University of Nigeria','Ahmadu Bello University','Ajayi Crowther University','Akwa Ibom State University','Al-Hikmah University','Ambrose Alli University','American University of Nigeria','Anchor University','Arthur Jarvis University','Atiba University','Augustine University','Babcock University','Bauchi State University','Bayero University Kano','Baze University','Bells University of Technology','Benson Idahosa University','Benue State University','Bingham University','Bowen University','Caleb University','Caritas University','Chrisland University','Christopher University','Clifford University','Coal City University','Covenant University','Crawford University','Crescent University','Delta State University','Dennis Osadebay University','Dominican University','Ebonyi State University','Edo State University Uzairue','Edwin Clark University','Ekiti State University','Elizade University','Evangel University','Federal University Gashua','Federal University Gusau','Federal University Kashere','Federal University Lafia','Federal University Lokoja','Federal University Otuoke','Federal University Oye-Ekiti','Federal University of Agriculture Abeokuta','Federal University of Technology Akure','Federal University of Technology Minna','Federal University of Technology Owerri','Federal University Dutse','Federal University Birnin Kebbi','Federal University Dutsin-Ma','Federal University Wukari','Fountain University','Godfrey Okoye University','Gombe State University','Gregory University','Hallmark University','Hezekiah University','Ibrahim Badamasi Babangida University','Igbinedion University','Ignatius Ajuru University of Education','Imo State University','Joseph Ayo Babalola University','Kaduna State University','Kano University of Science and Technology','Kebbi State University of Science and Technology','Kings University','Kogi State University','KolaDaisi University','Kwara State University','Lagos State University','Lagos State University of Education','Landmark University','Lead City University','Madonna University','McPherson University','Michael and Cecilia Ibru University','Michael Okpara University of Agriculture','Modibbo Adama University','Mountain Top University','Nasarawa State University','National Open University of Nigeria','Niger Delta University','Nigerian Army University Biu','Nigerian Defence Academy','Nile University of Nigeria','Nnamdi Azikiwe University','Northwest University Kano','Novena University','Obafemi Awolowo University','Oduduwa University','Olabisi Onabanjo University','Ondo State University of Medical Sciences','Osun State University','Pan-Atlantic University','Paul University','Plateau State University','Redeemer’s University','Renaissance University','Rhema University','Ritman University','Rivers State University','Salem University','Samuel Adegboyega University','Skyline University Nigeria','Sokoto State University','Southwestern University Nigeria','Spiritan University','Summit University','Tai Solarin University of Education','Tansian University','Taraba State University','The University of Africa Toru-Orua','Thomas Adewumi University','Umaru Musa Yar’Adua University','University of Abuja','University of Benin','University of Calabar','University of Cross River State','University of Ibadan','University of Ilorin','University of Jos','University of Lagos','University of Maiduguri','University of Mkar','University of Nigeria Nsukka','University of Port Harcourt','University of Uyo','Usmanu Danfodiyo University','Veritas University','Wellspring University','Wesley University','Western Delta University','Yobe State University','Adamawa State Polytechnic','Auchi Polytechnic','Abia State Polytechnic','Abubakar Tatari Ali Polytechnic','Akanu Ibiam Federal Polytechnic Unwana','Akwa Ibom State Polytechnic','Benue State Polytechnic','Delta State Polytechnic Otefe-Oghara','Delta State Polytechnic Ogwashi-Uku','Edo State Polytechnic Usen','Federal Polytechnic Ado-Ekiti','Federal Polytechnic Bauchi','Federal Polytechnic Bida','Federal Polytechnic Damaturu','Federal Polytechnic Ede','Federal Polytechnic Idah','Federal Polytechnic Ilaro','Federal Polytechnic Kaura Namoda','Federal Polytechnic Mubi','Federal Polytechnic Nasarawa','Federal Polytechnic Nekede','Federal Polytechnic Offa','Federal Polytechnic Oko','Federal Polytechnic Ukana','Gateway ICT Polytechnic','Hassan Usman Katsina Polytechnic','Imo State Polytechnic','Institute of Management and Technology Enugu','Kaduna Polytechnic','Kano State Polytechnic','Kwara State Polytechnic','Lagos State Polytechnic','Moshood Abiola Polytechnic','Niger State Polytechnic','Nuhu Bamalli Polytechnic','Ogun State Institute of Technology','Osun State Polytechnic Iree','Plateau State Polytechnic','Ramat Polytechnic','Rivers State Polytechnic','The Polytechnic Ibadan','Yaba College of Technology','Adeyemi College of Education','Alvan Ikoku Federal College of Education','College of Education Agbor','College of Education Akwanga','College of Education Ekiadolor','College of Education Gindiri','College of Education Hong','College of Education Ikere-Ekiti','College of Education Katsina-Ala','College of Education Minna','College of Education Oro','College of Education Warri','Emmanuel Alayande College of Education','Federal College of Education Abeokuta','Federal College of Education Asaba','Federal College of Education Kano','Federal College of Education Kontagora','Federal College of Education Obudu','Federal College of Education Okene','Federal College of Education Omoku','Federal College of Education Pankshin','Federal College of Education (Technical) Akoka','Federal College of Education (Technical) Bichi','Federal College of Education (Technical) Gombe','Federal College of Education (Technical) Umunze','Federal College of Education Zaria','Kashim Ibrahim College of Education','Lagos State College of Education','Nwafor Orizu College of Education','Tai Solarin College of Education','Isaac Jasper Boro College of Education'
@@ -292,10 +292,27 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [premiumBusy, setPremiumBusy] = useState(false);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteToken, setInviteToken] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [invitePosition, setInvitePosition] = useState<{ x: number; y: number } | null>(null);
+  const inviteDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const inviteWasDragged = useRef(false);
+  const inviteTokenFromUrl = useRef<string>('');
   const [groupSchoolSearch, setGroupSchoolSearch] = useState('');
   const [marketplacePosition, setMarketplacePosition] = useState<{ x: number; y: number } | null>(null);
   const marketplaceDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const marketplaceWasDragged = useRef(false);
+
+  // Preserve the invitation token through account registration and email confirmation.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('invite');
+    if (token && /^[0-9a-f-]{36}$/i.test(token)) {
+      inviteTokenFromUrl.current = token;
+      setAuthMode('signup');
+    }
+  }, []);
 
   // Keep the mobile chat aligned with the visible viewport when the keyboard opens.
   const internalHistoryRef = useRef<Array<{ tab: string; conversationId: string | null }>>([]);
@@ -334,6 +351,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       setShowGroup(false);
       setShowEmojiPicker(false);
       setMarketplaceOpen(false);
+      setInviteOpen(false);
       setHideActionsConversationId(null);
       setMessageActionsMessageId(null);
       window.history.pushState({ mrRichConnectInternal: true }, '', window.location.href);
@@ -686,13 +704,57 @@ const voiceChunksRef = useRef<Blob[]>([]);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setStatus(error ? error.message : 'Signed in successfully.');
   }
+  async function openInviteCard() {
+    if (!supabase || !userId) return;
+    setInviteBusy(true);
+    const { data, error } = await supabase.rpc('get_my_invite_token');
+    setInviteBusy(false);
+    if (error || !data) {
+      setStatus(`Could not prepare your invite link: ${error?.message || 'No invite token was returned.'}. Run the invite SQL migration first.`);
+      return;
+    }
+    setInviteToken(String(data));
+    setInviteOpen(true);
+  }
+
+  const inviteLink = inviteToken && typeof window !== 'undefined'
+    ? `${window.location.origin}/?invite=${encodeURIComponent(inviteToken)}`
+    : '';
+
+  async function copyInviteLink() {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setStatus('Invite link copied. Share it with someone outside MR RICH CONNECT.');
+    } catch {
+      setStatus('Could not copy automatically. Select and copy the invite link shown on the card.');
+    }
+  }
+
+  async function shareInviteLink() {
+    if (!inviteLink) return;
+    const shareData = {
+      title: `Connect with ${nickname || 'me'} on MR RICH CONNECT`,
+      text: `Join me on MR RICH CONNECT. Create an account using my invite link and you can message me directly:`,
+      url: inviteLink,
+    };
+    try {
+      if (navigator.share) await navigator.share(shareData);
+      else await copyInviteLink();
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        setStatus('Sharing was unavailable. You can copy the invite link instead.');
+      }
+    }
+  }
+
   async function signUp(e?: FormEvent) {
     e?.preventDefault();
     if (!supabase) return;
     if (!registration.nickname.trim() || !registration.full_name.trim()) { setStatus('Enter your nickname and full name to register.'); return; }
     const { error } = await supabase.auth.signUp({ email, password, options: {
       emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
-      data: { nickname: registration.nickname.trim().replace(/^@/, ''), full_name: registration.full_name.trim(), phone: registration.phone.trim(), department: registration.department.trim(), level: registration.level.trim(), college: registration.college.trim(), school: registration.school.trim(), bio: registration.bio.trim() }
+      data: { nickname: registration.nickname.trim().replace(/^@/, ''), full_name: registration.full_name.trim(), phone: registration.phone.trim(), department: registration.department.trim(), level: registration.level.trim(), college: registration.college.trim(), school: registration.school.trim(), bio: registration.bio.trim(), rc_invite_token: inviteTokenFromUrl.current || null }
     }});
     setStatus(error ? error.message : 'Registration submitted. Confirm your email, then sign in. Run the profile-fields SQL migration so the database creates the separate public and private records.');
     if (!error) setAuthMode('signin');
@@ -2520,6 +2582,46 @@ async function playVoiceNote(message: ChatMessage) {
     {userId && !selectedConversation && <nav className="rc-bottom-nav" aria-label="Main navigation">{NAV_ITEMS.filter(item => item.name !== 'Premium').map(item => <button key={item.name} className={`rc-bottom-item ${tab === item.name ? 'active' : ''}`} onClick={() => { setTab(item.name); setShowProfile(false); setShowGroup(false); setShowEmojiPicker(false); }}><span className="rc-bottom-icon"><item.icon size={24} strokeWidth={tab === item.name ? 2.5 : 2}/>{item.name === 'Requests' && requests > 0 && <i className="rc-nav-badge">{requests > 99 ? '99+' : requests}</i>}{item.name === 'Messages' && Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0) > 0 && <i className="rc-nav-badge">{Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0) > 99 ? '99+' : Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0)}</i>}</span><span className="rc-bottom-label">{item.name === 'My Profile' ? 'Profile' : item.name}</span></button>)}</nav>}
 
     {userId && tab === 'My Profile' && !selectedConversation && !showProfile && !showGroup && !marketplaceOpen && <button className="rc-floating-premium" onClick={() => setTab('Premium')}><Crown size={17}/> Premium</button>}
+    {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && !inviteOpen && <button
+      type="button"
+      className="rc-floating-invite"
+      style={invitePosition ? { left: invitePosition.x, top: invitePosition.y, right: 'auto', bottom: 'auto' } : undefined}
+      onPointerDown={e => { inviteWasDragged.current = false; const rect = e.currentTarget.getBoundingClientRect(); inviteDrag.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, originX: invitePosition?.x ?? rect.left, originY: invitePosition?.y ?? rect.top }; e.currentTarget.setPointerCapture(e.pointerId); }}
+      onPointerMove={e => { const drag = inviteDrag.current; if (!drag || drag.pointerId !== e.pointerId) return; if (Math.abs(e.clientX - drag.startX) > 5 || Math.abs(e.clientY - drag.startY) > 5) inviteWasDragged.current = true; const rect = e.currentTarget.getBoundingClientRect(); const w = rect.width || 48; const h = rect.height || 48; const x = Math.max(8, Math.min(window.innerWidth - w - 8, drag.originX + e.clientX - drag.startX)); const y = Math.max(8, Math.min(window.innerHeight - h - 8, drag.originY + e.clientY - drag.startY)); setInvitePosition({ x, y }); }}
+      onPointerUp={e => { if (inviteDrag.current?.pointerId === e.pointerId) inviteDrag.current = null; }}
+      onPointerCancel={() => { inviteDrag.current = null; }}
+      onClick={() => { if (inviteWasDragged.current) { inviteWasDragged.current = false; return; } void openInviteCard(); }}
+      aria-label="Invite people to MR RICH CONNECT"
+      title="Invite people"
+      disabled={inviteBusy}
+    ><UserPlus size={21}/></button>}
+
+    {inviteOpen && <div className="rc-invite-backdrop" onClick={() => setInviteOpen(false)}>
+      <section className="rc-invite-card" onClick={e => e.stopPropagation()} aria-label="Your MR RICH CONNECT invite card">
+        <button type="button" className="rc-modal-close" onClick={() => setInviteOpen(false)} aria-label="Close invite card"><X size={20}/></button>
+        <span className="rc-invite-eyebrow">YOU'RE INVITED TO CONNECT</span>
+        <div className="rc-invite-profile">
+          <div className="rc-invite-avatar">
+            {(profileForm.avatar_url || profiles.find(p => p.id === userId)?.avatar_url)
+              ? <img src={profileForm.avatar_url || profiles.find(p => p.id === userId)?.avatar_url || ''} alt={`${nickname || 'Your'} profile`} />
+              : <UserRound size={48}/>}
+          </div>
+          <strong>{nickname ? `@${nickname.replace(/^@/, '')}` : 'MR RICH CONNECT MEMBER'}</strong>
+        </div>
+        <p className="rc-invite-copy">Join me on MR RICH CONNECT. Sign up through my personal link and we can message each other directly.</p>
+        {inviteLink && <div className="rc-invite-qr-wrap">
+          <img className="rc-invite-qr" src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(inviteLink)}`} alt="QR code for your personal MR RICH CONNECT invite link"/>
+          <span>Scan to open my invite link</span>
+        </div>}
+        <div className="rc-invite-link">{inviteLink}</div>
+        <div className="rc-invite-actions">
+          <button type="button" className="rc-primary" onClick={() => void shareInviteLink()}><Share2 size={17}/> Share invite</button>
+          <button type="button" className="rc-secondary" onClick={() => void copyInviteLink()}><Copy size={16}/> Copy link</button>
+        </div>
+        <small className="rc-invite-footnote"><QrCode size={14}/> This QR code opens the same personal invite link.</small>
+      </section>
+    </div>}
+
     {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && <button
       className="rc-floating-marketplace"
       style={marketplacePosition ? { left: marketplacePosition.x, top: marketplacePosition.y, right: 'auto', bottom: 'auto' } : undefined}
@@ -2643,17 +2745,36 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-preview-ticks { color:#94a3b8; font-weight:800; white-space:nowrap; } .rc-preview-ticks.is-read { color:#facc15; }
       .rc-current-rank { border:1px solid rgba(96,165,250,.5); border-radius:12px; }
       .rc-admin-only-notice { width:100%; box-sizing:border-box; text-align:center; padding:18px 12px calc(18px + env(safe-area-inset-bottom)); color:#facc15; font-weight:800; background:rgba(16,43,88,.55); border-top:1px solid rgba(96,165,250,.25); } .rc-hour-unit { display:inline-block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.82em; font-weight:900; letter-spacing:-.04em; margin-left:2px; }
-      .rc-floating-premium, .rc-floating-marketplace { position:fixed; z-index:55; display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid rgba(96,165,250,.55); border-radius:999px; background:#102b58; color:#fff; padding:11px 15px; font-weight:700; box-shadow:0 8px 28px rgba(0,0,0,.3); touch-action:none; }
+      .rc-floating-premium, .rc-floating-marketplace, .rc-floating-invite { position:fixed; z-index:55; display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid rgba(96,165,250,.55); border-radius:999px; background:#102b58; color:#fff; padding:11px 15px; font-weight:700; box-shadow:0 8px 28px rgba(0,0,0,.3); touch-action:none; }
+      .rc-floating-invite { right:16px; bottom:calc(194px + env(safe-area-inset-bottom)); width:48px; height:48px; padding:0; border-radius:16px; cursor:grab; background:#1d4ed8; color:#fff; border-color:#60a5fa; }
+      .rc-floating-invite:active { cursor:grabbing; }
       .rc-floating-premium { right:16px; bottom:calc(86px + env(safe-area-inset-bottom)); }
       .rc-floating-marketplace { right:16px; bottom:calc(140px + env(safe-area-inset-bottom)); cursor:grab; background:#facc15; color:#172033; border-color:#fde047; width:48px; height:48px; padding:0; border-radius:16px; }
       .rc-floating-marketplace:active { cursor:grabbing; }
+      .rc-invite-backdrop { position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center; padding:18px; overflow-y:auto; background:rgba(2,8,23,.78); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px); }
+      .rc-invite-card { position:relative; width:min(100%,390px); max-height:calc(100dvh - 36px); overflow-y:auto; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; gap:13px; padding:28px 22px 22px; border:1px solid rgba(96,165,250,.42); border-radius:24px; background:linear-gradient(155deg,#10264b 0%,#081326 58%,#0b1c38 100%); color:#f8fafc; box-shadow:0 24px 80px rgba(0,0,0,.5); text-align:center; }
+      .rc-invite-card .rc-modal-close { top:12px; right:12px; }
+      .rc-invite-eyebrow { color:#93c5fd; font-size:10px; font-weight:900; letter-spacing:.16em; }
+      .rc-invite-profile { display:flex; flex-direction:column; align-items:center; gap:9px; margin-top:5px; }
+      .rc-invite-avatar { width:112px; height:112px; display:grid; place-items:center; overflow:hidden; border:3px solid #60a5fa; border-radius:50%; background:linear-gradient(145deg,#1e40af,#0f172a); color:#bfdbfe; box-shadow:0 0 0 7px rgba(59,130,246,.12); }
+      .rc-invite-avatar img { width:100%; height:100%; object-fit:cover; }
+      .rc-invite-profile strong { color:#fff; font-size:18px; font-weight:850; }
+      .rc-invite-copy { max-width:290px; margin:0; color:#cbd5e1; font-size:13px; line-height:1.55; }
+      .rc-invite-qr-wrap { display:flex; flex-direction:column; align-items:center; gap:7px; padding:10px; border-radius:16px; background:#fff; color:#334155; }
+      .rc-invite-qr { display:block; width:174px; height:174px; object-fit:contain; }
+      .rc-invite-qr-wrap span { font-size:10px; font-weight:700; }
+      .rc-invite-link { width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid rgba(147,197,253,.25); border-radius:10px; background:rgba(2,8,23,.45); color:#bfdbfe; font-size:11px; line-height:1.45; overflow-wrap:anywhere; user-select:text; }
+      .rc-invite-actions { width:100%; display:flex; gap:9px; }
+      .rc-invite-actions button { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px; min-width:0; padding:11px 9px; font-size:12px; }
+      .rc-invite-footnote { display:flex; align-items:center; gap:5px; color:#94a3b8; font-size:10px; }
       .rc-school-search-results { display:flex; flex-direction:column; gap:5px; max-height:180px; overflow:auto; margin-top:6px; } .rc-school-search-results button { text-align:left; justify-content:flex-start; width:100%; white-space:normal; } .rc-premium-title { color:#93c5fd; font-size:.88em; font-weight:700; }
       .rc-marketplace-screen { position:fixed; inset:0; z-index:100; background:#071326; color:#fff; display:flex; align-items:center; justify-content:center; padding:24px; }
       .rc-marketplace-back { position:absolute; top:calc(18px + env(safe-area-inset-top)); left:18px; }
       .rc-marketplace-message { width:min(100%,480px); text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; }
       .rc-marketplace-message h1 { margin:0; font-size:clamp(26px,5vw,38px); }
       .rc-marketplace-message p { color:#aab9d0; margin:0 0 10px; line-height:1.6; }
-      @media (max-width:800px) { .rc-floating-premium { bottom:calc(82px + env(safe-area-inset-bottom)); } .rc-floating-marketplace { bottom:calc(136px + env(safe-area-inset-bottom)); } }
+      @media (max-width:800px) { .rc-floating-premium { bottom:calc(82px + env(safe-area-inset-bottom)); } .rc-floating-marketplace { bottom:calc(136px + env(safe-area-inset-bottom)); } .rc-floating-invite { bottom:calc(192px + env(safe-area-inset-bottom)); } }
+      @media (max-height:620px) { .rc-invite-card { max-height:calc(100dvh - 20px); padding:22px 16px 16px; gap:9px; } .rc-invite-avatar { width:82px; height:82px; } .rc-invite-qr { width:138px; height:138px; } }
 
       /* Slim glass panels for each conversation in the Messages list. */
       .rc-conversation-row-wrap { margin-bottom: 7px !important; }
