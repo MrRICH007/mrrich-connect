@@ -3616,6 +3616,59 @@ async function playVoiceNote(message: ChatMessage) {
         }
       }
 
+
+      /* Messages scroll refinement: use the same page-level vertical scroller
+         as Discover, Groups and Requests. Keep the chat overlay independent. */
+      @media (max-width: 800px) {
+        .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) {
+          display: block !important;
+          height: 100dvh !important;
+          max-height: 100dvh !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          overscroll-behavior-y: contain !important;
+          touch-action: pan-y !important;
+          padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+          scroll-padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) > .rc-mobile-header {
+          position: sticky !important;
+          top: 0 !important;
+          z-index: 75 !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) > .rc-page-heading {
+          position: sticky !important;
+          top: 64px !important;
+          z-index: 70 !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) > .rc-messages-layout:not(.has-chat) {
+          display: block !important;
+          flex: none !important;
+          height: auto !important;
+          max-height: none !important;
+          min-height: 0 !important;
+          overflow: visible !important;
+        }
+        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+          display: block !important;
+          flex: none !important;
+          height: auto !important;
+          max-height: none !important;
+          min-height: 0 !important;
+          overflow: visible !important;
+          -webkit-overflow-scrolling: auto !important;
+          overscroll-behavior: auto !important;
+          padding: 0 2px calc(104px + env(safe-area-inset-bottom)) !important;
+          scroll-padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+        }
+        /* Selecting a conversation retains the existing full-screen chat rules. */
+        .rc-tab-panel:has(.rc-messages-layout.has-chat) {
+          overflow: hidden !important;
+          padding-bottom: 0 !important;
+        }
+      }
+
     `}
 </style>
   </main>
