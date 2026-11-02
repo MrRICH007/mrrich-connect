@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { FormEvent, TouchEvent } from 'react';
 import { createClient } from '../lib/supabase';
 import {
@@ -333,9 +334,6 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [announcementPosition, setAnnouncementPosition] = useState<{ x: number; y: number } | null>(null);
   const announcementDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const announcementWasDragged = useRef(false);
-  const [emojiCustomMode, setEmojiCustomMode] = useState(false);
-  const [customEmojiBase, setCustomEmojiBase] = useState('🥹');
-  const [customEmojiAccent, setCustomEmojiAccent] = useState('✨');
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState('');
@@ -2601,7 +2599,7 @@ async function playVoiceNote(message: ChatMessage) {
 >
   {voiceBusy ? '…' : isRecordingVoice ? <Square size={19} fill="currentColor" /> : <Mic size={21} />}
 </button>
-<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && <div className="rc-emoji-picker"><div className="rc-emoji-picker-tabs"><button type="button" className={!emojiCustomMode ? 'active' : ''} onClick={() => setEmojiCustomMode(false)}>All emojis</button><button type="button" className={emojiCustomMode ? 'active' : ''} onClick={() => setEmojiCustomMode(true)}>Custom designs</button></div>{!emojiCustomMode ? <div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button type="button" key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); }} aria-label={`Add ${emoji}`}>{emoji}</button>)}</div> : <div className="rc-custom-emoji-maker"><p>Combine two existing emojis to create a custom design.</p><div className="rc-custom-emoji-preview">{customEmojiBase}{customEmojiAccent}</div><small>Choose the main emoji</small><div className="rc-emoji-grid rc-emoji-grid-compact">{EMOJIS.slice(0,120).map((emoji,i)=><button type="button" key={`${emoji}-base-${i}`} onClick={() => setCustomEmojiBase(emoji)} aria-pressed={customEmojiBase===emoji}>{emoji}</button>)}</div><small>Choose the accent emoji</small><div className="rc-emoji-grid rc-emoji-grid-compact">{EMOJIS.slice(120,240).map((emoji,i)=><button type="button" key={`${emoji}-accent-${i}`} onClick={() => setCustomEmojiAccent(emoji)} aria-pressed={customEmojiAccent===emoji}>{emoji}</button>)}</div><div className="rc-custom-designs">{CUSTOM_EMOJI_DESIGNS.map((design,i)=><button type="button" key={design+i} onClick={() => setDraftMessage(v=>v+design)}>{design}</button>)}</div><button type="button" className="rc-primary rc-full" onClick={() => setDraftMessage(v=>v+customEmojiBase+customEmojiAccent)}>Add custom design</button></div>}</div>}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button type="button" key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}>{emoji}</button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -3249,12 +3247,11 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-chat-empty { background:transparent !important; background-color:transparent !important; }
       .rc-chat-header, .rc-composer-wrap { background-color:rgba(26,30,36,.88) !important; }
 
-      /* Keep the jump-to-latest control anchored to the right above the composer. */
-      .rc-chat-panel { position:relative !important; }
+      /* Keep the jump-to-latest button fixed at the right edge of the chat. */
       .rc-scroll-latest {
-        position:absolute !important; right:16px !important; left:auto !important;
-        bottom:82px !important; margin-left:0 !important; margin-right:0 !important;
-        align-self:auto !important; z-index:8 !important;
+        position:fixed !important; right:16px !important; left:auto !important;
+        bottom:calc(104px + env(safe-area-inset-bottom)) !important;
+        margin:0 !important; transform:none !important; z-index:90 !important;
       }
 
 
@@ -3798,40 +3795,31 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-request-profile-trigger { border:0; cursor:pointer; overflow:hidden; }
       .rc-request-profile-trigger img { width:100%; height:100%; object-fit:cover; }
       .rc-emoji-toggle { display:inline-flex !important; flex:0 0 40px !important; width:40px !important; height:40px !important; align-items:center !important; justify-content:center !important; visibility:visible !important; opacity:1 !important; color:#bfdbfe !important; background:rgba(96,165,250,.12) !important; border:1px solid rgba(96,165,250,.28) !important; border-radius:12px !important; }
-      .rc-emoji-picker { position:absolute; z-index:9999 !important; isolation:isolate; left:10px; right:10px; bottom:calc(70px + env(safe-area-inset-bottom)); max-height:min(48dvh,390px); overflow:auto; padding:10px; border:1px solid rgba(96,165,250,.32); border-radius:16px; background:#111c2c; box-shadow:0 14px 40px rgba(0,0,0,.45); }
-      /* Keep the campus-pattern layer behind the emoji picker and its controls. */
-      .rc-chat-panel { isolation:isolate !important; position:relative !important; }
-      .rc-chat-panel::before { z-index:-1 !important; pointer-events:none !important; }
-      .rc-chat-panel > * { position:relative !important; z-index:2 !important; }
-      .rc-chat-panel > .rc-composer-wrap,
-      .rc-chat-panel > .rc-composer-wrap .rc-composer { position:relative !important; z-index:2147483000 !important; }
-      .rc-chat-panel > .rc-composer-wrap { overflow:visible !important; }
-      .rc-chat-panel .rc-composer-wrap .rc-emoji-picker {
-        position:fixed !important;
-        z-index:2147483647 !important;
-        isolation:isolate !important;
+      /* Emoji picker is portaled to document.body, outside chat/background stacking contexts. */
+      .rc-emoji-picker {
+        position:fixed !important; z-index:2147483647 !important; isolation:isolate !important;
         left:10px !important; right:10px !important;
-        bottom:calc(72px + env(safe-area-inset-bottom)) !important;
-        max-height:min(48dvh,390px) !important;
-        background:#111c2c !important;
-        opacity:1 !important;
-        visibility:visible !important;
+        bottom:calc(78px + env(safe-area-inset-bottom)) !important;
+        width:auto !important; max-height:min(58dvh,460px) !important;
+        overflow-y:auto !important; overscroll-behavior:contain !important;
+        padding:12px !important; box-sizing:border-box !important;
+        border:1px solid rgba(96,165,250,.42) !important; border-radius:18px !important;
+        background:linear-gradient(145deg,#101f38 0%,#0b1425 58%,#111c30 100%) !important;
+        box-shadow:0 18px 55px rgba(0,0,0,.62),0 0 0 1px rgba(96,165,250,.08) !important;
+        color:#f8fafc !important; opacity:1 !important; visibility:visible !important;
       }
+      .rc-emoji-picker-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:2px 2px 11px; margin-bottom:9px; border-bottom:1px solid rgba(147,197,253,.18); }
+      .rc-emoji-picker-header > div { display:flex; flex-direction:column; gap:3px; }
+      .rc-emoji-picker-header strong { color:#eff6ff; font-size:14px; }
+      .rc-emoji-picker-header small { color:#94a3b8; font-size:10px; }
+      .rc-emoji-picker-header > button { width:32px; height:32px; display:grid; place-items:center; border:1px solid rgba(147,197,253,.22); border-radius:10px; background:rgba(96,165,250,.12); color:#dbeafe; }
       .rc-blocked-chat-notice { width:100%; box-sizing:border-box; display:flex; align-items:center; justify-content:center; text-align:center; min-height:64px; padding:14px 16px calc(14px + env(safe-area-inset-bottom)); color:#fca5a5; background:rgba(55,18,25,.96); border-top:1px solid rgba(248,113,113,.35); font-size:13px; font-weight:700; line-height:1.45; }
       /* Darker blue for messages sent by the current user, improving text contrast. */
       .rc-message-bubble.mine { background:#12366b !important; background-color:#12366b !important; color:#f8fbff !important; border:1px solid rgba(96,165,250,.28) !important; }
       .rc-message-bubble.mine * { color:inherit; }
-      .rc-emoji-picker-tabs { display:flex; gap:7px; margin-bottom:8px; }
-      .rc-emoji-picker-tabs button { flex:1; border:1px solid rgba(148,163,184,.2); border-radius:9px; padding:8px; color:#cbd5e1; background:#1e293b; }
-      .rc-emoji-picker-tabs button.active { color:#fff; border-color:#60a5fa; background:#1d4ed8; }
-      .rc-emoji-grid { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:4px; }
-      .rc-emoji-grid button, .rc-custom-designs button { min-width:0; border:0; border-radius:8px; background:rgba(148,163,184,.09); padding:7px 2px; font-size:23px; }
-      .rc-custom-emoji-maker p { margin:6px 0; color:#cbd5e1; font-size:12px; }
-      .rc-custom-emoji-preview { text-align:center; font-size:38px; padding:8px; }
-      .rc-emoji-grid-compact { max-height:120px; overflow:auto; }
-      .rc-emoji-grid-compact button { font-size:19px; }
-      .rc-custom-designs { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:5px; margin:10px 0; }
-      .rc-custom-designs button { font-size:19px; }
+      .rc-emoji-grid { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px; }
+      .rc-emoji-grid button { min-width:0; min-height:42px; display:grid; place-items:center; border:1px solid rgba(147,197,253,.10); border-radius:11px; background:linear-gradient(145deg,rgba(96,165,250,.13),rgba(30,41,59,.62)); padding:5px 2px; font-size:25px; line-height:1; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+      .rc-emoji-grid button:active { background:rgba(37,99,235,.42); transform:scale(.94); }
       .rc-floating-announcements { position:fixed; z-index:56; right:16px; bottom:calc(248px + env(safe-area-inset-bottom)); width:48px; height:48px; display:grid; place-items:center; border:1px solid rgba(250,204,21,.85); border-radius:16px; background:#facc15; color:#172033; box-shadow:0 8px 28px rgba(0,0,0,.38); touch-action:none; cursor:grab; } .rc-floating-announcements:active { cursor:grabbing; transform:scale(.97); }
       .rc-announcement-screen { position:fixed; inset:0; z-index:110; display:flex; flex-direction:column; background:#071326; color:#fff; overflow:auto; padding-bottom:env(safe-area-inset-bottom); }
       .rc-announcement-header { position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:12px; padding:calc(14px + env(safe-area-inset-top)) 16px 14px; background:rgba(7,19,38,.96); border-bottom:1px solid rgba(96,165,250,.2); }
