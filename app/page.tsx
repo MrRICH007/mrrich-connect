@@ -319,6 +319,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [voicePreviewDuration, setVoicePreviewDuration] = useState(0);
   const [draftMessage, setDraftMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [conversationBlockStatus, setConversationBlockStatus] = useState<'you' | 'them' | 'both' | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -1497,7 +1498,9 @@ async function playVoiceNote(message: ChatMessage) {
       }
 
       if (blockRows && blockRows.length > 0) {
-        setStatus('Message not sent. A block is active between these users.');
+        const youBlocked = blockRows.some(row => row.blocker_id === userId && row.blocked_id === selectedConversation.otherUserId);
+        const theyBlocked = blockRows.some(row => row.blocker_id === selectedConversation.otherUserId && row.blocked_id === userId);
+        setConversationBlockStatus(youBlocked && theyBlocked ? 'both' : youBlocked ? 'you' : 'them');
         return;
       }
     }
@@ -1685,6 +1688,8 @@ async function playVoiceNote(message: ChatMessage) {
       return;
     }
 
+    setConversationBlockStatus('you');
+    setShowEmojiPicker(false);
     setStatus(`@${nickname} blocked.`);
             }
   
@@ -1782,6 +1787,30 @@ async function playVoiceNote(message: ChatMessage) {
     window.addEventListener('focus', onFocus);
     return () => { window.removeEventListener('focus', onFocus); void supabase.removeChannel(channel); };
   }, [supabase, userId, selectedConversation?.id, loadUnreadCounts, markConversationRead]);
+
+  useEffect(() => {
+    let active = true;
+    const checkConversationBlock = async () => {
+      setConversationBlockStatus(null);
+      if (!supabase || !userId || selectedConversation?.kind !== 'person' || !selectedConversation.otherUserId) return;
+      const otherUserId = selectedConversation.otherUserId;
+      const { data, error } = await supabase
+        .from('user_blocks')
+        .select('blocker_id,blocked_id')
+        .or(`and(blocker_id.eq.${userId},blocked_id.eq.${otherUserId}),and(blocker_id.eq.${otherUserId},blocked_id.eq.${userId})`);
+      if (!active) return;
+      if (error) {
+        console.warn('Could not check conversation block status:', error.message);
+        return;
+      }
+      const rows = data || [];
+      const youBlocked = rows.some(row => row.blocker_id === userId && row.blocked_id === otherUserId);
+      const theyBlocked = rows.some(row => row.blocker_id === otherUserId && row.blocked_id === userId);
+      setConversationBlockStatus(youBlocked && theyBlocked ? 'both' : youBlocked ? 'you' : theyBlocked ? 'them' : null);
+    };
+    void checkConversationBlock();
+    return () => { active = false; };
+  }, [supabase, userId, selectedConversation?.id, selectedConversation?.kind, selectedConversation?.otherUserId]);
 
   useEffect(() => { if (typeof window !== 'undefined' && 'Notification' in window) setNotificationPermission(Notification.permission); }, []);
   async function enableMessageNotifications() {
@@ -2448,7 +2477,7 @@ async function playVoiceNote(message: ChatMessage) {
             </div>
 
           </div>;
-        })}</div>{showScrollToLatest && <button type="button" className="rc-scroll-latest" onClick={() => scrollChatToLatest('smooth')} aria-label="Scroll to latest message" title="Latest message"><ArrowDown size={20}/></button>}{(() => { const activeGroup = selectedConversation.kind === 'group' ? groups.find(g => g.conversation_id === selectedConversation.id) : null; const isGroupAdmin = !!activeGroup && (activeGroup.created_by === userId || isAdmin); const adminOnly = !!activeGroup && activeGroup.members_can_message === false && !isGroupAdmin; return adminOnly ? <div className="rc-admin-only-notice">Only Admin can Send Messages</div> : <div className="rc-composer-wrap">{replyTo && <div className="rc-reply-preview"><div><strong>Replying to {replyTo.sender_id === userId ? 'yourself' : '@' + (replyTo.sender_nickname || 'Member')}</strong><small>{replyTo.body.slice(0, 110)}{replyTo.body.length > 110 ? '…' : ''}</small></div><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X size={16}/></button></div>}
+        })}</div>{showScrollToLatest && <button type="button" className="rc-scroll-latest" onClick={() => scrollChatToLatest('smooth')} aria-label="Scroll to latest message" title="Latest message"><ArrowDown size={20}/></button>}{(() => { const activeGroup = selectedConversation.kind === 'group' ? groups.find(g => g.conversation_id === selectedConversation.id) : null; const isGroupAdmin = !!activeGroup && (activeGroup.created_by === userId || isAdmin); const adminOnly = !!activeGroup && activeGroup.members_can_message === false && !isGroupAdmin; return conversationBlockStatus ? <div className="rc-blocked-chat-notice">{conversationBlockStatus === 'you' ? 'You have blocked this user. Messaging is unavailable.' : conversationBlockStatus === 'them' ? 'This user has blocked you. You cannot send messages in this conversation.' : 'You and this user have blocked each other. Messages are unavailable.'}</div> : adminOnly ? <div className="rc-admin-only-notice">Only Admin can Send Messages</div> : <div className="rc-composer-wrap">{replyTo && <div className="rc-reply-preview"><div><strong>Replying to {replyTo.sender_id === userId ? 'yourself' : '@' + (replyTo.sender_nickname || 'Member')}</strong><small>{replyTo.body.slice(0, 110)}{replyTo.body.length > 110 ? '…' : ''}</small></div><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X size={16}/></button></div>}
 {voicePreviewUrl && (
   <div
     style={{
@@ -3771,10 +3800,24 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-emoji-toggle { display:inline-flex !important; flex:0 0 40px !important; width:40px !important; height:40px !important; align-items:center !important; justify-content:center !important; visibility:visible !important; opacity:1 !important; color:#bfdbfe !important; background:rgba(96,165,250,.12) !important; border:1px solid rgba(96,165,250,.28) !important; border-radius:12px !important; }
       .rc-emoji-picker { position:absolute; z-index:9999 !important; isolation:isolate; left:10px; right:10px; bottom:calc(70px + env(safe-area-inset-bottom)); max-height:min(48dvh,390px); overflow:auto; padding:10px; border:1px solid rgba(96,165,250,.32); border-radius:16px; background:#111c2c; box-shadow:0 14px 40px rgba(0,0,0,.45); }
       /* Keep the campus-pattern layer behind the emoji picker and its controls. */
-      .rc-chat-panel::before { z-index:0 !important; pointer-events:none !important; }
+      .rc-chat-panel { isolation:isolate !important; position:relative !important; }
+      .rc-chat-panel::before { z-index:-1 !important; pointer-events:none !important; }
+      .rc-chat-panel > * { position:relative !important; z-index:2 !important; }
       .rc-chat-panel > .rc-composer-wrap,
-      .rc-chat-panel > .rc-composer-wrap .rc-composer { position:relative !important; z-index:2 !important; }
-      .rc-chat-panel .rc-composer-wrap .rc-emoji-picker { z-index:9999 !important; }
+      .rc-chat-panel > .rc-composer-wrap .rc-composer { position:relative !important; z-index:2147483000 !important; }
+      .rc-chat-panel > .rc-composer-wrap { overflow:visible !important; }
+      .rc-chat-panel .rc-composer-wrap .rc-emoji-picker {
+        position:fixed !important;
+        z-index:2147483647 !important;
+        isolation:isolate !important;
+        left:10px !important; right:10px !important;
+        bottom:calc(72px + env(safe-area-inset-bottom)) !important;
+        max-height:min(48dvh,390px) !important;
+        background:#111c2c !important;
+        opacity:1 !important;
+        visibility:visible !important;
+      }
+      .rc-blocked-chat-notice { width:100%; box-sizing:border-box; display:flex; align-items:center; justify-content:center; text-align:center; min-height:64px; padding:14px 16px calc(14px + env(safe-area-inset-bottom)); color:#fca5a5; background:rgba(55,18,25,.96); border-top:1px solid rgba(248,113,113,.35); font-size:13px; font-weight:700; line-height:1.45; }
       /* Darker blue for messages sent by the current user, improving text contrast. */
       .rc-message-bubble.mine { background:#12366b !important; background-color:#12366b !important; color:#f8fbff !important; border:1px solid rgba(96,165,250,.28) !important; }
       .rc-message-bubble.mine * { color:inherit; }
