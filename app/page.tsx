@@ -106,6 +106,32 @@ const NAV_ITEMS = [
 const EMOJIS = Array.from(new Set((`😀 😃 😄 😁 😆 😅 😂 🤣 🥲 🥹 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤗 🤭 🫢 🫣 🤫 🤔 🫡 🤐 🤨 😐 😑 😶 🫥 😏 😒 🙄 😬 🤥 😔 🫠 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 😵‍💫 🤯 🤠 🥳 🥸 😎 🤓 🧐 😕 🫤 😟 🙁 ☹️ 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 💀 ☠️ 💩 🤡 👻 👽 👾 🤖 🎃 😺 😸 😹 😻 😼 😽 🙀 😿 😾 👋 🤚 🖐️ ✋ 🖖 🫱 🫲 🫳 🫴 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🙏 💅 🤝 💪 🦾 🦿 🦵 🦶 👂 🦻 👃 🧠 🫀 🫁 🦷 🦴 👀 👁️ 👅 👄 🫦 ❤️ 🧡 💛 💚 💙 💜 🖤 🩶 🤍 🤎 💔 ❤️‍🔥 ❤️‍🩹 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 💌 💋 💯 💢 💥 💫 💦 💨 🕳️ 💬 🗨️ 🗯️ 💭 💤 🔥 ✨ ⭐ 🌟 💫 ⚡ ☀️ 🌤️ ⛅ 🌈 ☁️ 🌧️ ⛈️ ❄️ ☃️ 🌊 💧 🌸 🌺 🌻 🌼 🌷 🪻 🌹 🥀 🍀 🌿 🌱 🌴 🌵 🌳 🍁 🍂 🍃 🍄 🪷 🦋 🐝 🐞 🐢 🐬 🐳 🦄 🐱 🐶 🦊 🐼 🐻 🐸 🐵 🦁 🐯 🐮 🐷 🐙 🦖 🐣 🐥 🕊️ 🦅 🦉 🦜 🐧 🦩 🍎 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥥 🥑 🍆 🥕 🌽 🌶️ 🥒 🥬 🥦 🧄 🧅 🍞 🥐 🥨 🧀 🍕 🍔 🍟 🌭 🍿 🧁 🎂 🍰 🍩 🍪 🍫 🍬 🍭 ☕ 🧋 🥤 🍹 🧃 🎉 🎊 🎈 🎁 🏆 🥇 🥈 🥉 ⚽ 🏀 🏈 ⚾ 🎾 🏐 🎮 🎯 🎲 🧩 🎨 🎧 🎤 🎵 🎶 🚀 🛸 🚗 ✈️ 🚁 🚲 🏠 🏡 🏰 💎 👑 🕶️ 💍 🛍️ 📱 💻 💡 📚 ✏️ 📝 📌 🔒 🔑 ❤️‍🔥 💙`).split(/\s+/)));
 const CUSTOM_EMOJI_DESIGNS = ['🥹💙','😎🔥','😍✨','😭😂','🤝💯','🫶🏽💛','🤔💭','🥳🎉','😴💤','🙏✨','👑💎','🦋🌸','💪🔥','😇🌟','🤯💥','🐱💖','🤖⚡','💀😂','🥺👉👈','💙✨','🫡🫶','😏🔥','🫠💧','❤️‍🩹🌱'];
 
+async function compressUploadImage(file: File, maxDimension = 1600, quality = 0.82): Promise<File> {
+  // Keep vector and animated images intact; canvas conversion would rasterize or remove animation.
+  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') return file;
+  if (typeof createImageBitmap === 'undefined') return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) { bitmap.close(); return file; }
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+    if (!blob || blob.size >= file.size) return file;
+    const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
+    return new File([blob], `${baseName}.webp`, { type: 'image/webp', lastModified: Date.now() });
+  } catch {
+    // Unsupported image formats or browser decoding issues should not block uploads.
+    return file;
+  }
+}
+
 function getExperienceTitle(totalOnlineSeconds: number | null | undefined): string {
   const hours = Math.floor(Math.max(0, totalOnlineSeconds || 0) / 3600);
   if (hours >= 1000) return 'Odogwu';
@@ -430,9 +456,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (file.size > 5 * 1024 * 1024) { setStatus('Avatar images must be 5 MB or smaller.'); return; }
     setAvatarUploading(true);
     try {
-      const extension = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
+      const optimizedFile = await compressUploadImage(file, 640, 0.80);
+      const extension = optimizedFile.type === 'image/webp' ? 'webp' : (optimizedFile.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg');
       const path = `${userId}/${Date.now()}.${extension}`;
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(path, optimizedFile, { upsert: true, contentType: optimizedFile.type || file.type });
       if (uploadError) { setStatus(`Avatar upload failed: ${uploadError.message}`); return; }
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
       const { error: saveError } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', userId);
@@ -752,9 +779,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!supabase || !userId || !isCurrentUserPremium) return;
     if (!announcementImage || !announcementCaption.trim()) { setStatus('Add an image and caption before publishing.'); return; }
     setAnnouncementBusy(true);
-    const extension = announcementImage.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const optimizedFile = await compressUploadImage(announcementImage, 1600, 0.82);
+    const extension = optimizedFile.type === 'image/webp' ? 'webp' : (optimizedFile.name.split('.').pop()?.toLowerCase() || 'jpg');
     const path = `${userId}/${Date.now()}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from('announcements').upload(path, announcementImage, { upsert: false, contentType: announcementImage.type || 'image/jpeg' });
+    const { error: uploadError } = await supabase.storage.from('announcements').upload(path, optimizedFile, { upsert: false, contentType: optimizedFile.type || announcementImage.type || 'image/jpeg' });
     if (uploadError) { setAnnouncementBusy(false); setStatus(`Image upload failed: ${uploadError.message}`); return; }
     const { data: publicUrl } = supabase.storage.from('announcements').getPublicUrl(path);
     const { error } = await supabase.from('community_announcements').insert({ author_id: userId, caption: announcementCaption.trim().slice(0, 500), image_url: publicUrl.publicUrl });
@@ -897,9 +925,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!file.type.startsWith('image/')) { setStatus('Choose an image file for the group avatar.'); return; }
     if (file.size > 5 * 1024 * 1024) { setStatus('Group avatar images must be 5 MB or smaller.'); return; }
     setGroupAvatarUploading(true);
-    const ext = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
+    const optimizedFile = await compressUploadImage(file, 1200, 0.82);
+    const ext = optimizedFile.type === 'image/webp' ? 'webp' : (optimizedFile.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg');
     const path = `groups/${userId}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+    const { error } = await supabase.storage.from('avatars').upload(path, optimizedFile, { upsert: true, contentType: optimizedFile.type || file.type });
     if (error) { setGroupAvatarUploading(false); setStatus(`Group avatar upload failed: ${error.message}`); return; }
     const { data } = supabase.storage.from('avatars').getPublicUrl(path);
     setGroupAvatarUrl(data.publicUrl); setGroupAvatarUploading(false); setStatus('Group avatar uploaded. Create the group to save it.');
@@ -911,9 +940,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!file.type.startsWith('image/')) { setStatus('Choose an image file.'); return; }
     if (file.size > 5 * 1024 * 1024) { setStatus('Image must be 5 MB or smaller.'); return; }
     setStatus('Uploading group image...');
-    const ext = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
+    const optimizedFile = await compressUploadImage(file, 1200, 0.82);
+    const ext = optimizedFile.type === 'image/webp' ? 'webp' : (optimizedFile.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg');
     const path = `groups/${userId}/${group.id}-${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, optimizedFile, { upsert: true, contentType: optimizedFile.type || file.type });
     if (uploadError) { setStatus(`Upload failed: ${uploadError.message}`); return; }
     const { data } = supabase.storage.from('avatars').getPublicUrl(path);
     const { error } = await supabase.from('groups').update({ avatar_url: data.publicUrl }).eq('id', group.id);
@@ -3739,7 +3769,15 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-request-profile-trigger { border:0; cursor:pointer; overflow:hidden; }
       .rc-request-profile-trigger img { width:100%; height:100%; object-fit:cover; }
       .rc-emoji-toggle { display:inline-flex !important; flex:0 0 40px !important; width:40px !important; height:40px !important; align-items:center !important; justify-content:center !important; visibility:visible !important; opacity:1 !important; color:#bfdbfe !important; background:rgba(96,165,250,.12) !important; border:1px solid rgba(96,165,250,.28) !important; border-radius:12px !important; }
-      .rc-emoji-picker { position:absolute; z-index:80; left:10px; right:10px; bottom:calc(70px + env(safe-area-inset-bottom)); max-height:min(48dvh,390px); overflow:auto; padding:10px; border:1px solid rgba(96,165,250,.32); border-radius:16px; background:#111c2c; box-shadow:0 14px 40px rgba(0,0,0,.45); }
+      .rc-emoji-picker { position:absolute; z-index:9999 !important; isolation:isolate; left:10px; right:10px; bottom:calc(70px + env(safe-area-inset-bottom)); max-height:min(48dvh,390px); overflow:auto; padding:10px; border:1px solid rgba(96,165,250,.32); border-radius:16px; background:#111c2c; box-shadow:0 14px 40px rgba(0,0,0,.45); }
+      /* Keep the campus-pattern layer behind the emoji picker and its controls. */
+      .rc-chat-panel::before { z-index:0 !important; pointer-events:none !important; }
+      .rc-chat-panel > .rc-composer-wrap,
+      .rc-chat-panel > .rc-composer-wrap .rc-composer { position:relative !important; z-index:2 !important; }
+      .rc-chat-panel .rc-composer-wrap .rc-emoji-picker { z-index:9999 !important; }
+      /* Darker blue for messages sent by the current user, improving text contrast. */
+      .rc-message-bubble.mine { background:#12366b !important; background-color:#12366b !important; color:#f8fbff !important; border:1px solid rgba(96,165,250,.28) !important; }
+      .rc-message-bubble.mine * { color:inherit; }
       .rc-emoji-picker-tabs { display:flex; gap:7px; margin-bottom:8px; }
       .rc-emoji-picker-tabs button { flex:1; border:1px solid rgba(148,163,184,.2); border-radius:9px; padding:8px; color:#cbd5e1; background:#1e293b; }
       .rc-emoji-picker-tabs button.active { color:#fff; border-color:#60a5fa; background:#1d4ed8; }
