@@ -884,7 +884,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
       data: { nickname: registration.nickname.trim().replace(/^@/, ''), full_name: registration.full_name.trim(), phone: registration.phone.trim(), department: registration.department.trim(), level: registration.level.trim(), college: registration.college.trim(), school: registration.school.trim(), bio: registration.bio.trim(), rc_invite_token: inviteTokenFromUrl.current || null }
     }});
-    setStatus(error ? error.message : 'Registration submitted. Confirm your email, then sign in. Run the profile-fields SQL migration so the database creates the separate public and private records.');
+    setStatus(error ? error.message : 'Registration submitted. Confirm your email, then sign in.');
     if (!error) setAuthMode('signin');
   }
   async function startPremiumPayment() {
