@@ -7,7 +7,7 @@ import { createClient } from '../lib/supabase';
 import {
   Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck,
   Users, UserRound, Wifi, Pencil, Plus, Send, Smile, ArrowLeft, RefreshCw,
-  X, Sparkles, Zap, ArrowDown, Store, Settings, Check, Megaphone, BadgeCheck,
+  X, Sparkles, Zap, ArrowDown, Store, Settings, CircleDot, Check, Megaphone, BadgeCheck,
   Mic, Square, Play, Pause, AudioLines, Trash2, Share2, Copy, QrCode, UserPlus
 } from 'lucide-react';
 const NIGERIAN_SCHOOLS = [
@@ -133,6 +133,11 @@ async function compressUploadImage(file: File, maxDimension = 1600, quality = 0.
   }
 }
 
+function getExperienceColor(title: string): string {
+  const colors: Record<string, string> = { 'Newcomer':'#22c55e', 'Sharp Guy':'#38bdf8', 'Regular':'#a78bfa', 'Oga':'#f59e0b', 'Chairman':'#f472b6', 'Odogwu':'#f97316' };
+  return colors[title] || '#94a3b8';
+}
+
 function getExperienceTitle(totalOnlineSeconds: number | null | undefined): string {
   const hours = Math.floor(Math.max(0, totalOnlineSeconds || 0) / 3600);
   if (hours >= 1000) return 'Odogwu';
@@ -141,19 +146,6 @@ function getExperienceTitle(totalOnlineSeconds: number | null | undefined): stri
   if (hours >= 50) return 'Regular';
   if (hours >= 10) return 'Sharp Guy';
   return 'Newcomer';
-}
-
-function getExperienceColor(totalOnlineSeconds: number | null | undefined): string {
-  const title = getExperienceTitle(totalOnlineSeconds);
-  const colors: Record<string, string> = {
-    'Newcomer': '#4ade80',
-    'Sharp Guy': '#38bdf8',
-    'Regular': '#c084fc',
-    'Oga': '#f59e0b',
-    'Chairman': '#fb7185',
-    'Odogwu': '#facc15',
-  };
-  return colors[title] || '#93c5fd';
 }
 
 
@@ -347,10 +339,21 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [announcementPosition, setAnnouncementPosition] = useState<{ x: number; y: number } | null>(null);
   const announcementDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const announcementWasDragged = useRef(false);
+  const [featuresMenuOpen, setFeaturesMenuOpen] = useState(false);
+  const [unreadAnnouncementCount, setUnreadAnnouncementCount] = useState(0);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusViewerOpen, setStatusViewerOpen] = useState(false);
+  const [statusRows, setStatusRows] = useState<any[]>([]);
+  const [statusCaption, setStatusCaption] = useState('');
+  const [statusLink, setStatusLink] = useState('');
+  const [statusImage, setStatusImage] = useState<File | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusViewerIndex, setStatusViewerIndex] = useState(0);
+  const [statusPaused, setStatusPaused] = useState(false);
+  const statusTimer = useRef<number | null>(null);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState('');
-  const [inviteCount, setInviteCount] = useState(0);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [invitePosition, setInvitePosition] = useState<{ x: number; y: number } | null>(null);
   const inviteDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -777,47 +780,42 @@ const voiceChunksRef = useRef<Blob[]>([]);
 
   const isCurrentUserPremium = profiles.some(p => p.id === userId && p.premium_status === 'active');
 
-  // Count completed registrations attributed to this user's personal invite link.
-  // The invite SQL migration records successful referrals in rc_invite_connections.
-  const loadInviteCount = useCallback(async () => {
-    if (!supabase || !userId) {
-      setInviteCount(0);
-      return;
-    }
-    const { count, error } = await supabase
-      .from('rc_invite_connections')
-      .select('inviter_id', { count: 'exact', head: true })
-      .eq('inviter_id', userId);
-    if (error) {
-      console.warn('Could not load invite count:', error.message);
-      return;
-    }
-    setInviteCount(count || 0);
-  }, [supabase, userId]);
-
+  const currentRankTitle = getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds);
+  const canPostStatus = isCurrentUserPremium && ['Sharp Guy','Regular','Oga','Chairman','Odogwu'].includes(currentRankTitle);
+  async function loadStatuses() {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('user_statuses').select('id,user_id,caption,link_url,image_path,created_at,expires_at,profiles:user_id(nickname,avatar_url)').gt('expires_at', new Date().toISOString()).order('created_at',{ascending:false});
+    if (error) { setStatus(`Could not load statuses: ${error.message}`); return; }
+    setStatusRows(data || []);
+  }
+  async function publishStatus() {
+    if (!supabase || !userId || !canPostStatus) { setStatus('Status posting requires Premium membership and Sharp Guy rank or higher.'); return; }
+    if (!statusImage || !statusCaption.trim()) { setStatus('Choose a picture and add a caption.'); return; }
+    setStatusBusy(true);
+    const path = `${userId}/${Date.now()}-${statusImage.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+    const { error: uploadError } = await supabase.storage.from('status-images').upload(path,statusImage,{upsert:false,contentType:statusImage.type});
+    if (uploadError) { setStatusBusy(false); setStatus(`Status image upload failed: ${uploadError.message}`); return; }
+    const { error } = await supabase.from('user_statuses').insert({user_id:userId,image_path:path,caption:statusCaption.trim().slice(0,500),link_url:statusLink.trim()||null});
+    setStatusBusy(false);
+    if (error) { await supabase.storage.from('status-images').remove([path]); setStatus(`Could not publish status: ${error.message}`); return; }
+    setStatusCaption('');setStatusLink('');setStatusImage(null);await loadStatuses();setStatus('Status published. It will expire after 12 hours.');
+  }
   useEffect(() => {
-    if (!userId || !supabase) {
-      setInviteCount(0);
-      return;
-    }
-    void loadInviteCount();
-    const channel = supabase
-      .channel(`invite-count-${userId}`)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'rc_invite_connections',
-        filter: `inviter_id=eq.${userId}`
-      }, () => { void loadInviteCount(); })
-      .subscribe();
-    const refreshOnFocus = () => { if (document.visibilityState === 'visible') void loadInviteCount(); };
-    window.addEventListener('focus', refreshOnFocus);
-    document.addEventListener('visibilitychange', refreshOnFocus);
-    return () => {
-      window.removeEventListener('focus', refreshOnFocus);
-      document.removeEventListener('visibilitychange', refreshOnFocus);
-      void supabase.removeChannel(channel);
-    };
-  }, [supabase, userId, loadInviteCount]);
-
+    if (!statusViewerOpen || statusPaused || statusRows.length < 1) return;
+    const timer = window.setTimeout(() => {
+      if (statusViewerIndex < statusRows.length - 1) setStatusViewerIndex(i => i + 1);
+      else setStatusViewerOpen(false);
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [statusViewerOpen, statusPaused, statusViewerIndex, statusRows.length]);
+  async function openStatusViewer(userIdToView: string) {
+    if (!supabase || !userId) return;
+    const { data, error } = await supabase.from('user_statuses').select('id,user_id,caption,link_url,image_path,created_at,expires_at').eq('user_id',userIdToView).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:true});
+    if (error) { setStatus(`Could not open status: ${error.message}`); return; }
+    if (!data?.length) { setStatus('No active status available.'); return; }
+    setStatusRows(data);setStatusViewerIndex(0);setStatusViewerOpen(true);
+    await supabase.from('status_views').upsert(data.map((row:any)=>({status_id:row.id,viewer_id:userId})),{onConflict:'status_id,viewer_id'});
+  }
   const loadAnnouncements = useCallback(async () => {
     if (!supabase) return;
     const { data, error } = await supabase.from('community_announcements').select('id,author_id,caption,image_url,created_at').order('created_at', { ascending: false }).limit(50);
@@ -880,9 +878,13 @@ const voiceChunksRef = useRef<Blob[]>([]);
     e?.preventDefault();
     if (!supabase) return;
     if (!registration.nickname.trim() || !registration.full_name.trim()) { setStatus('Enter your nickname and full name to register.'); return; }
+    const requestedNickname = registration.nickname.trim().replace(/^@/, '');
+    const { data: nicknameAvailable, error: nicknameCheckError } = await supabase.rpc('rc_nickname_available', { requested_nickname: requestedNickname });
+    if (nicknameCheckError) { setStatus(`Could not verify nickname: ${nicknameCheckError.message}`); return; }
+    if (nicknameAvailable === false) { setStatus('Nickname already taken. Choose another nickname.'); setStatusType('error'); return; }
     const { error } = await supabase.auth.signUp({ email, password, options: {
       emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
-      data: { nickname: registration.nickname.trim().replace(/^@/, ''), full_name: registration.full_name.trim(), phone: registration.phone.trim(), department: registration.department.trim(), level: registration.level.trim(), college: registration.college.trim(), school: registration.school.trim(), bio: registration.bio.trim(), rc_invite_token: inviteTokenFromUrl.current || null }
+      data: { nickname: requestedNickname, full_name: registration.full_name.trim(), phone: registration.phone.trim(), department: registration.department.trim(), level: registration.level.trim(), college: registration.college.trim(), school: registration.school.trim(), bio: registration.bio.trim(), rc_invite_token: inviteTokenFromUrl.current || null }
     }});
     setStatus(error ? error.message : 'Registration submitted. Confirm your email, then sign in.');
     if (!error) setAuthMode('signin');
@@ -958,6 +960,9 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!supabase || !userId) { setStatus('Sign in before creating a profile.'); return; }
     const clean = profileForm.nickname.trim().replace(/^@/, '');
     if (!clean) { setStatus('Choose a nickname first.'); return; }
+    const { data: nicknameAvailable, error: nicknameCheckError } = await supabase.rpc('rc_nickname_available', { requested_nickname: clean });
+    if (nicknameCheckError) { setStatus(`Could not verify nickname: ${nicknameCheckError.message}`); return; }
+    if (nicknameAvailable === false) { setStatus('Nickname already taken. Choose another nickname.'); setStatusType('error'); return; }
     const isPremium = profiles.find(p => p.id === userId)?.premium_status === 'active';
     const { error } = await supabase.from('profiles').upsert({ id: userId, nickname: clean, level: profileForm.level || null, college: profileForm.college || null, school: profileForm.school || null, department: profileForm.department || null, bio: profileForm.bio || null, avatar_url: profileForm.avatar_url || null, premium_title: isPremium ? (profileForm.premium_title.trim().slice(0, 40) || null) : null });
     if (error) { setStatus(error.message); return; }
@@ -2674,7 +2679,7 @@ async function playVoiceNote(message: ChatMessage) {
           <p className="rc-muted" style={{margin:0,fontSize:12}}>{discoverProfiles.length} member{discoverProfiles.length === 1 ? '' : 's'} found</p>
         </div>
         {activeAds.length > 0 && <section className="rc-ad-feed" aria-label="Sponsored community announcements"><div className="rc-section-title"><div><h2>Community spotlight</h2><p>Promotions and announcements</p></div></div><div className="rc-people-grid">{activeAds.map(ad => <article className="rc-person-card rc-ad-card" key={ad.id}><span className="rc-eyebrow">SPONSORED</span><h3>{ad.title}</h3>{ad.media_type === 'image' ? <img src={ad.media_path} alt={ad.title} style={{width:'100%',maxHeight:220,objectFit:'cover',borderRadius:12}}/> : <video src={ad.media_path} controls playsInline style={{width:'100%',maxHeight:220,borderRadius:12}}/>}{ad.target_url && <a href={ad.target_url} target="_blank" rel="noreferrer" className="rc-primary">Learn more</a>}<small>Expires {new Date(ad.expires_at).toLocaleDateString()}</small></article>)}</div></section>}
-        <div className="rc-people-grid">{discoverProfiles.map(p => <article className="rc-person-card rc-discover-person" key={p.id} onClick={() => setPublicProfile(p)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setPublicProfile(p); }}><div className="rc-discover-main"><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div></div><div className="rc-discover-details"><h3>@{p.nickname} {p.premium_status === 'active' && <><BadgeCheck className="rc-premium-tick" size={16}/>{p.premium_title && <small className="rc-premium-title"> · {p.premium_title}</small>}</>} {onlineUserIds.includes(p.id) && <span title="Online now" aria-label="Online now" style={{display:'inline-block',width:8,height:8,borderRadius:'50%',background:'#32d296',verticalAlign:'middle',marginLeft:5}}/>}</h3><p className="rc-discover-level-college">{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small><span className="rc-premium-badge" style={{marginTop:6,display:'inline-flex',color:getExperienceColor(p.total_online_seconds)}}>{getExperienceTitle(p.total_online_seconds)}</span></div></div><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor(rankingSeconds(p) / 3600)} ranking h</span>{conversationList.some(c => c.kind === 'person' && c.otherUserId === p.id) ? <button className="rc-primary rc-connect" onClick={e => { e.stopPropagation(); const convo = conversationList.find(c => c.kind === 'person' && c.otherUserId === p.id); if (convo) { setSelectedConversation(convo); setTab('Messages'); setReplyTo(null); void markConversationRead(convo.id); } }}>Message <MessageCircle size={15}/></button> : <button className="rc-primary rc-connect" onClick={e => { e.stopPropagation(); void sendRequest(p.id); }}>Connect <Plus size={15}/></button>}</div></article>)}</div>
+        <div className="rc-people-grid">{discoverProfiles.map(p => <article className="rc-person-card rc-discover-person" key={p.id} onClick={() => setPublicProfile(p)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setPublicProfile(p); }}><div className="rc-discover-main"><div className="rc-person-top"><div className="rc-avatar rc-avatar-large">{p.avatar_url ? <img src={p.avatar_url} alt=""/> : p.nickname?.[0]?.toUpperCase() || 'M'}</div></div><div className="rc-discover-details"><h3>@{p.nickname} {p.premium_status === 'active' && <><BadgeCheck className="rc-premium-tick" size={16}/>{p.premium_title && <small className="rc-premium-title"> · {p.premium_title}</small>}</>} {onlineUserIds.includes(p.id) && <span title="Online now" aria-label="Online now" style={{display:'inline-block',width:8,height:8,borderRadius:'50%',background:'#32d296',verticalAlign:'middle',marginLeft:5}}/>}</h3><p className="rc-discover-level-college">{[p.level, p.college].filter(Boolean).join(' · ') || 'Community member'}</p><small>{p.school || 'School not listed'}</small><span className={`rc-premium-badge rc-rank-${getExperienceTitle(p.total_online_seconds).toLowerCase().replace(' ', '-')}`} style={{marginTop:6,display:'inline-flex'}}>{getExperienceTitle(p.total_online_seconds)}</span></div></div><div className="rc-person-footer"><span><Zap size={13}/> {Math.floor(rankingSeconds(p) / 3600)} ranking h</span>{conversationList.some(c => c.kind === 'person' && c.otherUserId === p.id) ? <button className="rc-primary rc-connect" onClick={e => { e.stopPropagation(); const convo = conversationList.find(c => c.kind === 'person' && c.otherUserId === p.id); if (convo) { setSelectedConversation(convo); setTab('Messages'); setReplyTo(null); void markConversationRead(convo.id); } }}>Message <MessageCircle size={15}/></button> : <button className="rc-primary rc-connect" onClick={e => { e.stopPropagation(); void sendRequest(p.id); }}>Connect <Plus size={15}/></button>}</div></article>)}</div>
         {discoverProfiles.length === 0 && <div className="rc-empty-state"><div className="rc-empty-icon"><Users size={27}/></div><h2>{discoverQuery || discoverFilter !== 'all' ? 'No matching members' : 'No people to show yet'}</h2><p>{discoverQuery || discoverFilter !== 'all' ? 'Try a different search or filter. Search currently checks the members loaded by Discover.' : 'New members will appear here when they create a profile.'}</p>{!profileExists && <button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button>}{(discoverQuery || discoverFilter !== 'all') && <button className="rc-secondary" onClick={() => { setDiscoverQuery(''); setDiscoverFilter('all'); }}>Clear search and filters</button>}</div>}
       </section>}
 
@@ -2705,7 +2710,7 @@ async function playVoiceNote(message: ChatMessage) {
       {page.name === 'Requests' && <section className="rc-content-section">
         {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card rc-request-slim" key={request.id}><div className="rc-request-top"><button type="button" className="rc-avatar rc-avatar-large rc-request-profile-trigger" onClick={() => setPublicProfile(profiles.find(p => p.id === request.sender_id) || { id: request.sender_id, nickname: request.sender_nickname, level: null, college: null, school: null, avatar_url: request.sender_avatar_url || null, premium_status: request.sender_premium_status || 'inactive', premium_title: request.sender_premium_title || null })}>{request.sender_avatar_url ? <img src={request.sender_avatar_url} alt=""/> : request.sender_nickname[0]?.toUpperCase() || 'M'}</button><div className="rc-request-details"><h3>@{request.sender_nickname}{request.sender_premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={15}/>} {request.sender_premium_status === 'active' && request.sender_premium_title && <small className="rc-premium-title">{request.sender_premium_title}</small>}</h3><p>Wants to start a private conversation.</p><small>{new Date(request.created_at).toLocaleDateString()}</small></div></div><div className="rc-request-actions"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p></div>}</section>}
 
-      {page.name === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}{profiles.find(p => p.id === userId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={19}/>}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p>{profiles.find(p => p.id === userId)?.premium_status === 'active' && profileForm.premium_title && <p className="rc-premium-title">{profileForm.premium_title}</p>}<div className="rc-lifetime-summary"><strong className="rc-experience-title" style={{ color: getExperienceColor(profiles.find(p => p.id === userId)?.total_online_seconds) }}>{getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds)}</strong><strong className="rc-lifetime-hours">{Math.floor((profiles.find(p => p.id === userId)?.total_online_seconds || 0) / 3600)} <span>lifetime hours</span></strong></div><div className="rc-profile-invite-count"><UserPlus size={17}/><strong>{inviteCount}</strong><span>successful invite{inviteCount === 1 ? '' : 's'}</span></div><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{(() => { const ranked = [...profiles].sort((a,b)=>rankingSeconds(b)-rankingSeconds(a)); const top = ranked.slice(0,10); const meIndex = ranked.findIndex(p => p.id === userId); if (meIndex >= 10 && meIndex >= 0) top.push(ranked[meIndex]); return top.map(p => { const rank = ranked.findIndex(r => r.id === p.id) + 1; return <div className={`rc-group-row ${p.id === userId ? 'rc-current-rank' : ''}`} key={p.id}><span className="rc-group-icon">#{rank > 999 ? '999+' : rank}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small style={{color:getExperienceColor(p.total_online_seconds)}}>{getExperienceTitle(p.total_online_seconds)}{p.premium_status === 'active' && p.premium_title ? ` · ${p.premium_title}` : ''}</small></span><span className="rc-arrow">{Math.floor(rankingSeconds(p)/3600)}<span className="rc-hour-unit">h</span></span></div>; }); })()}</div></section>}</section>}
+      {page.name === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}{profiles.find(p => p.id === userId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={19}/>}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p>{profiles.find(p => p.id === userId)?.premium_status === 'active' && profileForm.premium_title && <p className="rc-premium-title">{profileForm.premium_title}</p>}<div className="rc-lifetime-summary"><strong className={`rc-experience-title rc-rank-${getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds).toLowerCase().replace(' ', '-')}`}>{getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds)}</strong><strong className="rc-lifetime-hours">{Math.floor((profiles.find(p => p.id === userId)?.total_online_seconds || 0) / 3600)} <span>lifetime hours</span></strong></div><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{(() => { const ranked = [...profiles].sort((a,b)=>rankingSeconds(b)-rankingSeconds(a)); const top = ranked.slice(0,10); const meIndex = ranked.findIndex(p => p.id === userId); if (meIndex >= 10 && meIndex >= 0) top.push(ranked[meIndex]); return top.map(p => { const rank = ranked.findIndex(r => r.id === p.id) + 1; return <div className={`rc-group-row ${p.id === userId ? 'rc-current-rank' : ''}`} key={p.id}><span className="rc-group-icon">#{rank > 999 ? '999+' : rank}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small className={`rc-rank-${getExperienceTitle(p.total_online_seconds).toLowerCase().replace(' ', '-')}`}>{getExperienceTitle(p.total_online_seconds)}{p.premium_status === 'active' && p.premium_title ? ` · ${p.premium_title}` : ''}</small></span><span className="rc-arrow">{Math.floor(rankingSeconds(p)/3600)}<span className="rc-hour-unit">h</span></span></div>; }); })()}</div></section>}</section>}
 
       {page.name === 'Premium' && <section className="rc-content-section rc-premium-page">
         <button className="rc-secondary rc-premium-back" onClick={() => setTab('My Profile')}><ArrowLeft size={16}/> Back to profile</button>
@@ -2740,35 +2745,17 @@ async function playVoiceNote(message: ChatMessage) {
     {userId && !selectedConversation && <nav className="rc-bottom-nav" aria-label="Main navigation">{NAV_ITEMS.filter(item => item.name !== 'Premium').map(item => <button key={item.name} className={`rc-bottom-item ${tab === item.name ? 'active' : ''}`} onClick={() => { setTab(item.name); setShowProfile(false); setShowGroup(false); setShowEmojiPicker(false); }}><span className="rc-bottom-icon"><item.icon size={24} strokeWidth={tab === item.name ? 2.5 : 2}/>{item.name === 'Requests' && requests > 0 && <i className="rc-nav-badge">{requests > 99 ? '99+' : requests}</i>}{item.name === 'Messages' && Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0) > 0 && <i className="rc-nav-badge">{Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0) > 99 ? '99+' : Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0)}</i>}</span><span className="rc-bottom-label">{item.name === 'My Profile' ? 'Profile' : item.name}</span></button>)}</nav>}
 
     {userId && tab === 'My Profile' && !selectedConversation && !showProfile && !showGroup && !marketplaceOpen && <button className="rc-floating-premium" onClick={() => setTab('Premium')}><Crown size={17}/> Premium</button>}
-    {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && !inviteOpen && <button
-      type="button"
-      className="rc-floating-invite"
-      style={invitePosition ? { left: invitePosition.x, top: invitePosition.y, right: 'auto', bottom: 'auto' } : undefined}
-      onPointerDown={e => { inviteWasDragged.current = false; const rect = e.currentTarget.getBoundingClientRect(); inviteDrag.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, originX: invitePosition?.x ?? rect.left, originY: invitePosition?.y ?? rect.top }; e.currentTarget.setPointerCapture(e.pointerId); }}
-      onPointerMove={e => { const drag = inviteDrag.current; if (!drag || drag.pointerId !== e.pointerId) return; if (Math.abs(e.clientX - drag.startX) > 5 || Math.abs(e.clientY - drag.startY) > 5) inviteWasDragged.current = true; const rect = e.currentTarget.getBoundingClientRect(); const w = rect.width || 48; const h = rect.height || 48; const x = Math.max(8, Math.min(window.innerWidth - w - 8, drag.originX + e.clientX - drag.startX)); const y = Math.max(8, Math.min(window.innerHeight - h - 8, drag.originY + e.clientY - drag.startY)); setInvitePosition({ x, y }); }}
-      onPointerUp={e => { if (inviteDrag.current?.pointerId === e.pointerId) inviteDrag.current = null; }}
-      onPointerCancel={() => { inviteDrag.current = null; }}
-      onClick={() => { if (inviteWasDragged.current) { inviteWasDragged.current = false; return; } void openInviteCard(); }}
-      aria-label="Invite people to MR RICH CONNECT"
-      title="Invite people"
-      disabled={inviteBusy}
-    ><UserPlus size={21}/></button>}
+    {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && !inviteOpen && <div className="rc-features-wrap" style={invitePosition ? { left: invitePosition.x, top: invitePosition.y, right: 'auto', bottom: 'auto' } : undefined}>
+      <button type="button" className="rc-features-button" onPointerDown={e => { inviteWasDragged.current=false; const r=e.currentTarget.getBoundingClientRect(); inviteDrag.current={pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,originX:invitePosition?.x??r.left,originY:invitePosition?.y??r.top}; e.currentTarget.setPointerCapture(e.pointerId); }} onPointerMove={e=>{const d=inviteDrag.current;if(!d||d.pointerId!==e.pointerId)return;if(Math.abs(e.clientX-d.startX)>5||Math.abs(e.clientY-d.startY)>5)inviteWasDragged.current=true;const r=e.currentTarget.getBoundingClientRect();setInvitePosition({x:Math.max(8,Math.min(window.innerWidth-r.width-8,d.originX+e.clientX-d.startX)),y:Math.max(8,Math.min(window.innerHeight-r.height-8,d.originY+e.clientY-d.startY))});}} onPointerUp={e=>{if(inviteDrag.current?.pointerId===e.pointerId)inviteDrag.current=null;}} onPointerCancel={()=>{inviteDrag.current=null;}} onClick={()=>{if(inviteWasDragged.current){inviteWasDragged.current=false;return;}setFeaturesMenuOpen(v=>!v);}} aria-label="Open Features menu"><Sparkles size={21}/><span>Features</span>{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount>99?'99+':unreadAnnouncementCount}</i>}</button>
+      {featuresMenuOpen&&<div className="rc-features-menu"><button onClick={()=>{setFeaturesMenuOpen(false);setStatusOpen(true);void loadStatuses();}}> <CircleDot size={17}/> Status</button><button onClick={()=>{setFeaturesMenuOpen(false);setMarketplaceOpen(true);}}><Store size={17}/> Marketplace</button><button onClick={()=>{setFeaturesMenuOpen(false);void openInviteCard();}}><UserPlus size={17}/> Invite</button><button onClick={()=>{setFeaturesMenuOpen(false);void loadAnnouncements();setAnnouncementOpen(true);setUnreadAnnouncementCount(0);}}><Megaphone size={17}/> Announcements{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount}</i>}</button></div>}
+    </div>}
 
-    {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && !inviteOpen && !announcementOpen && <button
-      type="button"
-      className="rc-floating-announcements"
-      style={announcementPosition ? { left: announcementPosition.x, top: announcementPosition.y, right: 'auto', bottom: 'auto' } : undefined}
-      onPointerDown={e => { announcementWasDragged.current = false; const rect = e.currentTarget.getBoundingClientRect(); announcementDrag.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, originX: announcementPosition?.x ?? rect.left, originY: announcementPosition?.y ?? rect.top }; e.currentTarget.setPointerCapture(e.pointerId); }}
-      onPointerMove={e => { const drag = announcementDrag.current; if (!drag || drag.pointerId !== e.pointerId) return; if (Math.abs(e.clientX - drag.startX) > 5 || Math.abs(e.clientY - drag.startY) > 5) announcementWasDragged.current = true; const rect = e.currentTarget.getBoundingClientRect(); const w = rect.width || 48; const h = rect.height || 48; const x = Math.max(8, Math.min(window.innerWidth - w - 8, drag.originX + e.clientX - drag.startX)); const y = Math.max(8, Math.min(window.innerHeight - h - 8, drag.originY + e.clientY - drag.startY)); setAnnouncementPosition({ x, y }); }}
-      onPointerUp={e => { if (announcementDrag.current?.pointerId === e.pointerId) announcementDrag.current = null; }}
-      onPointerCancel={() => { announcementDrag.current = null; }}
-      onClick={() => { if (announcementWasDragged.current) { announcementWasDragged.current = false; return; } void loadAnnouncements(); setAnnouncementOpen(true); }}
-      aria-label="Open community announcements"
-      title="Announcements"
-    ><Megaphone size={21}/></button>}
+
+    {statusViewerOpen && <div className="rc-status-screen" onClick={()=>setStatusViewerOpen(false)}><section className="rc-status-viewer" onClick={e=>e.stopPropagation()} onPointerDown={()=>setStatusPaused(true)} onPointerUp={()=>setStatusPaused(false)}><button className="rc-modal-close" onClick={()=>setStatusViewerOpen(false)} aria-label="Close status"><X/></button>{statusRows[statusViewerIndex]&&<><img src={supabase?.storage.from('status-images').getPublicUrl(statusRows[statusViewerIndex].image_path).data.publicUrl} alt="Status"/><div className="rc-status-caption"><p>{statusRows[statusViewerIndex].caption}</p>{statusRows[statusViewerIndex].link_url&&<a href={statusRows[statusViewerIndex].link_url} target="_blank" rel="noreferrer">Open link</a>}</div><div className="rc-status-controls"><button onClick={()=>setStatusViewerIndex(i=>Math.max(0,i-1))}>Previous</button><button onClick={()=>setStatusViewerIndex(i=>Math.min(statusRows.length-1,i+1))}>Next</button></div></>}</section></div>}
+    {statusOpen && <div className="rc-status-compose-wrap"><form className="rc-status-compose" onSubmit={e=>{e.preventDefault();void publishStatus();}}><button type="button" className="rc-modal-close" onClick={()=>setStatusOpen(false)}><X/></button><h2>Share a status</h2>{canPostStatus?<><label>Picture<input type="file" accept="image/*" onChange={e=>setStatusImage(e.target.files?.[0]||null)} required/></label><label>Caption<textarea value={statusCaption} onChange={e=>setStatusCaption(e.target.value)} maxLength={500} required/></label><label>Optional link<input type="url" value={statusLink} onChange={e=>setStatusLink(e.target.value)} placeholder="https://..."/></label><button className="rc-primary" disabled={statusBusy}>{statusBusy?'Publishing…':'Publish status'}</button></>:<p>Status posting requires Premium membership and Sharp Guy rank or higher.</p>}<div className="rc-status-list">{statusRows.map((s:any)=><button type="button" key={s.id} onClick={()=>void openStatusViewer(s.user_id)}>View status</button>)}</div></form></div>}
 
     {announcementOpen && <div className="rc-announcement-screen"><header className="rc-announcement-header"><button className="rc-icon-btn" onClick={() => setAnnouncementOpen(false)} aria-label="Back"><ArrowLeft size={19}/></button><div><h1>Announcements</h1><p>Offers, updates and news from the community</p></div></header><div className="rc-announcement-content">{isCurrentUserPremium && <form className="rc-announcement-compose" onSubmit={e => { e.preventDefault(); void publishAnnouncement(); }}><span className="rc-eyebrow">PREMIUM PUBLISHER</span><h2>Share an announcement</h2><label>Image<input type="file" accept="image/*" onChange={e => setAnnouncementImage(e.target.files?.[0] || null)} required/></label>{announcementImage && <small className="rc-muted">Selected image: {announcementImage.name}</small>}<label>Caption<textarea value={announcementCaption} onChange={e => setAnnouncementCaption(e.target.value)} maxLength={500} placeholder="Write your offer, update or announcement…" required/></label><button className="rc-primary rc-full" type="submit" disabled={announcementBusy}>{announcementBusy ? 'Publishing…' : 'Publish announcement'}</button></form>}{!isCurrentUserPremium && <p className="rc-announcement-view-note">You’re viewing community announcements. Posting is available to Premium members.</p>}{announcements.length ? announcements.map(item => <article className="rc-announcement-card" key={item.id}><img src={item.image_url} alt="Community announcement"/><div><strong>@{item.author_nickname}</strong><p>{item.caption}</p><small>{new Date(item.created_at).toLocaleString()}</small></div></article>) : <div className="rc-empty-state"><Megaphone size={30}/><h2>No announcements yet</h2><p>New offers and updates will appear here.</p></div>}</div></div>}
-    {publicProfile && <div className="rc-public-profile-backdrop" onClick={() => setPublicProfile(null)}><section className="rc-public-profile-card" onClick={e => e.stopPropagation()}><button className="rc-modal-close" onClick={() => setPublicProfile(null)} aria-label="Close profile"><X size={20}/></button><div className="rc-public-profile-avatar">{publicProfile.avatar_url ? <img src={publicProfile.avatar_url} alt=""/> : publicProfile.nickname?.[0]?.toUpperCase() || <UserRound size={38}/>}</div><h2>@{publicProfile.nickname}{publicProfile.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={19}/>}</h2>{publicProfile.premium_status === 'active' && publicProfile.premium_title && <strong className="rc-public-premium-title">{publicProfile.premium_title}</strong>}<p>{[publicProfile.level, publicProfile.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{publicProfile.school || 'School not listed'}</p>{publicProfile.department && <p>{publicProfile.department}</p>}{publicProfile.bio && <div className="rc-public-profile-bio">{publicProfile.bio}</div>}<div className="rc-public-profile-hours"><strong style={{color:getExperienceColor(publicProfile.total_online_seconds)}}>{getExperienceTitle(publicProfile.total_online_seconds)}</strong><span>{Math.floor((publicProfile.total_online_seconds || 0)/3600)} lifetime hours</span></div>{publicProfile.id === userId && <div className="rc-profile-invite-count"><UserPlus size={17}/><strong>{inviteCount}</strong><span>successful invites</span></div>}{publicProfile.id !== userId && <button className="rc-primary rc-full" onClick={() => { const convo = conversationList.find(c => c.kind === 'person' && c.otherUserId === publicProfile.id); if (convo) { setSelectedConversation(convo); setTab('Messages'); void markConversationRead(convo.id); } else { void sendRequest(publicProfile.id); } setPublicProfile(null); }}>{conversationList.some(c => c.kind === 'person' && c.otherUserId === publicProfile.id) ? 'Message' : 'Connect'}</button>}</section></div>}
+    {publicProfile && <div className="rc-public-profile-backdrop" onClick={() => setPublicProfile(null)}><section className="rc-public-profile-card" onClick={e => e.stopPropagation()}><button className="rc-modal-close" onClick={() => setPublicProfile(null)} aria-label="Close profile"><X size={20}/></button><div className="rc-public-profile-avatar">{publicProfile.avatar_url ? <img src={publicProfile.avatar_url} alt=""/> : publicProfile.nickname?.[0]?.toUpperCase() || <UserRound size={38}/>}</div><h2>@{publicProfile.nickname}{publicProfile.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={19}/>}</h2>{publicProfile.premium_status === 'active' && publicProfile.premium_title && <strong className="rc-public-premium-title">{publicProfile.premium_title}</strong>}<p>{[publicProfile.level, publicProfile.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{publicProfile.school || 'School not listed'}</p>{publicProfile.department && <p>{publicProfile.department}</p>}{publicProfile.bio && <div className="rc-public-profile-bio">{publicProfile.bio}</div>}<div className="rc-public-profile-hours"><strong>{getExperienceTitle(publicProfile.total_online_seconds)}</strong><span>{Math.floor((publicProfile.total_online_seconds || 0)/3600)} lifetime hours</span></div>{publicProfile.id !== userId && <button className="rc-primary rc-full" onClick={() => { const convo = conversationList.find(c => c.kind === 'person' && c.otherUserId === publicProfile.id); if (convo) { setSelectedConversation(convo); setTab('Messages'); void markConversationRead(convo.id); } else { void sendRequest(publicProfile.id); } setPublicProfile(null); }}>{conversationList.some(c => c.kind === 'person' && c.otherUserId === publicProfile.id) ? 'Message' : 'Connect'}</button>}</section></div>}
     {inviteOpen && <div className="rc-invite-backdrop" onClick={() => setInviteOpen(false)}>
       <section className="rc-invite-card" onClick={e => e.stopPropagation()} aria-label="Your MR RICH CONNECT invite card">
         <button type="button" className="rc-modal-close" onClick={() => setInviteOpen(false)} aria-label="Close invite card"><X size={20}/></button>
@@ -2904,6 +2891,8 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-heading-notification { flex: 0 0 auto; margin-left: auto; }
       .rc-lifetime-summary { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; margin:14px 0; text-align:center; }
       .rc-experience-title, .rc-discover-details .rc-premium-badge { color:#32d296; font-weight:800; line-height:1.25; }
+      .rc-rank-newcomer{color:#22c55e!important}.rc-rank-sharp{color:#38bdf8!important}.rc-rank-regular{color:#a78bfa!important}.rc-rank-oga{color:#f59e0b!important}.rc-rank-chairman{color:#f472b6!important}.rc-rank-odogwu{color:#f97316!important}
+      .rc-toast{left:50%!important;right:auto!important;transform:translateX(-50%)!important;width:min( calc(100vw - 32px), 480px)!important;}
       .rc-lifetime-hours { color:#32d296; font-weight:800; line-height:1.3; }
       .rc-lifetime-hours span { color:#fff; font-weight:500; }
       .rc-premium-back { margin-bottom:14px; }
@@ -3098,9 +3087,7 @@ async function playVoiceNote(message: ChatMessage) {
         position: fixed !important;
         top: max(12px, calc(env(safe-area-inset-top) + 8px)) !important;
         bottom: auto !important;
-        left: 50vw !important;
-        right: auto !important;
-        margin-left: 0 !important;
+        left: 50% !important;
         transform: translateX(-50%) !important;
         width: min( calc(100vw - 24px), 520px) !important;
         max-width: calc(100vw - 24px) !important;
@@ -3239,7 +3226,6 @@ async function playVoiceNote(message: ChatMessage) {
       }
       .rc-chat-panel > * { position: relative; z-index: 1; }
       .rc-chat-header, .rc-composer-wrap { background-color: rgba(7,16,30,.94) !important; }
-      .rc-chat-header { position:sticky !important; top:0 !important; z-index:35 !important; }
       .rc-chat-empty.is-empty {
         align-items: center !important;
         justify-content: center !important;
@@ -3875,7 +3861,7 @@ async function playVoiceNote(message: ChatMessage) {
       /* Darker blue for messages sent by the current user, improving text contrast. */
       .rc-message-bubble.mine { background:#12366b !important; background-color:#12366b !important; color:#f8fbff !important; border:1px solid rgba(96,165,250,.28) !important; }
       .rc-message-bubble.mine * { color:inherit; }
-      .rc-emoji-grid { display:grid !important; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px; min-height:160px !important; max-height:min(42dvh,360px) !important; overflow-y:auto !important; align-content:start !important; visibility:visible !important; opacity:1 !important; color:#fff !important; font-size:29px !important; }
+      .rc-emoji-grid { display:grid !important; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px; visibility:visible !important; opacity:1 !important; color:#fff !important; font-size:29px !important; }
       .rc-emoji-grid button { min-width:0 !important; min-height:46px !important; display:grid !important; place-items:center !important; border:1px solid rgba(147,197,253,.16) !important; border-radius:11px !important; background:linear-gradient(145deg,rgba(96,165,250,.16),rgba(30,41,59,.72)) !important; padding:5px 2px !important; color:#ffffff !important; font-size:25px !important; line-height:1.2 !important; opacity:1 !important; visibility:visible !important; text-indent:0 !important; cursor:pointer; -webkit-tap-highlight-color:transparent; }
       .rc-emoji-grid .rc-emoji-glyph { display:inline-block !important; position:relative !important; visibility:visible !important; opacity:1 !important; color:#ffffff !important; -webkit-text-fill-color:#ffffff !important; font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",system-ui,sans-serif !important; font-size:29px !important; font-style:normal !important; font-weight:400 !important; font-variant-emoji:emoji !important; line-height:1.25 !important; text-indent:0 !important; white-space:nowrap !important; }
       .rc-emoji-grid button:active { background:rgba(37,99,235,.42); transform:scale(.94); }
@@ -3894,11 +3880,12 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-public-profile-backdrop { position:fixed; inset:0; z-index:130; display:flex; align-items:center; justify-content:center; padding:18px; background:rgba(2,8,23,.78); backdrop-filter:blur(8px); }
       .rc-public-profile-card { position:relative; width:min(100%,390px); max-height:calc(100dvh - 36px); overflow:auto; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; gap:9px; padding:28px 22px 22px; border:1px solid rgba(96,165,250,.3); border-radius:22px; background:linear-gradient(155deg,#14243d,#081326); text-align:center; }
       .rc-public-profile-avatar { width:104px; height:104px; display:grid; place-items:center; overflow:hidden; border:2px solid #60a5fa; border-radius:50%; background:#102b58; font-size:34px; }.rc-public-profile-avatar img { width:100%; height:100%; object-fit:cover; }
-      .rc-public-profile-card h2 { display:flex; align-items:center; margin:4px 0; font-size:22px; }.rc-public-profile-card p { margin:0; color:#cbd5e1; font-size:13px; }.rc-profile-invite-count { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin:4px 0 12px; padding:11px 14px; box-sizing:border-box; border:1px solid rgba(96,165,250,.24); border-radius:13px; background:rgba(37,99,235,.10); color:#bfdbfe; }.rc-profile-invite-count strong { color:#fff; font-size:18px; font-weight:850; font-variant-numeric:tabular-nums; }.rc-profile-invite-count span { color:#a9bad5; font-size:12px; }.rc-public-profile-bio { width:100%; margin:7px 0; padding:12px; box-sizing:border-box; border-radius:12px; background:rgba(148,163,184,.08); color:#e2e8f0; white-space:pre-wrap; line-height:1.5; }.rc-public-profile-hours { display:flex; flex-direction:column; gap:3px; margin:6px 0 10px; }.rc-public-profile-hours strong { color:#93c5fd; }.rc-public-profile-hours span { color:#94a3b8; font-size:12px; }
+      .rc-public-profile-card h2 { display:flex; align-items:center; margin:4px 0; font-size:22px; }.rc-public-profile-card p { margin:0; color:#cbd5e1; font-size:13px; }.rc-public-profile-bio { width:100%; margin:7px 0; padding:12px; box-sizing:border-box; border-radius:12px; background:rgba(148,163,184,.08); color:#e2e8f0; white-space:pre-wrap; line-height:1.5; }.rc-public-profile-hours { display:flex; flex-direction:column; gap:3px; margin:6px 0 10px; }.rc-public-profile-hours strong { color:#93c5fd; }.rc-public-profile-hours span { color:#94a3b8; font-size:12px; }
       @media (max-width:800px) { .rc-floating-announcements { bottom:calc(248px + env(safe-area-inset-bottom)); } }
 
-
+      .rc-features-wrap{position:fixed;z-index:70;right:16px;bottom:calc(248px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:flex-end;gap:10px;touch-action:none}.rc-features-button{position:relative;display:flex;align-items:center;gap:7px;background:#facc15;color:#172033;border:1px solid #fde68a;border-radius:16px;padding:13px 15px;font-weight:900;box-shadow:0 8px 28px #0007;cursor:grab}.rc-features-badge{font-style:normal;background:#2563eb;color:white;border-radius:99px;padding:2px 6px;font-size:10px}.rc-features-menu{display:flex;flex-direction:column;min-width:190px;padding:7px;border:1px solid #334155;border-radius:15px;background:#101b2d;box-shadow:0 12px 32px #0009;gap:3px}.rc-features-menu button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:white;padding:11px;border-radius:9px;text-align:left}.rc-status-screen,.rc-status-compose-wrap{position:fixed;inset:0;z-index:110;background:#050914ed;display:grid;place-items:center;padding:16px}.rc-status-viewer,.rc-status-compose{position:relative;width:min(100%,440px);max-height:88dvh;overflow:auto;background:#111c2e;border:1px solid #334155;border-radius:20px;padding:18px;color:white}.rc-status-viewer>img{width:100%;max-height:65dvh;object-fit:contain;border-radius:12px}.rc-status-caption{padding:10px}.rc-status-controls{display:flex;justify-content:space-between}.rc-status-compose label{display:grid;gap:7px;margin:12px 0}.rc-status-compose input,.rc-status-compose textarea{width:100%;background:#0b1424;color:white;border:1px solid #334155;border-radius:10px;padding:10px}.rc-status-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
     `}
+
 </style>
   </main>
 );
