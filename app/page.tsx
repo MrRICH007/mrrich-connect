@@ -264,6 +264,7 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [nickname, setNickname] = useState('');
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [myReferralCount, setMyReferralCount] = useState(0);
   const [discoverQuery, setDiscoverQuery] = useState('');
   const [discoverFilter, setDiscoverFilter] = useState<'all' | 'online' | 'school'>('all');
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
@@ -824,14 +825,36 @@ const voiceChunksRef = useRef<Blob[]>([]);
     }
 
     setStatusBusy(true);
-    const safeName = statusImage.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${userId}/${Date.now()}-${safeName}`;
+    let uploadedPath = '';
     try {
+      // Normalize phone-camera formats to WebP/JPEG where the browser can decode
+      // them. The bucket accepts JPEG, PNG, WebP and GIF only.
+      let uploadFile = await compressUploadImage(statusImage, 1600, 0.84);
+      if (!['image/jpeg','image/png','image/webp','image/gif'].includes(uploadFile.type)) {
+        if (typeof createImageBitmap === 'undefined') throw new Error('This picture format is not supported by your browser. Please choose a JPG or PNG image.');
+        let bitmap: ImageBitmap;
+        try { bitmap = await createImageBitmap(statusImage); }
+        catch { throw new Error('Your phone image could not be decoded. Please choose a JPG or PNG image.'); }
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { bitmap.close(); throw new Error('Could not prepare the picture for upload.'); }
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.84));
+        if (!blob) throw new Error('Could not convert the picture. Please try another image.');
+        uploadFile = new File([blob], `status-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      }
+      const extension = uploadFile.type === 'image/webp' ? 'webp' : uploadFile.type === 'image/png' ? 'png' : uploadFile.type === 'image/gif' ? 'gif' : 'jpg';
+      const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${userId}/${Date.now()}-${safeName.replace(/\.[^.]+$/, '')}.${extension}`;
+      uploadedPath = path;
       const { error: uploadError } = await supabase.storage
         .from('status-images')
-        .upload(path, statusImage, {
+        .upload(path, uploadFile, {
           upsert: false,
-          contentType: statusImage.type,
+          contentType: uploadFile.type,
           cacheControl: '3600'
         });
 
@@ -850,6 +873,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
 
       if (insertError) {
         await supabase.storage.from('status-images').remove([path]);
+        uploadedPath = '';
         throw new Error(`Could not save your status: ${insertError.message}`);
       }
 
@@ -863,6 +887,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       setStatusType('success');
       setStatus('Status published successfully. It will remain visible for 12 hours.');
     } catch (error) {
+      if (uploadedPath) { try { await supabase.storage.from('status-images').remove([uploadedPath]); } catch {} }
       const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
       setStatusType('error');
       setStatus(`Status was not published. ${message}`);
@@ -1262,6 +1287,21 @@ const voiceChunksRef = useRef<Blob[]>([]);
     setSelectedConversation(current => current ? (mapped.find(c => c.id === current.id) ?? current) : null);
   }, [supabase, userId, groups]);
 
+  const refreshMyReferralCount = useCallback(async () => {
+    if (!supabase || !userId) { setMyReferralCount(0); return; }
+    const { data, error } = await supabase.rpc('rc_my_invite_count');
+    if (error) {
+      console.warn('Referral count could not be loaded:', error.message);
+      return;
+    }
+    setMyReferralCount(Number(data) || 0);
+  }, [supabase, userId]);
+
+  useEffect(() => {
+    if (!supabase || !userId) { setMyReferralCount(0); return; }
+    void refreshMyReferralCount();
+  }, [supabase, userId, refreshMyReferralCount]);
+
   // Retry invite attribution/chat creation after an invitee confirms email and signs in.
   // This is a recovery path if the auth.users trigger could not create the chat
   // during signup; it does not interfere with ordinary accounts.
@@ -1273,15 +1313,17 @@ const voiceChunksRef = useRef<Blob[]>([]);
       if (cancelled) return;
       if (error) {
         console.warn('Invite connection recovery could not run:', error.message);
-        return;
-      }
-      if (data === true) {
+      } else if (data === true) {
         await loadConversations();
       }
+      // Refresh attribution independently from conversation creation. A referral
+      // remains counted even if a chat needs a later repair.
+      await refreshMyReferralCount();
+      if (!cancelled) await loadConversations();
     };
     void completeInvite();
     return () => { cancelled = true; };
-  }, [supabase, userId, loadConversations]);
+  }, [supabase, userId, loadConversations, refreshMyReferralCount]);
 
   function decodeChatMessage(message: ChatMessage): ChatMessage {
     const prefix = '[[RC_REPLY]]';
@@ -2757,7 +2799,7 @@ async function playVoiceNote(message: ChatMessage) {
 >
   {voiceBusy ? '…' : isRecordingVoice ? <Square size={19} fill="currentColor" /> : <Mic size={21} />}
 </button>
-<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button type="button" key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}><span className="rc-emoji-glyph" style={{fontFamily:'"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",system-ui,sans-serif',fontSize:29,lineHeight:1.25,display:"inline-block",visibility:"visible",opacity:1,color:"#ffffff",WebkitTextFillColor:"#ffffff",fontVariantEmoji:"emoji" as any}}>{emoji}</span></button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button type="button" key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}><span className="rc-emoji-glyph">{emoji}</span></button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -2808,7 +2850,7 @@ async function playVoiceNote(message: ChatMessage) {
       {page.name === 'Requests' && <section className="rc-content-section">
         {incomingRequests.length > 0 ? <div className="rc-group-list">{incomingRequests.map(request => <article className="rc-person-card rc-request-slim" key={request.id}><div className="rc-request-top"><button type="button" className="rc-avatar rc-avatar-large rc-request-profile-trigger" onClick={() => setPublicProfile(profiles.find(p => p.id === request.sender_id) || { id: request.sender_id, nickname: request.sender_nickname, level: null, college: null, school: null, avatar_url: request.sender_avatar_url || null, premium_status: request.sender_premium_status || 'inactive', premium_title: request.sender_premium_title || null })}>{request.sender_avatar_url ? <img src={request.sender_avatar_url} alt=""/> : request.sender_nickname[0]?.toUpperCase() || 'M'}</button><div className="rc-request-details"><h3>@{request.sender_nickname}{request.sender_premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={15}/>} {request.sender_premium_status === 'active' && request.sender_premium_title && <small className="rc-premium-title">{request.sender_premium_title}</small>}</h3><p>Wants to start a private conversation.</p><small>{new Date(request.created_at).toLocaleDateString()}</small></div></div><div className="rc-request-actions"><button className="rc-secondary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'decline')}>Decline</button><button className="rc-primary" disabled={requestBusy === request.id} onClick={() => void respondToRequest(request.id, 'accept')}>{requestBusy === request.id ? 'Please wait…' : 'Accept'}</button></div></article>)}</div> : <div className="rc-empty-state"><div className="rc-empty-icon"><Bell size={27}/></div><h2>{requests ? `${requests} pending request${requests === 1 ? '' : 's'}` : 'No new requests'}</h2><p>{requests ? 'A request exists, but the request details could not be loaded. Check the status message above and your Supabase policies.' : 'When someone sends you a message request, it will appear here.'}</p></div>}</section>}
 
-      {page.name === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}{profiles.find(p => p.id === userId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={19}/>}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p>{profiles.find(p => p.id === userId)?.premium_status === 'active' && profileForm.premium_title && <p className="rc-premium-title">{profileForm.premium_title}</p>}<div className="rc-lifetime-summary"><strong className={`rc-experience-title rc-rank-${getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds).toLowerCase().replace(' ', '-')}`}>{getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds)}</strong><strong className="rc-lifetime-hours">{Math.floor((profiles.find(p => p.id === userId)?.total_online_seconds || 0) / 3600)} <span>lifetime hours</span></strong></div><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{(() => { const ranked = [...profiles].sort((a,b)=>rankingSeconds(b)-rankingSeconds(a)); const top = ranked.slice(0,10); const meIndex = ranked.findIndex(p => p.id === userId); if (meIndex >= 10 && meIndex >= 0) top.push(ranked[meIndex]); return top.map(p => { const rank = ranked.findIndex(r => r.id === p.id) + 1; return <div className={`rc-group-row ${p.id === userId ? 'rc-current-rank' : ''}`} key={p.id}><span className="rc-group-icon">#{rank > 999 ? '999+' : rank}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small className={`rc-rank-${getExperienceTitle(p.total_online_seconds).toLowerCase().replace(' ', '-')}`}>{getExperienceTitle(p.total_online_seconds)}{p.premium_status === 'active' && p.premium_title ? ` · ${p.premium_title}` : ''}</small></span><span className="rc-arrow">{Math.floor(rankingSeconds(p)/3600)}<span className="rc-hour-unit">h</span></span></div>; }); })()}</div></section>}</section>}
+      {page.name === 'My Profile' && <section className="rc-profile-page">{profileExists ? <><div className="rc-profile-card"><label className="rc-profile-avatar-click" title="Change profile photo"><span className="rc-profile-avatar">{profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="Your profile avatar"/> : nickname?.[0]?.toUpperCase() || <UserRound size={36}/>}<i><Pencil size={14}/></i></span><input className="rc-hidden-file" type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label><span className="rc-eyebrow">COMMUNITY PROFILE</span><h2>@{nickname}{profiles.find(p => p.id === userId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={19}/>}</h2><p>{[profileForm.level, profileForm.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{profileForm.school || 'School not listed'}</p>{profiles.find(p => p.id === userId)?.premium_status === 'active' && profileForm.premium_title && <p className="rc-premium-title">{profileForm.premium_title}</p>}<div className="rc-lifetime-summary"><strong className={`rc-experience-title rc-rank-${getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds).toLowerCase().replace(' ', '-')}`}>{getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds)}</strong><strong className="rc-lifetime-hours">{Math.floor((profiles.find(p => p.id === userId)?.total_online_seconds || 0) / 3600)} <span>lifetime hours</span></strong></div><div className="rc-referral-summary"><span>People invited</span><strong>{myReferralCount}</strong></div><button className="rc-primary" onClick={() => { setEditingProfile(true); setShowProfile(true); }}><Pencil size={16}/> Edit profile</button></div><div className="rc-privacy-card"><ShieldCheck size={20}/><div><strong>Your information stays private</strong><p>Your name, phone number, department and email aren't shown on your public profile.</p></div></div></> : <div className="rc-empty-state"><div className="rc-empty-icon"><UserRound size={27}/></div><h2>Create your profile</h2><p>Choose a nickname and add your school details to join the community.</p><button className="rc-primary" onClick={openProfileEditor}>Create profile <Plus size={16}/></button></div>}{<section className="rc-content-section rc-online-rankings"><div className="rc-section-title"><div><h2>Community rankings</h2><p>Members ranked by recorded online hours.</p></div></div><div className="rc-group-list">{(() => { const ranked = [...profiles].sort((a,b)=>rankingSeconds(b)-rankingSeconds(a)); const top = ranked.slice(0,10); const meIndex = ranked.findIndex(p => p.id === userId); if (meIndex >= 10 && meIndex >= 0) top.push(ranked[meIndex]); return top.map(p => { const rank = ranked.findIndex(r => r.id === p.id) + 1; return <div className={`rc-group-row ${p.id === userId ? 'rc-current-rank' : ''}`} key={p.id}><span className="rc-group-icon">#{rank > 999 ? '999+' : rank}</span><span className="rc-group-info"><strong>@{p.nickname}{p.premium_status === 'active' ? ' ★' : ''}</strong><small className={`rc-rank-${getExperienceTitle(p.total_online_seconds).toLowerCase().replace(' ', '-')}`}>{getExperienceTitle(p.total_online_seconds)}{p.premium_status === 'active' && p.premium_title ? ` · ${p.premium_title}` : ''}</small></span><span className="rc-arrow">{Math.floor(rankingSeconds(p)/3600)}<span className="rc-hour-unit">h</span></span></div>; }); })()}</div></section>}</section>}
 
       {page.name === 'Premium' && <section className="rc-content-section rc-premium-page">
         <button className="rc-secondary rc-premium-back" onClick={() => setTab('My Profile')}><ArrowLeft size={16}/> Back to profile</button>
@@ -2850,7 +2892,7 @@ async function playVoiceNote(message: ChatMessage) {
 
 
     {statusViewerOpen && <div className="rc-status-screen" onClick={()=>setStatusViewerOpen(false)}><section className="rc-status-viewer" onClick={e=>e.stopPropagation()} onPointerDown={()=>setStatusPaused(true)} onPointerUp={()=>setStatusPaused(false)}><button className="rc-modal-close" onClick={()=>setStatusViewerOpen(false)} aria-label="Close status"><X/></button>{statusRows[statusViewerIndex]&&<><img src={supabase?.storage.from('status-images').getPublicUrl(statusRows[statusViewerIndex].image_path).data.publicUrl} alt="Status"/><div className="rc-status-caption"><p>{statusRows[statusViewerIndex].caption}</p>{statusRows[statusViewerIndex].link_url&&<a href={statusRows[statusViewerIndex].link_url} target="_blank" rel="noreferrer">Open link</a>}</div><div className="rc-status-controls"><button onClick={()=>setStatusViewerIndex(i=>Math.max(0,i-1))}>Previous</button><button onClick={()=>setStatusViewerIndex(i=>Math.min(statusRows.length-1,i+1))}>Next</button></div></>}</section></div>}
-    {statusOpen && <div className="rc-status-compose-wrap"><form className="rc-status-compose" onSubmit={e=>{e.preventDefault();void publishStatus();}}><button type="button" className="rc-modal-close" onClick={()=>setStatusOpen(false)}><X/></button><h2>Share a status</h2>{canPostStatus?<><label>Picture<input type="file" accept="image/*" onChange={e=>setStatusImage(e.target.files?.[0]||null)} required/></label><label>Caption<textarea value={statusCaption} onChange={e=>setStatusCaption(e.target.value)} maxLength={500} required/></label><label>Optional link<input type="url" value={statusLink} onChange={e=>setStatusLink(e.target.value)} placeholder="https://..."/></label><button className="rc-primary" disabled={statusBusy}>{statusBusy?'Publishing…':'Publish status'}</button></>:<p>Status posting requires Premium membership and Sharp Guy rank or higher.</p>}<div className="rc-status-list">{statusRows.map((s:any)=><button type="button" key={s.id} onClick={()=>void openStatusViewer(s.user_id)}>View status</button>)}</div></form></div>}
+    {statusOpen && <div className="rc-status-compose-wrap"><form className="rc-status-compose" onSubmit={e=>{e.preventDefault();void publishStatus();}}><button type="button" className="rc-modal-close" onClick={()=>setStatusOpen(false)}><X/></button><h2>Share a status</h2>{canPostStatus?<><label>Picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/*" onChange={e=>setStatusImage(e.target.files?.[0]||null)} required/></label><label>Caption<textarea value={statusCaption} onChange={e=>setStatusCaption(e.target.value)} maxLength={500} required/></label><label>Optional link<input type="url" value={statusLink} onChange={e=>setStatusLink(e.target.value)} placeholder="https://..."/></label><button className="rc-primary" disabled={statusBusy}>{statusBusy?'Publishing…':'Publish status'}</button></>:<p>Status posting requires Premium membership and Sharp Guy rank or higher.</p>}<div className="rc-status-list">{statusRows.map((s:any)=><button type="button" key={s.id} onClick={()=>void openStatusViewer(s.user_id)}>View status</button>)}</div></form></div>}
 
     {announcementOpen && <div className="rc-announcement-screen"><header className="rc-announcement-header"><button className="rc-icon-btn" onClick={() => setAnnouncementOpen(false)} aria-label="Back"><ArrowLeft size={19}/></button><div><h1>Announcements</h1><p>Offers, updates and news from the community</p></div></header><div className="rc-announcement-content">{isCurrentUserPremium && <form className="rc-announcement-compose" onSubmit={e => { e.preventDefault(); void publishAnnouncement(); }}><span className="rc-eyebrow">PREMIUM PUBLISHER</span><h2>Share an announcement</h2><label>Image<input type="file" accept="image/*" onChange={e => setAnnouncementImage(e.target.files?.[0] || null)} required/></label>{announcementImage && <small className="rc-muted">Selected image: {announcementImage.name}</small>}<label>Caption<textarea value={announcementCaption} onChange={e => setAnnouncementCaption(e.target.value)} maxLength={500} placeholder="Write your offer, update or announcement…" required/></label><button className="rc-primary rc-full" type="submit" disabled={announcementBusy}>{announcementBusy ? 'Publishing…' : 'Publish announcement'}</button></form>}{!isCurrentUserPremium && <p className="rc-announcement-view-note">You’re viewing community announcements. Posting is available to Premium members.</p>}{announcements.length ? announcements.map(item => <article className="rc-announcement-card" key={item.id}><img src={item.image_url} alt="Community announcement"/><div><strong>@{item.author_nickname}</strong><p>{item.caption}</p><small>{new Date(item.created_at).toLocaleString()}</small></div></article>) : <div className="rc-empty-state"><Megaphone size={30}/><h2>No announcements yet</h2><p>New offers and updates will appear here.</p></div>}</div></div>}
     {publicProfile && <div className="rc-public-profile-backdrop" onClick={() => setPublicProfile(null)}><section className="rc-public-profile-card" onClick={e => e.stopPropagation()}><button className="rc-modal-close" onClick={() => setPublicProfile(null)} aria-label="Close profile"><X size={20}/></button><div className="rc-public-profile-avatar">{publicProfile.avatar_url ? <img src={publicProfile.avatar_url} alt=""/> : publicProfile.nickname?.[0]?.toUpperCase() || <UserRound size={38}/>}</div><h2>@{publicProfile.nickname}{publicProfile.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={19}/>}</h2>{publicProfile.premium_status === 'active' && publicProfile.premium_title && <strong className="rc-public-premium-title">{publicProfile.premium_title}</strong>}<p>{[publicProfile.level, publicProfile.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{publicProfile.school || 'School not listed'}</p>{publicProfile.department && <p>{publicProfile.department}</p>}{publicProfile.bio && <div className="rc-public-profile-bio">{publicProfile.bio}</div>}<div className="rc-public-profile-hours"><strong>{getExperienceTitle(publicProfile.total_online_seconds)}</strong><span>{Math.floor((publicProfile.total_online_seconds || 0)/3600)} lifetime hours</span></div>{publicProfile.id !== userId && <button className="rc-primary rc-full" onClick={() => { const convo = conversationList.find(c => c.kind === 'person' && c.otherUserId === publicProfile.id); if (convo) { setSelectedConversation(convo); setTab('Messages'); void markConversationRead(convo.id); } else { void sendRequest(publicProfile.id); } setPublicProfile(null); }}>{conversationList.some(c => c.kind === 'person' && c.otherUserId === publicProfile.id) ? 'Message' : 'Connect'}</button>}</section></div>}
@@ -2903,6 +2945,13 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-person-card, .rc-group-row-wrap, .rc-request-card, .rc-conversation-row, .rc-primary, .rc-secondary, .rc-icon-btn, .rc-bottom-item { transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease; }
       .rc-person-card:active, .rc-group-row-wrap:active, .rc-request-card:active, .rc-conversation-row:active, .rc-primary:active, .rc-secondary:active, .rc-icon-btn:active, .rc-bottom-item:active { transform: scale(.985); }
       .rc-shell { touch-action: pan-y; overflow-x: clip; padding-bottom: 0 !important; min-height: 100dvh; }
+      .rc-referral-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0;padding:12px 14px;border:1px solid rgba(96,165,250,.24);border-radius:13px;background:rgba(37,99,235,.09);color:#dbeafe}.rc-referral-summary span{font-size:13px;font-weight:700}.rc-referral-summary strong{font-size:22px;color:#60a5fa;font-variant-numeric:tabular-nums}
+      /* Keep chat identity header pinned inside the visible keyboard-adjusted viewport. */
+      .rc-messages-layout.has-chat .rc-chat-panel{display:flex!important;flex-direction:column!important;min-height:0!important;overflow:hidden!important}
+      .rc-messages-layout.has-chat .rc-chat-header{position:relative!important;top:auto!important;z-index:30!important;flex:0 0 auto!important;min-height:62px!important;max-height:92px!important;transform:none!important;will-change:auto!important}
+      .rc-messages-layout.has-chat .rc-chat-empty:not(.is-empty){flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important}
+      .rc-emoji-picker{pointer-events:auto!important;display:block!important;max-height:min(58dvh,460px)!important;bottom:calc(84px + env(safe-area-inset-bottom))!important}
+
       
 
 .rc-swipe-viewport {
@@ -2979,7 +3028,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-heading-notification { flex: 0 0 auto; margin-left: auto; }
       .rc-lifetime-summary { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; margin:14px 0; text-align:center; }
       .rc-experience-title, .rc-discover-details .rc-premium-badge { color:#32d296; font-weight:800; line-height:1.25; }
-      .rc-rank-newcomer{color:#22c55e!important}.rc-rank-sharp{color:#38bdf8!important}.rc-rank-regular{color:#a78bfa!important}.rc-rank-oga{color:#f59e0b!important}.rc-rank-chairman{color:#f472b6!important}.rc-rank-odogwu{color:#f97316!important}
+      .rc-rank-newcomer{color:#22c55e!important;background:rgba(34,197,94,.12)!important;border-color:rgba(34,197,94,.35)!important}.rc-rank-sharp,.rc-rank-sharp-guy{color:#38bdf8!important;background:rgba(56,189,248,.12)!important;border-color:rgba(56,189,248,.35)!important}.rc-rank-regular{color:#a78bfa!important;background:rgba(167,139,250,.12)!important;border-color:rgba(167,139,250,.35)!important}.rc-rank-oga{color:#f59e0b!important;background:rgba(245,158,11,.12)!important;border-color:rgba(245,158,11,.35)!important}.rc-rank-chairman{color:#f472b6!important;background:rgba(244,114,182,.12)!important;border-color:rgba(244,114,182,.35)!important}.rc-rank-odogwu{color:#f97316!important;background:rgba(249,115,22,.12)!important;border-color:rgba(249,115,22,.35)!important}
       .rc-toast{left:50%!important;right:auto!important;transform:translateX(-50%)!important;width:min( calc(100vw - 32px), 480px)!important;}
       .rc-lifetime-hours { color:#32d296; font-weight:800; line-height:1.3; }
       .rc-lifetime-hours span { color:#fff; font-weight:500; }
@@ -3949,7 +3998,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-message-bubble.mine * { color:inherit; }
       .rc-emoji-grid { display:grid !important; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px; visibility:visible !important; opacity:1 !important; color:#fff !important; font-size:29px !important; }
       .rc-emoji-grid button { min-width:0 !important; min-height:46px !important; display:grid !important; place-items:center !important; border:1px solid rgba(147,197,253,.16) !important; border-radius:11px !important; background:linear-gradient(145deg,rgba(96,165,250,.16),rgba(30,41,59,.72)) !important; padding:5px 2px !important; color:#ffffff !important; font-size:25px !important; line-height:1.2 !important; opacity:1 !important; visibility:visible !important; text-indent:0 !important; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-      .rc-emoji-grid .rc-emoji-glyph { display:inline-block !important; position:relative !important; visibility:visible !important; opacity:1 !important; color:#ffffff !important; -webkit-text-fill-color:#ffffff !important; font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",system-ui,sans-serif !important; font-size:29px !important; font-style:normal !important; font-weight:400 !important; font-variant-emoji:emoji !important; line-height:1.25 !important; text-indent:0 !important; white-space:nowrap !important; }
+      .rc-emoji-grid .rc-emoji-glyph { display:inline-block !important; position:relative !important; visibility:visible !important; opacity:1 !important; color:inherit !important; -webkit-text-fill-color:initial !important; font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",system-ui,sans-serif !important; font-size:29px !important; font-style:normal !important; font-weight:400 !important; font-variant-emoji:emoji !important; line-height:1.25 !important; text-indent:0 !important; white-space:nowrap !important; color:inherit !important; -webkit-text-fill-color:initial !important; }
       .rc-emoji-grid button:active { background:rgba(37,99,235,.42); transform:scale(.94); }
       .rc-floating-announcements { position:fixed; z-index:56; right:16px; bottom:calc(248px + env(safe-area-inset-bottom)); width:48px; height:48px; display:grid; place-items:center; border:1px solid rgba(250,204,21,.85); border-radius:16px; background:#facc15; color:#172033; box-shadow:0 8px 28px rgba(0,0,0,.38); touch-action:none; cursor:grab; } .rc-floating-announcements:active { cursor:grabbing; transform:scale(.97); }
       .rc-announcement-screen { position:fixed; inset:0; z-index:110; display:flex; flex-direction:column; background:#071326; color:#fff; overflow:auto; padding-bottom:env(safe-area-inset-bottom); }
@@ -3970,6 +4019,13 @@ async function playVoiceNote(message: ChatMessage) {
       @media (max-width:800px) { .rc-floating-announcements { bottom:calc(248px + env(safe-area-inset-bottom)); } }
 
       .rc-features-wrap{position:fixed;z-index:70;right:16px;bottom:calc(248px + env(safe-area-inset-bottom));width:52px;height:52px;touch-action:none}.rc-features-button{position:relative;display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;background:#facc15;color:#172033;border:1px solid #fde68a;border-radius:17px;font-weight:900;box-shadow:0 8px 28px #0007;cursor:grab}.rc-features-button:active{cursor:grabbing}.rc-features-badge{position:absolute;top:-7px;right:-7px;font-style:normal;background:#2563eb;color:white;border:2px solid #101b2d;border-radius:99px;min-width:19px;height:19px;display:grid;place-items:center;padding:0 4px;font-size:10px}.rc-features-menu{position:absolute;right:0;bottom:calc(100% + 12px);display:flex;flex-direction:column;width:min(210px,calc(100vw - 24px));max-height:min(220px,calc(100dvh - 250px));overflow-y:auto;padding:7px;border:1px solid #334155;border-radius:15px;background:#101b2d;box-shadow:0 12px 32px #0009;gap:3px}.rc-features-menu button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:white;padding:11px;border-radius:9px;text-align:left;white-space:nowrap}.rc-status-screen,.rc-status-compose-wrap{position:fixed;inset:0;z-index:110;background:#050914ed;display:grid;place-items:center;padding:16px}.rc-status-viewer,.rc-status-compose{position:relative;width:min(100%,440px);max-height:88dvh;overflow:auto;background:#111c2e;border:1px solid #334155;border-radius:20px;padding:18px;color:white}.rc-status-viewer>img{width:100%;max-height:65dvh;object-fit:contain;border-radius:12px}.rc-status-caption{padding:10px}.rc-status-controls{display:flex;justify-content:space-between}.rc-status-compose label{display:grid;gap:7px;margin:12px 0}.rc-status-compose input,.rc-status-compose textarea{width:100%;background:#0b1424;color:white;border:1px solid #334155;border-radius:10px;padding:10px}.rc-status-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+      /* Final overrides: preserve native full-colour emoji rendering and keep
+         the conversation identity row fixed above the keyboard-adjusted scroller. */
+      .rc-emoji-picker{display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;z-index:2147483647!important;max-height:min(58dvh,460px)!important;overflow-y:auto!important;bottom:calc(84px + env(safe-area-inset-bottom))!important}
+      .rc-emoji-grid .rc-emoji-glyph{font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif!important;font-size:29px!important;line-height:1.3!important;color:inherit!important;-webkit-text-fill-color:initial!important;font-variant-emoji:emoji!important}
+      .rc-messages-layout.has-chat .rc-chat-panel{display:flex!important;flex-direction:column!important;overflow:hidden!important;min-height:0!important}
+      .rc-messages-layout.has-chat .rc-chat-header{position:relative!important;flex:0 0 auto!important;top:auto!important;z-index:40!important;transform:none!important;min-height:62px!important;max-height:92px!important}
+      .rc-messages-layout.has-chat .rc-chat-empty{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important}
     `}
 
 </style>
