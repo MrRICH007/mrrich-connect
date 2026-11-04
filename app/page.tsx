@@ -956,8 +956,15 @@ const voiceChunksRef = useRef<Blob[]>([]);
       emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
       data: { nickname: requestedNickname, full_name: registration.full_name.trim(), phone: registration.phone.trim(), department: registration.department.trim(), level: registration.level.trim(), college: registration.college.trim(), school: registration.school.trim(), bio: registration.bio.trim(), rc_invite_token: inviteTokenFromUrl.current || null }
     }});
-    setStatus(error ? error.message : 'Registration submitted. Confirm your email, then sign in.');
-    if (!error) setAuthMode('signin');
+    if (error) {
+      setStatus(`Account creation failed: ${error.message}`);
+      setStatusType('error');
+      return;
+    }
+    setStatus(inviteTokenFromUrl.current
+      ? 'Account created. Confirm your email, then sign in. Your inviter connection will be completed automatically.'
+      : 'Registration submitted. Confirm your email, then sign in.');
+    setAuthMode('signin');
   }
   async function startPremiumPayment() {
     if (!supabase || !userId) { setStatus('Sign in before purchasing Premium.'); return; }
@@ -1254,6 +1261,27 @@ const voiceChunksRef = useRef<Blob[]>([]);
     setConversationList(mapped);
     setSelectedConversation(current => current ? (mapped.find(c => c.id === current.id) ?? current) : null);
   }, [supabase, userId, groups]);
+
+  // Retry invite attribution/chat creation after an invitee confirms email and signs in.
+  // This is a recovery path if the auth.users trigger could not create the chat
+  // during signup; it does not interfere with ordinary accounts.
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    let cancelled = false;
+    const completeInvite = async () => {
+      const { data, error } = await supabase.rpc('rc_complete_my_invite_connection');
+      if (cancelled) return;
+      if (error) {
+        console.warn('Invite connection recovery could not run:', error.message);
+        return;
+      }
+      if (data === true) {
+        await loadConversations();
+      }
+    };
+    void completeInvite();
+    return () => { cancelled = true; };
+  }, [supabase, userId, loadConversations]);
 
   function decodeChatMessage(message: ChatMessage): ChatMessage {
     const prefix = '[[RC_REPLY]]';
