@@ -4029,11 +4029,12 @@ async function playVoiceNote(message: ChatMessage) {
     `}
 
       /* Lightweight transparent conversation cards */
+.rc-co/* Lightweight transparent conversation cards */
 .rc-conversation-row {
   background: transparent !important;
   background-color: transparent !important;
-  border: 1px solid rgba(59,130,246,.9) !important;
-  box-shadow: 0 0 8px rgba(37,99,235,.16) !important;
+  border: 1px solid rgba(59, 130, 246, 0.9) !important;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.16) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -4047,10 +4048,10 @@ async function playVoiceNote(message: ChatMessage) {
 .rc-conversation-row.active {
   background: transparent !important;
   border-color: #60a5fa !important;
-  box-shadow: 0 0 13px rgba(37,99,235,.32) !important;
-      }
+  box-shadow: 0 0 13px rgba(37, 99, 235, 0.32) !important;
+}
 
-      .rc-emoji-picker .rc-emoji-grid {
+.rc-emoji-picker .rc-emoji-grid {
   display: grid !important;
   grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
   visibility: visible !important;
@@ -4063,8 +4064,7 @@ async function playVoiceNote(message: ChatMessage) {
   min-height: 46px !important;
   color: white !important;
   -webkit-text-fill-color: initial !important;
-  font-family: "Noto Color Emoji", "Apple Color Emoji",
-    "Segoe UI Emoji", sans-serif !important;
+  font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif !important;
   font-size: 27px !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -4072,8 +4072,7 @@ async function playVoiceNote(message: ChatMessage) {
 
 .rc-emoji-picker .rc-emoji-glyph {
   display: inline-block !important;
-  font-family: "Noto Color Emoji", "Apple Color Emoji",
-    "Segoe UI Emoji", sans-serif !important;
+  font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif !important;
   font-size: 29px !important;
   color: initial !important;
   -webkit-text-fill-color: initial !important;
