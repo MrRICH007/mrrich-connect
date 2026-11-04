@@ -4029,7 +4029,6 @@ async function playVoiceNote(message: ChatMessage) {
     `}
 
       /* Lightweight transparent conversation cards */
-.rc-co/* Lightweight transparent conversation cards */
 .rc-conversation-row {
   background: transparent !important;
   background-color: transparent !important;
