@@ -360,9 +360,6 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const inviteWasDragged = useRef(false);
   const inviteTokenFromUrl = useRef<string>('');
   const [groupSchoolSearch, setGroupSchoolSearch] = useState('');
-  const [marketplacePosition, setMarketplacePosition] = useState<{ x: number; y: number } | null>(null);
-  const marketplaceDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
-  const marketplaceWasDragged = useRef(false);
 
   // Preserve the invitation token through account registration and email confirmation.
   useEffect(() => {
@@ -784,21 +781,94 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const canPostStatus = isCurrentUserPremium && ['Sharp Guy','Regular','Oga','Chairman','Odogwu'].includes(currentRankTitle);
   async function loadStatuses() {
     if (!supabase) return;
-    const { data, error } = await supabase.from('user_statuses').select('id,user_id,caption,link_url,image_path,created_at,expires_at,profiles:user_id(nickname,avatar_url)').gt('expires_at', new Date().toISOString()).order('created_at',{ascending:false});
-    if (error) { setStatus(`Could not load statuses: ${error.message}`); return; }
+    // Keep this query independent of PostgREST relationship inference so a
+    // profile foreign-key ambiguity cannot make a successful status invisible.
+    const { data, error } = await supabase
+      .from('user_statuses')
+      .select('id,user_id,caption,link_url,image_path,created_at,expires_at')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+    if (error) {
+      setStatus(`Could not load statuses: ${error.message}`);
+      setStatusType('error');
+      return;
+    }
     setStatusRows(data || []);
   }
+
   async function publishStatus() {
-    if (!supabase || !userId || !canPostStatus) { setStatus('Status posting requires Premium membership and Sharp Guy rank or higher.'); return; }
-    if (!statusImage || !statusCaption.trim()) { setStatus('Choose a picture and add a caption.'); return; }
+    if (!supabase || !userId) {
+      setStatus('Please sign in before publishing a status.');
+      setStatusType('error');
+      return;
+    }
+    if (!canPostStatus) {
+      setStatus('Status posting requires active Premium membership and Sharp Guy rank or higher (at least 10 lifetime hours).');
+      setStatusType('error');
+      return;
+    }
+    if (!statusImage || !statusCaption.trim()) {
+      setStatus('Choose a picture and add a caption.');
+      setStatusType('error');
+      return;
+    }
+    if (!statusImage.type.startsWith('image/')) {
+      setStatus('Please choose a valid image file.');
+      setStatusType('error');
+      return;
+    }
+    if (statusImage.size > 10 * 1024 * 1024) {
+      setStatus('Your status picture must be 10 MB or smaller.');
+      setStatusType('error');
+      return;
+    }
+
     setStatusBusy(true);
-    const path = `${userId}/${Date.now()}-${statusImage.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
-    const { error: uploadError } = await supabase.storage.from('status-images').upload(path,statusImage,{upsert:false,contentType:statusImage.type});
-    if (uploadError) { setStatusBusy(false); setStatus(`Status image upload failed: ${uploadError.message}`); return; }
-    const { error } = await supabase.from('user_statuses').insert({user_id:userId,image_path:path,caption:statusCaption.trim().slice(0,500),link_url:statusLink.trim()||null});
-    setStatusBusy(false);
-    if (error) { await supabase.storage.from('status-images').remove([path]); setStatus(`Could not publish status: ${error.message}`); return; }
-    setStatusCaption('');setStatusLink('');setStatusImage(null);await loadStatuses();setStatus('Status published. It will expire after 12 hours.');
+    const safeName = statusImage.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${userId}/${Date.now()}-${safeName}`;
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('status-images')
+        .upload(path, statusImage, {
+          upsert: false,
+          contentType: statusImage.type,
+          cacheControl: '3600'
+        });
+
+      if (uploadError) {
+        throw new Error(`Picture upload failed: ${uploadError.message}`);
+      }
+
+      const { error: insertError } = await supabase
+        .from('user_statuses')
+        .insert({
+          user_id: userId,
+          image_path: path,
+          caption: statusCaption.trim().slice(0, 500),
+          link_url: statusLink.trim() || null
+        });
+
+      if (insertError) {
+        await supabase.storage.from('status-images').remove([path]);
+        throw new Error(`Could not save your status: ${insertError.message}`);
+      }
+
+      // Close the composer before showing confirmation; otherwise the toast
+      // can sit behind the modal and make a successful publish look unresponsive.
+      setStatusOpen(false);
+      setStatusCaption('');
+      setStatusLink('');
+      setStatusImage(null);
+      await loadStatuses();
+      setStatusType('success');
+      setStatus('Status published successfully. It will remain visible for 12 hours.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      setStatusType('error');
+      setStatus(`Status was not published. ${message}`);
+    } finally {
+      setStatusBusy(false);
+    }
   }
   useEffect(() => {
     if (!statusViewerOpen || statusPaused || statusRows.length < 1) return;
@@ -2746,7 +2816,7 @@ async function playVoiceNote(message: ChatMessage) {
 
     {userId && tab === 'My Profile' && !selectedConversation && !showProfile && !showGroup && !marketplaceOpen && <button className="rc-floating-premium" onClick={() => setTab('Premium')}><Crown size={17}/> Premium</button>}
     {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && !inviteOpen && <div className="rc-features-wrap" style={invitePosition ? { left: invitePosition.x, top: invitePosition.y, right: 'auto', bottom: 'auto' } : undefined}>
-      <button type="button" className="rc-features-button" onPointerDown={e => { inviteWasDragged.current=false; const r=e.currentTarget.getBoundingClientRect(); inviteDrag.current={pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,originX:invitePosition?.x??r.left,originY:invitePosition?.y??r.top}; e.currentTarget.setPointerCapture(e.pointerId); }} onPointerMove={e=>{const d=inviteDrag.current;if(!d||d.pointerId!==e.pointerId)return;if(Math.abs(e.clientX-d.startX)>5||Math.abs(e.clientY-d.startY)>5)inviteWasDragged.current=true;const r=e.currentTarget.getBoundingClientRect();setInvitePosition({x:Math.max(8,Math.min(window.innerWidth-r.width-8,d.originX+e.clientX-d.startX)),y:Math.max(8,Math.min(window.innerHeight-r.height-8,d.originY+e.clientY-d.startY))});}} onPointerUp={e=>{if(inviteDrag.current?.pointerId===e.pointerId)inviteDrag.current=null;}} onPointerCancel={()=>{inviteDrag.current=null;}} onClick={()=>{if(inviteWasDragged.current){inviteWasDragged.current=false;return;}setFeaturesMenuOpen(v=>!v);}} aria-label="Open Features menu"><Sparkles size={21}/><span>Features</span>{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount>99?'99+':unreadAnnouncementCount}</i>}</button>
+      <button type="button" className="rc-features-button" onPointerDown={e => { inviteWasDragged.current=false; const r=e.currentTarget.getBoundingClientRect(); inviteDrag.current={pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,originX:invitePosition?.x??r.left,originY:invitePosition?.y??r.top}; e.currentTarget.setPointerCapture(e.pointerId); }} onPointerMove={e=>{const d=inviteDrag.current;if(!d||d.pointerId!==e.pointerId)return;if(Math.abs(e.clientX-d.startX)>5||Math.abs(e.clientY-d.startY)>5)inviteWasDragged.current=true;const r=e.currentTarget.getBoundingClientRect();const minY=Math.min(220,Math.max(8,window.innerHeight-r.height-8));setInvitePosition({x:Math.max(8,Math.min(window.innerWidth-r.width-8,d.originX+e.clientX-d.startX)),y:Math.max(minY,Math.min(window.innerHeight-r.height-8,d.originY+e.clientY-d.startY))});}} onPointerUp={e=>{if(inviteDrag.current?.pointerId===e.pointerId)inviteDrag.current=null;}} onPointerCancel={()=>{inviteDrag.current=null;}} onClick={()=>{if(inviteWasDragged.current){inviteWasDragged.current=false;return;}setFeaturesMenuOpen(v=>!v);}} aria-label="Open Features menu" aria-expanded={featuresMenuOpen}><Sparkles size={22}/>{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount>99?'99+':unreadAnnouncementCount}</i>}</button>
       {featuresMenuOpen&&<div className="rc-features-menu"><button onClick={()=>{setFeaturesMenuOpen(false);setStatusOpen(true);void loadStatuses();}}> <CircleDot size={17}/> Status</button><button onClick={()=>{setFeaturesMenuOpen(false);setMarketplaceOpen(true);}}><Store size={17}/> Marketplace</button><button onClick={()=>{setFeaturesMenuOpen(false);void openInviteCard();}}><UserPlus size={17}/> Invite</button><button onClick={()=>{setFeaturesMenuOpen(false);void loadAnnouncements();setAnnouncementOpen(true);setUnreadAnnouncementCount(0);}}><Megaphone size={17}/> Announcements{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount}</i>}</button></div>}
     </div>}
 
@@ -2782,16 +2852,6 @@ async function playVoiceNote(message: ChatMessage) {
       </section>
     </div>}
 
-    {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && <button
-      className="rc-floating-marketplace"
-      style={marketplacePosition ? { left: marketplacePosition.x, top: marketplacePosition.y, right: 'auto', bottom: 'auto' } : undefined}
-      onPointerDown={e => { marketplaceWasDragged.current = false; const rect = e.currentTarget.getBoundingClientRect(); marketplaceDrag.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, originX: marketplacePosition?.x ?? rect.left, originY: marketplacePosition?.y ?? rect.top }; e.currentTarget.setPointerCapture(e.pointerId); }}
-      onPointerMove={e => { const drag = marketplaceDrag.current; if (!drag || drag.pointerId !== e.pointerId) return; if (Math.abs(e.clientX - drag.startX) > 5 || Math.abs(e.clientY - drag.startY) > 5) marketplaceWasDragged.current = true; const rect = e.currentTarget.getBoundingClientRect(); const buttonWidth = rect.width || 48; const buttonHeight = rect.height || 48; const x = Math.max(8, Math.min(window.innerWidth - buttonWidth - 8, drag.originX + e.clientX - drag.startX)); const y = Math.max(8, Math.min(window.innerHeight - buttonHeight - 8, drag.originY + e.clientY - drag.startY)); setMarketplacePosition({ x, y }); }}
-      onPointerUp={e => { if (marketplaceDrag.current?.pointerId === e.pointerId) marketplaceDrag.current = null; }}
-      onPointerCancel={() => { marketplaceDrag.current = null; }}
-      onClick={() => { if (marketplaceWasDragged.current) { marketplaceWasDragged.current = false; return; } setMarketplaceOpen(true); }}
-      aria-label="Open Marketplace"
-    ><Store size={22}/></button>}
     {marketplaceOpen && <div className="rc-marketplace-screen"><button className="rc-icon-btn rc-marketplace-back" onClick={() => setMarketplaceOpen(false)} aria-label="Back"><ArrowLeft size={19}/></button><div className="rc-marketplace-message"><div className="rc-empty-icon"><Store size={30}/></div><h1>Marketplace coming soon</h1><p>We’re preparing something useful for the MR RICH CONNECT community.</p><button className="rc-primary" onClick={() => setMarketplaceOpen(false)}>Back to MR RICH CONNECT</button></div></div>}
 
     {showProfile && <div className="rc-modal-backdrop" onClick={() => { setShowProfile(false); setEditingProfile(false); }}><form className="rc-modal" onSubmit={saveProfile} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => { setShowProfile(false); setEditingProfile(false); }} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">YOUR PUBLIC IDENTITY</span><h2>{editingProfile ? 'Edit profile' : 'Create your profile'}</h2><p className="rc-muted">Public details are visible to members. Private details are only readable by your own account.</p><label>Nickname<input required maxLength={24} value={profileForm.nickname} onChange={e => setProfileForm({...profileForm, nickname:e.target.value})} placeholder="@yournickname"/></label><label>Level<select value={profileForm.level} onChange={e => setProfileForm({...profileForm,level:e.target.value})}><option value="">Select level</option>{PROFILE_LEVELS.map(level=><option key={level} value={level}>{level}</option>)}</select></label><label>College<input value={profileForm.college} onChange={e => setProfileForm({...profileForm, college:e.target.value})} placeholder="Your college"/></label><label>School / institution<input value={profileForm.school} onChange={e => setProfileForm({...profileForm,school:e.target.value})} placeholder="Type to search Nigerian institutions…" autoComplete="off"/><div className="rc-school-options rc-school-search-results">{NIGERIAN_SCHOOLS.filter(s=>profileForm.school.trim().length>0 && s.toLocaleLowerCase().includes(profileForm.school.toLocaleLowerCase())).slice(0,8).map(s=><button type="button" key={s} className="rc-secondary" onClick={()=>setProfileForm({...profileForm,school:s})}>{s}</button>)}</div></label>
@@ -2907,12 +2967,10 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-preview-ticks { color:#94a3b8; font-weight:800; white-space:nowrap; } .rc-preview-ticks.is-read { color:#facc15; }
       .rc-current-rank { border:1px solid rgba(96,165,250,.5); border-radius:12px; }
       .rc-admin-only-notice { width:100%; box-sizing:border-box; text-align:center; padding:18px 12px calc(18px + env(safe-area-inset-bottom)); color:#facc15; font-weight:800; background:rgba(16,43,88,.55); border-top:1px solid rgba(96,165,250,.25); } .rc-hour-unit { display:inline-block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.82em; font-weight:900; letter-spacing:-.04em; margin-left:2px; }
-      .rc-floating-premium, .rc-floating-marketplace, .rc-floating-invite { position:fixed; z-index:55; display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid rgba(96,165,250,.55); border-radius:999px; background:#102b58; color:#fff; padding:11px 15px; font-weight:700; box-shadow:0 8px 28px rgba(0,0,0,.3); touch-action:none; }
+      .rc-floating-premium, .rc-floating-invite { position:fixed; z-index:55; display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid rgba(96,165,250,.55); border-radius:999px; background:#102b58; color:#fff; padding:11px 15px; font-weight:700; box-shadow:0 8px 28px rgba(0,0,0,.3); touch-action:none; }
       .rc-floating-invite { right:16px; bottom:calc(194px + env(safe-area-inset-bottom)); width:48px; height:48px; padding:0; border-radius:16px; cursor:grab; background:#1d4ed8; color:#fff; border-color:#60a5fa; }
       .rc-floating-invite:active { cursor:grabbing; }
       .rc-floating-premium { right:16px; bottom:calc(86px + env(safe-area-inset-bottom)); }
-      .rc-floating-marketplace { right:16px; bottom:calc(140px + env(safe-area-inset-bottom)); cursor:grab; background:#facc15; color:#172033; border-color:#fde047; width:48px; height:48px; padding:0; border-radius:16px; }
-      .rc-floating-marketplace:active { cursor:grabbing; }
       .rc-invite-backdrop { position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center; padding:18px; overflow-y:auto; background:rgba(2,8,23,.78); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px); }
       .rc-invite-card { position:relative; width:min(100%,390px); max-height:calc(100dvh - 36px); overflow-y:auto; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; gap:13px; padding:28px 22px 22px; border:1px solid rgba(96,165,250,.42); border-radius:24px; background:linear-gradient(155deg,#10264b 0%,#081326 58%,#0b1c38 100%); color:#f8fafc; box-shadow:0 24px 80px rgba(0,0,0,.5); text-align:center; }
       .rc-invite-card .rc-modal-close { top:12px; right:12px; }
@@ -2935,7 +2993,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-marketplace-message { width:min(100%,480px); text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; }
       .rc-marketplace-message h1 { margin:0; font-size:clamp(26px,5vw,38px); }
       .rc-marketplace-message p { color:#aab9d0; margin:0 0 10px; line-height:1.6; }
-      @media (max-width:800px) { .rc-floating-premium { bottom:calc(82px + env(safe-area-inset-bottom)); } .rc-floating-marketplace { bottom:calc(136px + env(safe-area-inset-bottom)); } .rc-floating-invite { bottom:calc(192px + env(safe-area-inset-bottom)); } }
+      @media (max-width:800px) { .rc-floating-premium { bottom:calc(82px + env(safe-area-inset-bottom)); } .rc-floating-invite { bottom:calc(192px + env(safe-area-inset-bottom)); } }
       @media (max-height:620px) { .rc-invite-card { max-height:calc(100dvh - 20px); padding:22px 16px 16px; gap:9px; } .rc-invite-avatar { width:82px; height:82px; } .rc-invite-qr { width:138px; height:138px; } }
 
       /* Slim glass panels for each conversation in the Messages list. */
@@ -3083,7 +3141,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-conversation-copy small { line-height:1.3; }
       .rc-page-heading.rc-simple-page-heading { margin-top: 0 !important; padding-top: 2px !important; }
       .rc-page-heading.rc-simple-page-heading h1 { margin-top: 0 !important; }
-      .rc-toast {
+      .rc-toast { z-index: 200;
         position: fixed !important;
         top: max(12px, calc(env(safe-area-inset-top) + 8px)) !important;
         bottom: auto !important;
@@ -3883,7 +3941,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-public-profile-card h2 { display:flex; align-items:center; margin:4px 0; font-size:22px; }.rc-public-profile-card p { margin:0; color:#cbd5e1; font-size:13px; }.rc-public-profile-bio { width:100%; margin:7px 0; padding:12px; box-sizing:border-box; border-radius:12px; background:rgba(148,163,184,.08); color:#e2e8f0; white-space:pre-wrap; line-height:1.5; }.rc-public-profile-hours { display:flex; flex-direction:column; gap:3px; margin:6px 0 10px; }.rc-public-profile-hours strong { color:#93c5fd; }.rc-public-profile-hours span { color:#94a3b8; font-size:12px; }
       @media (max-width:800px) { .rc-floating-announcements { bottom:calc(248px + env(safe-area-inset-bottom)); } }
 
-      .rc-features-wrap{position:fixed;z-index:70;right:16px;bottom:calc(248px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:flex-end;gap:10px;touch-action:none}.rc-features-button{position:relative;display:flex;align-items:center;gap:7px;background:#facc15;color:#172033;border:1px solid #fde68a;border-radius:16px;padding:13px 15px;font-weight:900;box-shadow:0 8px 28px #0007;cursor:grab}.rc-features-badge{font-style:normal;background:#2563eb;color:white;border-radius:99px;padding:2px 6px;font-size:10px}.rc-features-menu{display:flex;flex-direction:column;min-width:190px;padding:7px;border:1px solid #334155;border-radius:15px;background:#101b2d;box-shadow:0 12px 32px #0009;gap:3px}.rc-features-menu button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:white;padding:11px;border-radius:9px;text-align:left}.rc-status-screen,.rc-status-compose-wrap{position:fixed;inset:0;z-index:110;background:#050914ed;display:grid;place-items:center;padding:16px}.rc-status-viewer,.rc-status-compose{position:relative;width:min(100%,440px);max-height:88dvh;overflow:auto;background:#111c2e;border:1px solid #334155;border-radius:20px;padding:18px;color:white}.rc-status-viewer>img{width:100%;max-height:65dvh;object-fit:contain;border-radius:12px}.rc-status-caption{padding:10px}.rc-status-controls{display:flex;justify-content:space-between}.rc-status-compose label{display:grid;gap:7px;margin:12px 0}.rc-status-compose input,.rc-status-compose textarea{width:100%;background:#0b1424;color:white;border:1px solid #334155;border-radius:10px;padding:10px}.rc-status-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+      .rc-features-wrap{position:fixed;z-index:70;right:16px;bottom:calc(248px + env(safe-area-inset-bottom));width:52px;height:52px;touch-action:none}.rc-features-button{position:relative;display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;background:#facc15;color:#172033;border:1px solid #fde68a;border-radius:17px;font-weight:900;box-shadow:0 8px 28px #0007;cursor:grab}.rc-features-button:active{cursor:grabbing}.rc-features-badge{position:absolute;top:-7px;right:-7px;font-style:normal;background:#2563eb;color:white;border:2px solid #101b2d;border-radius:99px;min-width:19px;height:19px;display:grid;place-items:center;padding:0 4px;font-size:10px}.rc-features-menu{position:absolute;right:0;bottom:calc(100% + 12px);display:flex;flex-direction:column;width:min(210px,calc(100vw - 24px));max-height:min(220px,calc(100dvh - 250px));overflow-y:auto;padding:7px;border:1px solid #334155;border-radius:15px;background:#101b2d;box-shadow:0 12px 32px #0009;gap:3px}.rc-features-menu button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:white;padding:11px;border-radius:9px;text-align:left;white-space:nowrap}.rc-status-screen,.rc-status-compose-wrap{position:fixed;inset:0;z-index:110;background:#050914ed;display:grid;place-items:center;padding:16px}.rc-status-viewer,.rc-status-compose{position:relative;width:min(100%,440px);max-height:88dvh;overflow:auto;background:#111c2e;border:1px solid #334155;border-radius:20px;padding:18px;color:white}.rc-status-viewer>img{width:100%;max-height:65dvh;object-fit:contain;border-radius:12px}.rc-status-caption{padding:10px}.rc-status-controls{display:flex;justify-content:space-between}.rc-status-compose label{display:grid;gap:7px;margin:12px 0}.rc-status-compose input,.rc-status-compose textarea{width:100%;background:#0b1424;color:white;border:1px solid #334155;border-radius:10px;padding:10px}.rc-status-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
     `}
 
 </style>
