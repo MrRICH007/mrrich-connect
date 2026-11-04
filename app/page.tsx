@@ -4027,56 +4027,6 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-messages-layout.has-chat .rc-chat-header{position:relative!important;flex:0 0 auto!important;top:auto!important;z-index:40!important;transform:none!important;min-height:62px!important;max-height:92px!important}
       .rc-messages-layout.has-chat .rc-chat-empty{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important}
     `}
-
-      /* Lightweight transparent conversation cards */
-.rc-conversation-row {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 1px solid rgba(59, 130, 246, 0.9) !important;
-  box-shadow: 0 0 8px rgba(37, 99, 235, 0.16) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-.rc-conversation-row::before,
-.rc-conversation-row::after {
-  display: none !important;
-  content: none !important;
-}
-
-.rc-conversation-row.active {
-  background: transparent !important;
-  border-color: #60a5fa !important;
-  box-shadow: 0 0 13px rgba(37, 99, 235, 0.32) !important;
-}
-
-.rc-emoji-picker .rc-emoji-grid {
-  display: grid !important;
-  grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-.rc-emoji-picker .rc-emoji-grid button {
-  display: grid !important;
-  place-items: center !important;
-  min-height: 46px !important;
-  color: white !important;
-  -webkit-text-fill-color: initial !important;
-  font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif !important;
-  font-size: 27px !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-.rc-emoji-picker .rc-emoji-glyph {
-  display: inline-block !important;
-  font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif !important;
-  font-size: 29px !important;
-  color: initial !important;
-  -webkit-text-fill-color: initial !important;
-  visibility: visible !important;
-  opacity: 1 !important;
       }
 </style>
   </main>
