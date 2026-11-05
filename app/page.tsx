@@ -477,6 +477,8 @@ const voiceChunksRef = useRef<Blob[]>([]);
     const updateViewport = () => {
       const keyboardOpen = window.innerHeight - viewport.height > 140;
       document.documentElement.style.setProperty('--rc-visual-height', `${viewport.height}px`);
+      document.documentElement.style.setProperty('--rc-visual-width', `${viewport.width}px`);
+      document.documentElement.style.setProperty('--rc-visual-left', `${Math.max(0, viewport.offsetLeft)}px`);
       document.documentElement.style.setProperty('--rc-visual-offset', `${Math.max(0, viewport.offsetTop)}px`);
       document.documentElement.classList.toggle('rc-keyboard-open', keyboardOpen);
     };
@@ -489,6 +491,8 @@ const voiceChunksRef = useRef<Blob[]>([]);
       viewport.removeEventListener('scroll', updateViewport);
       window.removeEventListener('resize', updateViewport);
       document.documentElement.style.removeProperty('--rc-visual-height');
+      document.documentElement.style.removeProperty('--rc-visual-width');
+      document.documentElement.style.removeProperty('--rc-visual-left');
       document.documentElement.style.removeProperty('--rc-visual-offset');
       document.documentElement.classList.remove('rc-keyboard-open');
     };
@@ -1014,7 +1018,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   }
 
   const inviteLink = inviteToken && typeof window !== 'undefined'
-    ? `${window.location.origin}/?invite=${encodeURIComponent(inviteToken)}`
+    ? `${window.location.origin}/invite/${encodeURIComponent(inviteToken)}`
     : '';
 
   async function copyInviteLink() {
@@ -2881,7 +2885,7 @@ async function playVoiceNote(message: ChatMessage) {
 >
   {voiceBusy ? '…' : isRecordingVoice ? <Square size={19} fill="currentColor" /> : <Mic size={21} />}
 </button>
-<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{(EMOJIS.length ? EMOJIS : ["😀","😂","🥰","😍","😊","😉","😭","🔥","❤️","👍","🙏","🎉","✨","💯","🤔","😎"]).map((emoji, i)=><button type="button" key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}><span className="rc-emoji-glyph" role="img" aria-label={emoji}>{emoji}</span></button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{(EMOJIS.length ? EMOJIS : ["😀","😂","🥰","😍","😊","😉","😭","🔥","❤️","👍","🙏","🎉","✨","💯","🤔","😎"]).map((emoji, i)=><button type="button" key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); setShowEmojiPicker(false); window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('textarea[name=\"chat-message\"]')?.focus(), 0); }} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}><span className="rc-emoji-glyph" role="img" aria-label={emoji}>{emoji}</span></button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -4283,8 +4287,81 @@ async function playVoiceNote(message: ChatMessage) {
        .rc-incoming-invite-person>div { display:flex;flex-direction:column;gap:5px;min-width:0; }
        .rc-incoming-invite-person strong { font-size:16px;color:#fff; }
        .rc-incoming-invite-person small { font-size:12px;color:#cbd5e1; }
-    `}
-</style>
+      /* FINAL STRUCTURAL FIXES (Chrome/Android): visual viewport, chat grid and emoji rendering. */
+      @media (max-width: 800px) {
+        .rc-status-screen {
+          position:fixed!important; left:var(--rc-visual-left,0px)!important;
+          top:var(--rc-visual-offset,0px)!important; right:auto!important; bottom:auto!important;
+          width:var(--rc-visual-width,100vw)!important; min-width:var(--rc-visual-width,100vw)!important;
+          max-width:var(--rc-visual-width,100vw)!important; height:var(--rc-visual-height,100dvh)!important;
+          min-height:var(--rc-visual-height,100dvh)!important; max-height:var(--rc-visual-height,100dvh)!important;
+          padding:0!important; margin:0!important; transform:none!important; overflow:hidden!important;
+          contain:none!important; z-index:2147483647!important; box-sizing:border-box!important;
+        }
+        .rc-status-viewer {
+          position:absolute!important; inset:0!important; width:100%!important; height:100%!important;
+          min-width:0!important; max-width:none!important; min-height:0!important; max-height:none!important;
+          padding:0!important; margin:0!important; border:0!important; border-radius:0!important;
+          overflow:hidden!important; box-sizing:border-box!important;
+        }
+        .rc-status-image {
+          position:absolute!important; left:0!important; top:0!important; right:0!important; bottom:0!important;
+          display:block!important; width:100%!important; height:100%!important; max-width:none!important;
+          max-height:none!important; object-fit:cover!important; object-position:center center!important;
+          border:0!important; border-radius:0!important;
+        }
+        /* Grid rows, not sticky positioning: the message scroller cannot move the header in Chrome. */
+        .rc-messages-layout.has-chat { height:var(--rc-visual-height,100dvh)!important; min-height:0!important; overflow:hidden!important; }
+        .rc-messages-layout.has-chat .rc-chat-panel {
+          display:grid!important; grid-template-rows:minmax(64px,auto) minmax(0,1fr) auto!important;
+          grid-template-columns:minmax(0,1fr)!important; align-content:stretch!important;
+          position:relative!important; height:100%!important; min-height:0!important; max-height:100%!important;
+          overflow:hidden!important; transform:none!important; contain:layout paint!important;
+        }
+        .rc-messages-layout.has-chat .rc-chat-header {
+          grid-row:1!important; grid-column:1!important; position:relative!important; inset:auto!important;
+          display:flex!important; width:100%!important; min-height:64px!important; max-height:92px!important;
+          flex:none!important; align-self:stretch!important; z-index:5!important; transform:none!important;
+          overflow:hidden!important; background:#101820!important;
+        }
+        .rc-messages-layout.has-chat .rc-chat-empty {
+          grid-row:2!important; grid-column:1!important; width:100%!important; height:auto!important;
+          min-height:0!important; max-height:none!important; overflow-y:auto!important; overflow-x:hidden!important;
+          align-self:stretch!important; -webkit-overflow-scrolling:touch!important; overscroll-behavior:contain!important;
+        }
+        .rc-messages-layout.has-chat .rc-composer-wrap {
+          grid-row:3!important; grid-column:1!important; position:relative!important; inset:auto!important;
+          width:100%!important; min-height:0!important; flex:none!important; align-self:stretch!important;
+          z-index:6!important; margin:0!important; overflow:visible!important; background:#101820!important;
+        }
+        .rc-messages-layout.has-chat .rc-composer { width:100%!important; flex:none!important; }
+      }
+      /* Emoji content is a plain text glyph grid; avoid inherited icon/text clipping styles. */
+      .rc-emoji-picker {
+        position:fixed!important; display:block!important; visibility:visible!important; opacity:1!important;
+        pointer-events:auto!important; left:8px!important; right:8px!important; bottom:calc(76px + env(safe-area-inset-bottom))!important;
+        width:auto!important; height:auto!important; min-height:150px!important; max-height:55dvh!important;
+        overflow-y:auto!important; z-index:2147483647!important; background:#101b2d!important;
+        color:#fff!important; padding:12px!important; box-sizing:border-box!important;
+      }
+      .rc-emoji-grid {
+        display:grid!important; visibility:visible!important; opacity:1!important;
+        grid-template-columns:repeat(7,minmax(0,1fr))!important; gap:7px!important;
+        min-height:100px!important; color:#fff!important;
+      }
+      .rc-emoji-grid button {
+        display:grid!important; place-items:center!important; min-width:0!important; min-height:46px!important;
+        padding:0!important; visibility:visible!important; opacity:1!important; overflow:visible!important;
+        color:#fff!important; font-size:27px!important; line-height:1.3!important; text-indent:0!important;
+        -webkit-text-fill-color:initial!important;
+      }
+      .rc-emoji-grid .rc-emoji-glyph {
+        display:block!important; visibility:visible!important; opacity:1!important; position:static!important;
+        font-family:system-ui,"Apple Color Emoji","Noto Color Emoji","Segoe UI Emoji",sans-serif!important;
+        font-size:28px!important; line-height:1.3!important; font-style:normal!important; font-weight:400!important;
+        color:initial!important; -webkit-text-fill-color:initial!important; text-indent:0!important;
+      }
+    `}</style>
   </main>
 );
 }
