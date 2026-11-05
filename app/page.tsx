@@ -326,7 +326,6 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [voicePreviewDuration, setVoicePreviewDuration] = useState(0);
   const [draftMessage, setDraftMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const draftMessageRef = useRef<HTMLTextAreaElement | null>(null);
   const [conversationBlockStatus, setConversationBlockStatus] = useState<'you' | 'them' | 'both' | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -346,7 +345,6 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusViewerOpen, setStatusViewerOpen] = useState(false);
   const [statusRows, setStatusRows] = useState<any[]>([]);
-  const [statusPeople, setStatusPeople] = useState<any[]>([]);
   const [statusCaption, setStatusCaption] = useState('');
   const [statusLink, setStatusLink] = useState('');
   const [statusImage, setStatusImage] = useState<File | null>(null);
@@ -365,6 +363,8 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const inviteDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const inviteWasDragged = useRef(false);
   const inviteTokenFromUrl = useRef<string>('');
+  const [inviterPreview, setInviterPreview] = useState<{inviter_id:string;nickname:string;avatar_url:string|null;invite_token:string}|null>(null);
+  const [inviterPreviewLoading, setInviterPreviewLoading] = useState(false);
   const [groupSchoolSearch, setGroupSchoolSearch] = useState('');
 
   // Preserve the invitation token through account registration and email confirmation.
@@ -376,6 +376,23 @@ const voiceChunksRef = useRef<Blob[]>([]);
       setAuthMode('signup');
     }
   }, []);
+
+  // Resolve a shared invite token to the inviter's public-only profile preview.
+  useEffect(() => {
+    const token = inviteTokenFromUrl.current;
+    if (!token || !supabase) return;
+    let cancelled = false;
+    setInviterPreviewLoading(true);
+    supabase.rpc('rc_get_inviter_preview', { p_token: token }).then(({ data, error }: any) => {
+      if (cancelled) return;
+      if (error) console.warn('Invite preview lookup failed:', error.message);
+      setInviterPreview(data && typeof data === 'object' ? data : null);
+      setInviterPreviewLoading(false);
+    }).catch((error: any) => {
+      if (!cancelled) { console.warn('Invite preview lookup failed:', error); setInviterPreview(null); setInviterPreviewLoading(false); }
+    });
+    return () => { cancelled = true; };
+  }, [supabase]);
 
   // Keep the mobile chat aligned with the visible viewport when the keyboard opens.
   const internalHistoryRef = useRef<Array<{ tab: string; conversationId: string | null }>>([]);
@@ -444,9 +461,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
     const updateViewport = () => {
       const keyboardOpen = window.innerHeight - viewport.height > 140;
       document.documentElement.style.setProperty('--rc-visual-height', `${viewport.height}px`);
-      document.documentElement.style.setProperty('--rc-visual-width', `${viewport.width}px`);
       document.documentElement.style.setProperty('--rc-visual-offset', `${Math.max(0, viewport.offsetTop)}px`);
-      document.documentElement.style.setProperty('--rc-visual-offset-left', `${Math.max(0, viewport.offsetLeft)}px`);
       document.documentElement.classList.toggle('rc-keyboard-open', keyboardOpen);
     };
     updateViewport();
@@ -458,9 +473,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       viewport.removeEventListener('scroll', updateViewport);
       window.removeEventListener('resize', updateViewport);
       document.documentElement.style.removeProperty('--rc-visual-height');
-      document.documentElement.style.removeProperty('--rc-visual-width');
       document.documentElement.style.removeProperty('--rc-visual-offset');
-      document.documentElement.style.removeProperty('--rc-visual-offset-left');
       document.documentElement.classList.remove('rc-keyboard-open');
     };
   }, []);
@@ -791,8 +804,8 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const canPostStatus = isCurrentUserPremium && ['Sharp Guy','Regular','Oga','Chairman','Odogwu'].includes(currentRankTitle);
   async function loadStatuses() {
     if (!supabase) return;
-    // Load active status rows first, then fetch only the public profile fields
-    // needed for the status list. This avoids relying on PostgREST FK inference.
+    // Keep this query independent of PostgREST relationship inference so a
+    // profile foreign-key ambiguity cannot make a successful status invisible.
     const { data, error } = await supabase
       .from('user_statuses')
       .select('id,user_id,caption,link_url,image_path,created_at,expires_at')
@@ -803,46 +816,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       setStatusType('error');
       return;
     }
-    const rows = data || [];
-    setStatusRows(rows);
-    const userIds = [...new Set(rows.map((row: any) => row.user_id))];
-    if (!userIds.length) {
-      setStatusPeople([]);
-      return;
-    }
-    const { data: statusProfiles, error: profileError } = await supabase
-      .from('profiles')
-      .select('id,nickname,avatar_url,premium_status,premium_title')
-      .in('id', userIds);
-    if (profileError) {
-      setStatus(`Statuses loaded, but member details could not be loaded: ${profileError.message}`);
-      setStatusType('error');
-    }
-    const profileById = new Map((statusProfiles || []).map((profile: any) => [profile.id, profile]));
-    const grouped = new Map<string, any>();
-    // Rows are newest-first, so the first row per user is their latest preview.
-    for (const row of rows) {
-      const profile = profileById.get(row.user_id) || profiles.find((item: Profile) => item.id === row.user_id);
-      const existing = grouped.get(row.user_id);
-      if (!existing) {
-        grouped.set(row.user_id, {
-          user_id: row.user_id,
-          nickname: profile?.nickname || 'Community member',
-          avatar_url: profile?.avatar_url || null,
-          premium_status: profile?.premium_status || 'inactive',
-          premium_title: profile?.premium_title || null,
-          latest_status: row,
-          status_count: 1,
-        });
-      } else {
-        existing.status_count += 1;
-      }
-    }
-    setStatusPeople([...grouped.values()].sort((a, b) => {
-      const premiumOrder = Number(b.premium_status === 'active') - Number(a.premium_status === 'active');
-      if (premiumOrder) return premiumOrder;
-      return new Date(b.latest_status.created_at).getTime() - new Date(a.latest_status.created_at).getTime();
-    }));
+    setStatusRows(data || []);
   }
 
   async function publishStatus() {
@@ -1039,10 +1013,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
 
   async function shareInviteLink() {
     if (!inviteLink) return;
-    // Send one combined text payload. Some Android share targets render both
-    // title and text plus a separate URL as duplicate message/preview content.
     const shareData = {
-      text: `Connect with me on MR RICH CONNECT. Create an account using my invitation link and you can message me directly:\n${inviteLink}`,
+      title: `Connect with ${nickname || 'me'} on MR RICH CONNECT`,
+      text: `Join me on MR RICH CONNECT. Create an account using my invite link and you can message me directly:`,
+      url: inviteLink,
     };
     try {
       if (navigator.share) await navigator.share(shareData);
@@ -2375,6 +2349,13 @@ async function playVoiceNote(message: ChatMessage) {
     </header>
     <section className="rc-auth-layout">
       <div className="rc-auth-intro"><span className="rc-eyebrow"><Sparkles size={14}/> YOUR CAMPUS. YOUR COMMUNITY.</span><h1>Find your people.<br/><em>Build your circle.</em></h1><p>Connect with people from your school and community.</p><div className="rc-auth-symbol"><MessageCircle size={58}/><Wifi size={25}/></div></div>
+      {inviteTokenFromUrl.current && <section className="rc-incoming-invite-card" aria-label="Invitation preview">
+        <span className="rc-eyebrow">PERSONAL INVITATION</span>
+        <div className="rc-incoming-invite-person">
+          <span className="rc-incoming-invite-avatar">{inviterPreview?.avatar_url ? <img src={inviterPreview.avatar_url} alt="Inviter profile"/> : <UserRound size={34}/>}</span>
+          <div><strong>{inviterPreviewLoading ? 'Loading invitation…' : inviterPreview?.nickname ? `@${inviterPreview.nickname.replace(/^@/, '')}` : 'MR RICH CONNECT MEMBER'}</strong><small>Connect with me on MR RICH CONNECT</small></div>
+        </div>
+      </section>}
       <form className="rc-auth-card" onSubmit={authMode === 'signin' ? signIn : signUp}>
         <span className="rc-eyebrow">WELCOME TO THE NETWORK</span><h2>{authMode === 'signin' ? 'Sign in' : 'Create your account'}</h2>
         <p className="rc-muted">{authMode === 'signin' ? 'Use your email and password to continue.' : 'Public profile details and private information are collected separately.'}</p>
@@ -2884,7 +2865,7 @@ async function playVoiceNote(message: ChatMessage) {
 >
   {voiceBusy ? '…' : isRecordingVoice ? <Square size={19} fill="currentColor" /> : <Mic size={21} />}
 </button>
-<textarea ref={draftMessageRef} name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{EMOJIS.map((emoji, i)=><button type="button" key={`${emoji}-${i}`} onClick={() => { setDraftMessage(value => value + emoji); setShowEmojiPicker(false); window.requestAnimationFrame(() => { const input = draftMessageRef.current; if (input) { input.focus(); const end = input.value.length; input.setSelectionRange(end, end); } }); }} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}><span className="rc-emoji-glyph" role="img" aria-label={emoji}>{emoji}</span></button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{(EMOJIS.length ? EMOJIS : ["😀","😂","🥰","😍","😊","😉","😭","🔥","❤️","👍","🙏","🎉","✨","💯","🤔","😎"]).map((emoji, i)=><button type="button" key={`${emoji}-${i}`} onClick={() => setDraftMessage(v=>v+emoji)} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}><span className="rc-emoji-glyph" role="img" aria-label={emoji}>{emoji}</span></button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -3011,41 +2992,7 @@ async function playVoiceNote(message: ChatMessage) {
       </div>,
       document.body
     )}
-    {statusOpen && typeof document !== 'undefined' && createPortal(
-      <div className="rc-status-page">
-        <header className="rc-status-page-header">
-          <button type="button" className="rc-icon-btn" onClick={() => setStatusOpen(false)} aria-label="Back from statuses"><ArrowLeft size={19}/></button>
-          <div><h2>Community Status</h2><small className="rc-muted">Updates from people in your community</small></div>
-        </header>
-        <main className="rc-status-page-content">
-          <form className="rc-status-compose" onSubmit={e=>{e.preventDefault();void publishStatus();}}>
-            <h2>Share a status</h2>
-            {canPostStatus ? <>
-              <label>Picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/*" onChange={e=>setStatusImage(e.target.files?.[0]||null)} required/></label>
-              <label>Caption<textarea value={statusCaption} onChange={e=>setStatusCaption(e.target.value)} maxLength={500} required/></label>
-              <label>Optional link<input type="url" value={statusLink} onChange={e=>setStatusLink(e.target.value)} placeholder="https://..."/></label>
-              <button className="rc-primary" type="submit" disabled={statusBusy}>{statusBusy?'Publishing…':'Publish status'}</button>
-            </> : <p>Status posting requires active Premium membership and Sharp Guy rank or higher (at least 10 lifetime hours).</p>}
-          </form>
-          <section className="rc-status-people" aria-label="People with active statuses">
-            <h3>Recent status updates</h3>
-            {statusPeople.length ? statusPeople.map((person:any) => (
-              <button type="button" className="rc-status-person-row" key={person.user_id} onClick={() => void openStatusViewer(person.user_id)}>
-                <span className="rc-status-preview-ring">
-                  <img src={supabase?.storage.from('status-images').getPublicUrl(person.latest_status.image_path).data.publicUrl} alt=""/>
-                </span>
-                <span className="rc-status-person-copy">
-                  <strong>@{person.nickname}{person.premium_status === 'active' && <BadgeCheck className="rc-status-premium-badge" size={16}/>}</strong>
-                  <small>{person.premium_status === 'active' ? (person.premium_title || 'Premium member') + ' · ' : ''}{person.status_count} update{person.status_count === 1 ? '' : 's'} · {new Date(person.latest_status.created_at).toLocaleString()}</small>
-                </span>
-                <span className="rc-arrow"><ArrowDown size={16} style={{transform:'rotate(-90deg)'}}/></span>
-              </button>
-            )) : <div className="rc-status-empty">No active statuses yet. When someone posts, their update will appear here.</div>}
-          </section>
-        </main>
-      </div>,
-      document.body
-    )}
+    {statusOpen && <div className="rc-status-compose-wrap"><form className="rc-status-compose" onSubmit={e=>{e.preventDefault();void publishStatus();}}><button type="button" className="rc-modal-close" onClick={()=>setStatusOpen(false)}><X/></button><h2>Share a status</h2>{canPostStatus?<><label>Picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/*" onChange={e=>setStatusImage(e.target.files?.[0]||null)} required/></label><label>Caption<textarea value={statusCaption} onChange={e=>setStatusCaption(e.target.value)} maxLength={500} required/></label><label>Optional link<input type="url" value={statusLink} onChange={e=>setStatusLink(e.target.value)} placeholder="https://..."/></label><button className="rc-primary" disabled={statusBusy}>{statusBusy?'Publishing…':'Publish status'}</button></>:<p>Status posting requires Premium membership and Sharp Guy rank or higher.</p>}<div className="rc-status-list">{statusRows.map((s:any)=><button type="button" key={s.id} onClick={()=>void openStatusViewer(s.user_id)}>View status</button>)}</div></form></div>}
 
     {announcementOpen && <div className="rc-announcement-screen"><header className="rc-announcement-header"><button className="rc-icon-btn" onClick={() => setAnnouncementOpen(false)} aria-label="Back"><ArrowLeft size={19}/></button><div><h1>Announcements</h1><p>Offers, updates and news from the community</p></div></header><div className="rc-announcement-content">{isCurrentUserPremium && <form className="rc-announcement-compose" onSubmit={e => { e.preventDefault(); void publishAnnouncement(); }}><span className="rc-eyebrow">PREMIUM PUBLISHER</span><h2>Share an announcement</h2><label>Image<input type="file" accept="image/*" onChange={e => setAnnouncementImage(e.target.files?.[0] || null)} required/></label>{announcementImage && <small className="rc-muted">Selected image: {announcementImage.name}</small>}<label>Caption<textarea value={announcementCaption} onChange={e => setAnnouncementCaption(e.target.value)} maxLength={500} placeholder="Write your offer, update or announcement…" required/></label><button className="rc-primary rc-full" type="submit" disabled={announcementBusy}>{announcementBusy ? 'Publishing…' : 'Publish announcement'}</button></form>}{!isCurrentUserPremium && <p className="rc-announcement-view-note">You’re viewing community announcements. Posting is available to Premium members.</p>}{announcements.length ? announcements.map(item => <article className="rc-announcement-card" key={item.id}><img src={item.image_url} alt="Community announcement"/><div><strong>@{item.author_nickname}</strong><p>{item.caption}</p><small>{new Date(item.created_at).toLocaleString()}</small></div></article>) : <div className="rc-empty-state"><Megaphone size={30}/><h2>No announcements yet</h2><p>New offers and updates will appear here.</p></div>}</div></div>}
     {publicProfile && <div className="rc-public-profile-backdrop" onClick={() => setPublicProfile(null)}><section className="rc-public-profile-card" onClick={e => e.stopPropagation()}><button className="rc-modal-close" onClick={() => setPublicProfile(null)} aria-label="Close profile"><X size={20}/></button><div className="rc-public-profile-avatar">{publicProfile.avatar_url ? <img src={publicProfile.avatar_url} alt=""/> : publicProfile.nickname?.[0]?.toUpperCase() || <UserRound size={38}/>}</div><h2>@{publicProfile.nickname}{publicProfile.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={19}/>}</h2>{publicProfile.premium_status === 'active' && publicProfile.premium_title && <strong className="rc-public-premium-title">{publicProfile.premium_title}</strong>}<p>{[publicProfile.level, publicProfile.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{publicProfile.school || 'School not listed'}</p>{publicProfile.department && <p>{publicProfile.department}</p>}{publicProfile.bio && <div className="rc-public-profile-bio">{publicProfile.bio}</div>}<div className="rc-public-profile-hours"><strong>{getExperienceTitle(publicProfile.total_online_seconds)}</strong><span>{Math.floor((publicProfile.total_online_seconds || 0)/3600)} lifetime hours</span></div>{publicProfile.id !== userId && <button className="rc-primary rc-full" onClick={() => { const convo = conversationList.find(c => c.kind === 'person' && c.otherUserId === publicProfile.id); if (convo) { setSelectedConversation(convo); setTab('Messages'); void markConversationRead(convo.id); } else { void sendRequest(publicProfile.id); } setPublicProfile(null); }}>{conversationList.some(c => c.kind === 'person' && c.otherUserId === publicProfile.id) ? 'Message' : 'Connect'}</button>}</section></div>}
@@ -4196,32 +4143,25 @@ async function playVoiceNote(message: ChatMessage) {
        }
        .rc-conversation-row-wrap { background:transparent!important; }
 
-       /* Keep the chat identity row and composer fixed; only message history scrolls. */
+       /* Keep only the message history scrollable; identity and composer remain pinned. */
        .rc-messages-layout.has-chat .rc-chat-panel {
-         display:grid!important;
-         grid-template-rows:minmax(62px,auto) minmax(0,1fr) auto!important;
-         align-content:stretch!important;min-height:0!important;
+         display:flex!important;flex-direction:column!important;min-height:0!important;
          height:100%!important;max-height:100%!important;overflow:hidden!important;
-         position:relative!important;
        }
        .rc-messages-layout.has-chat .rc-chat-header {
-         grid-row:1!important;position:relative!important;inset:auto!important;top:auto!important;
-         z-index:80!important;display:flex!important;flex:initial!important;flex-shrink:0!important;
-         width:100%!important;min-height:62px!important;max-height:92px!important;
-         align-self:stretch!important;transform:none!important;overflow:visible!important;
+         position:relative!important;top:auto!important;z-index:40!important;
+         flex:0 0 auto!important;transform:none!important;
        }
        .rc-messages-layout.has-chat .rc-chat-empty {
-         grid-row:2!important;min-height:0!important;height:100%!important;
-         flex:initial!important;overflow-y:auto!important;overflow-x:hidden!important;
+         flex:1 1 0%!important;min-height:0!important;height:auto!important;
+         overflow-y:auto!important;overflow-x:hidden!important;
          -webkit-overflow-scrolling:touch!important;overscroll-behavior:contain!important;
        }
        .rc-messages-layout.has-chat .rc-composer-wrap {
-         grid-row:3!important;position:relative!important;z-index:90!important;
-         flex:initial!important;flex-shrink:0!important;align-self:stretch!important;
-         margin:0!important;overflow:visible!important;
-         padding-bottom:env(safe-area-inset-bottom)!important;
+         position:relative!important;z-index:45!important;flex:0 0 auto!important;
+         margin-top:auto!important;overflow:visible!important;
        }
-       .rc-messages-layout.has-chat .rc-composer { flex:initial!important; }
+       .rc-messages-layout.has-chat .rc-composer { flex:0 0 auto!important; }
 
        /* Native colour emoji glyphs and an explicit emoji presentation preference. */
        .rc-emoji-grid .rc-emoji-glyph {
@@ -4305,54 +4245,28 @@ async function playVoiceNote(message: ChatMessage) {
        .rc-status-tap-zone.next { right:0!important; }
        .rc-status-viewer.is-paused .rc-status-progress-bar { animation-play-state:paused!important; }
 
-       /* Status screens use the visible browser viewport, not the transformed swipe stage. */
-       .rc-status-screen {
-         position:fixed!important;inset:auto!important;
-         left:var(--rc-visual-offset-left,0px)!important;top:var(--rc-visual-offset,0px)!important;
-         width:var(--rc-visual-width,100vw)!important;height:var(--rc-visual-height,100dvh)!important;
-         z-index:2147482000!important;padding:0!important;margin:0!important;
-         display:block!important;overflow:hidden!important;box-sizing:border-box!important;
-       }
-       .rc-status-viewer {
-         position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
-         min-width:0!important;max-width:none!important;max-height:none!important;
-         margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
-         overflow:hidden!important;box-sizing:border-box!important;
-       }
-       .rc-status-image { width:100%!important;height:100%!important;max-width:100%!important;object-fit:cover!important; }
-       .rc-status-page {
-         position:fixed!important;inset:auto!important;
-         left:var(--rc-visual-offset-left,0px)!important;top:var(--rc-visual-offset,0px)!important;
-         width:var(--rc-visual-width,100vw)!important;height:var(--rc-visual-height,100dvh)!important;
-         z-index:2147481000!important;display:flex!important;flex-direction:column!important;
-         overflow:hidden!important;box-sizing:border-box!important;background:#050b18!important;color:#f8fafc!important;
-       }
-       .rc-status-page-header {
-         flex:0 0 auto!important;display:flex!important;align-items:center!important;gap:12px!important;
-         min-height:62px!important;padding:calc(10px + env(safe-area-inset-top)) 16px 10px!important;
-         border-bottom:1px solid rgba(96,165,250,.2)!important;background:#081326!important;
-       }
-       .rc-status-page-header h2 { margin:0!important;font-size:19px!important; }
-       .rc-status-page-content { flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;padding:16px 14px calc(26px + env(safe-area-inset-bottom))!important; }
-       .rc-status-page .rc-status-compose { width:min(100%,520px)!important;max-width:520px!important;max-height:none!important;overflow:visible!important;margin:0 auto 24px!important;padding:16px!important;box-sizing:border-box!important;border:1px solid rgba(96,165,250,.22)!important;border-radius:18px!important;background:#101c30!important; }
-       .rc-status-people { width:min(100%,520px)!important;margin:0 auto!important;display:flex!important;flex-direction:column!important;gap:9px!important; }
-       .rc-status-people h3 { margin:0 0 4px!important;font-size:15px!important;color:#dbeafe!important; }
-       .rc-status-person-row { display:flex!important;align-items:center!important;gap:12px!important;width:100%!important;min-width:0!important;padding:10px 12px!important;border:1px solid rgba(96,165,250,.17)!important;border-radius:14px!important;background:#0d192b!important;color:#f8fafc!important;text-align:left!important; }
-       .rc-status-preview-ring { flex:0 0 48px!important;width:48px!important;height:48px!important;padding:2px!important;border-radius:50%!important;border:2px solid #3b82f6!important;overflow:hidden!important;background:#13284a!important; }
-       .rc-status-preview-ring img { display:block!important;width:100%!important;height:100%!important;object-fit:cover!important;border-radius:50%!important; }
-       .rc-status-person-copy { display:flex!important;flex:1 1 auto!important;min-width:0!important;flex-direction:column!important;gap:3px!important; }
-       .rc-status-person-copy strong { display:flex!important;align-items:center!important;gap:4px!important;min-width:0!important;overflow-wrap:anywhere!important;font-size:14px!important; }
-       .rc-status-person-copy small { color:#94a3b8!important;font-size:11px!important; }
-       .rc-status-premium-badge { color:#facc15!important;flex:0 0 auto!important; }
-       .rc-status-empty { padding:22px 14px!important;border:1px dashed rgba(96,165,250,.28)!important;border-radius:14px!important;color:#94a3b8!important;text-align:center!important;font-size:13px!important; }
-       /* Keep the chat identity and composer outside the only scrolling region. */
-       .rc-messages-layout.has-chat .rc-chat-panel { display:grid!important;grid-template-rows:minmax(62px,auto) minmax(0,1fr) auto!important;min-height:0!important;height:100%!important;overflow:hidden!important; }
-       .rc-messages-layout.has-chat .rc-chat-header { grid-row:1!important;position:relative!important;top:auto!important;z-index:80!important;display:flex!important;flex-shrink:0!important;min-height:62px!important;max-height:92px!important;width:100%!important; }
-       .rc-messages-layout.has-chat .rc-chat-empty { grid-row:2!important;min-height:0!important;height:100%!important;overflow-y:auto!important;overflow-x:hidden!important; }
-       .rc-messages-layout.has-chat .rc-composer-wrap { grid-row:3!important;position:relative!important;z-index:90!important;flex-shrink:0!important;margin:0!important; }
-       /* Use platform emoji fonts directly; do not recolour glyphs through inherited text fill. */
-       .rc-emoji-picker { position:fixed!important;left:10px!important;right:10px!important;bottom:calc(78px + env(safe-area-inset-bottom))!important;width:auto!important;max-width:calc(100vw - 20px)!important;z-index:2147483647!important;isolation:isolate!important; }
-       .rc-emoji-grid .rc-emoji-glyph { display:inline-block!important;font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif!important;font-size:29px!important;font-variant-emoji:emoji!important;font-style:normal!important;font-weight:400!important;line-height:1.3!important;color:initial!important;-webkit-text-fill-color:initial!important;text-indent:0!important; }
+       /* Final cross-browser fixes: viewport-locked status, visible emoji grid, pinned chat header, quiet conversation cards. */
+       .rc-status-screen { position:fixed!important;left:0!important;top:var(--rc-visual-offset,0px)!important;right:auto!important;bottom:auto!important;width:100dvw!important;height:var(--rc-visual-height,100dvh)!important;min-width:100dvw!important;max-width:100dvw!important;transform:none!important;margin:0!important;padding:0!important;overflow:hidden!important;z-index:2147483647!important;contain:layout paint!important; }
+       .rc-status-viewer { position:absolute!important;left:0!important;top:0!important;right:0!important;bottom:0!important;width:100%!important;height:100%!important;min-width:100%!important;max-width:none!important;transform:none!important; }
+       .rc-status-image { position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-width:100%!important;max-width:none!important;object-fit:cover!important; }
+       .rc-emoji-picker { position:fixed!important;display:block!important;visibility:visible!important;opacity:1!important;left:8px!important;right:8px!important;bottom:calc(76px + env(safe-area-inset-bottom))!important;width:auto!important;max-width:none!important;max-height:55dvh!important;overflow-y:auto!important;background:#101b2d!important;border:1px solid rgba(148,163,184,.38)!important;border-radius:16px!important;padding:12px!important;z-index:2147483647!important; }
+       .rc-emoji-grid { display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:7px!important;min-height:80px!important; }
+       .rc-emoji-grid button { display:flex!important;align-items:center!important;justify-content:center!important;min-height:44px!important;visibility:visible!important;opacity:1!important; }
+       .rc-emoji-grid .rc-emoji-glyph { font-family:"Apple Color Emoji","Noto Color Emoji","Segoe UI Emoji",sans-serif!important;font-size:27px!important;line-height:1.35!important;color:initial!important;-webkit-text-fill-color:initial!important; }
+       .rc-messages-layout.has-chat .rc-chat-panel { display:flex!important;flex-direction:column!important;position:relative!important;min-height:0!important;height:100%!important;overflow:hidden!important;transform:none!important; }
+       .rc-messages-layout.has-chat .rc-chat-header { position:sticky!important;top:0!important;left:0!important;right:0!important;z-index:2147483000!important;flex:0 0 auto!important;display:flex!important;min-height:64px!important;transform:translateZ(0)!important;align-self:stretch!important;background:#101b2d!important;border-bottom:1px solid rgba(148,163,184,.22)!important; }
+       .rc-messages-layout.has-chat .rc-chat-empty { flex:1 1 0!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important; }
+       .rc-messages-layout.has-chat .rc-composer-wrap { flex:0 0 auto!important;position:relative!important;z-index:20!important; }
+       .rc-conversation-row { border:1px solid rgba(148,153,163,.24)!important;border-radius:14px!important;background:linear-gradient(110deg,rgba(45,48,55,.88) 0%,rgba(24,27,33,.82) 48%,rgba(8,10,14,.92) 100%)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.018),0 4px 12px rgba(0,0,0,.16)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important; }
+       .rc-conversation-row::before,.rc-conversation-row::after { content:none!important;display:none!important; }
+       .rc-conversation-row.active { border-color:rgba(180,185,195,.42)!important;background:linear-gradient(110deg,rgba(65,69,78,.9),rgba(27,30,37,.92) 60%,rgba(10,12,17,.96))!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.035),0 4px 14px rgba(0,0,0,.2)!important; }
+       .rc-incoming-invite-card { width:min(calc(100% - 32px),520px);margin:0 auto 16px;padding:16px;border:1px solid rgba(148,163,184,.28);border-radius:16px;background:linear-gradient(120deg,rgba(45,48,55,.96),rgba(15,18,24,.96));color:#f8fafc; }
+       .rc-incoming-invite-person { display:flex;align-items:center;gap:12px;margin-top:10px; }
+       .rc-incoming-invite-avatar { width:56px;height:56px;flex:0 0 56px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#263244;color:#cbd5e1;border:1px solid rgba(203,213,225,.4); }
+       .rc-incoming-invite-avatar img { width:100%;height:100%;object-fit:cover; }
+       .rc-incoming-invite-person>div { display:flex;flex-direction:column;gap:5px;min-width:0; }
+       .rc-incoming-invite-person strong { font-size:16px;color:#fff; }
+       .rc-incoming-invite-person small { font-size:12px;color:#cbd5e1; }
     `}
 </style>
   </main>
