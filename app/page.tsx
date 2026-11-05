@@ -378,19 +378,35 @@ const voiceChunksRef = useRef<Blob[]>([]);
   }, []);
 
   // Resolve a shared invite token to the inviter's public-only profile preview.
+  // Supabase RPC builders are PromiseLike (not always native Promises), so use
+  // async/await with try/catch rather than chaining .catch().
   useEffect(() => {
     const token = inviteTokenFromUrl.current;
-    if (!token || !supabase) return;
+    const client = supabase;
+    if (!token || !client) return;
     let cancelled = false;
     setInviterPreviewLoading(true);
-    supabase.rpc('rc_get_inviter_preview', { p_token: token }).then(({ data, error }: any) => {
-      if (cancelled) return;
-      if (error) console.warn('Invite preview lookup failed:', error.message);
-      setInviterPreview(data && typeof data === 'object' ? data : null);
-      setInviterPreviewLoading(false);
-    }).catch((error: any) => {
-      if (!cancelled) { console.warn('Invite preview lookup failed:', error); setInviterPreview(null); setInviterPreviewLoading(false); }
-    });
+
+    void (async () => {
+      try {
+        const { data, error }: any = await client.rpc('rc_get_inviter_preview', { p_token: token });
+        if (cancelled) return;
+        if (error) {
+          console.warn('Invite preview lookup failed:', error.message);
+          setInviterPreview(null);
+        } else {
+          setInviterPreview(data && typeof data === 'object' ? data : null);
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          console.warn('Invite preview lookup failed:', error);
+          setInviterPreview(null);
+        }
+      } finally {
+        if (!cancelled) setInviterPreviewLoading(false);
+      }
+    })();
+
     return () => { cancelled = true; };
   }, [supabase]);
 
