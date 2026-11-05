@@ -8,7 +8,7 @@ import {
   Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck,
   Users, UserRound, Wifi, Pencil, Plus, Send, Smile, ArrowLeft, RefreshCw,
   X, Sparkles, Zap, ArrowDown, Store, Settings, CircleDot, Check, Megaphone, BadgeCheck,
-  Mic, Square, Play, Pause, AudioLines, Trash2, Share2, Copy, QrCode, UserPlus
+  Mic, Square, Play, Pause, AudioLines, Trash2, Share2, Copy, QrCode, UserPlus, ImagePlus, Link2
 } from 'lucide-react';
 const NIGERIAN_SCHOOLS = [
   'Abia State University','Abubakar Tafawa Balewa University','Achievers University','Adekunle Ajasin University','Adeleke University','Admiralty University of Nigeria','Ahmadu Bello University','Ajayi Crowther University','Akwa Ibom State University','Al-Hikmah University','Ambrose Alli University','American University of Nigeria','Anchor University','Arthur Jarvis University','Atiba University','Augustine University','Babcock University','Bauchi State University','Bayero University Kano','Baze University','Bells University of Technology','Benson Idahosa University','Benue State University','Bingham University','Bowen University','Caleb University','Caritas University','Chrisland University','Christopher University','Clifford University','Coal City University','Covenant University','Crawford University','Crescent University','Delta State University','Dennis Osadebay University','Dominican University','Ebonyi State University','Edo State University Uzairue','Edwin Clark University','Ekiti State University','Elizade University','Evangel University','Federal University Gashua','Federal University Of Petroleum Resources, Effurun (FUPRE)','Federal University Gusau','Federal University Kashere','Federal University Lafia','Federal University Lokoja','Federal University Otuoke','Federal University Oye-Ekiti','Federal University of Agriculture Abeokuta','Federal University of Technology Akure','Federal University of Technology Minna','Federal University of Technology Owerri','Federal University Dutse','Federal University Birnin Kebbi','Federal University Dutsin-Ma','Federal University Wukari','Fountain University','Godfrey Okoye University','Gombe State University','Gregory University','Hallmark University','Hezekiah University','Ibrahim Badamasi Babangida University','Igbinedion University','Ignatius Ajuru University of Education','Imo State University','Joseph Ayo Babalola University','Kaduna State University','Kano University of Science and Technology','Kebbi State University of Science and Technology','Kings University','Kogi State University','KolaDaisi University','Kwara State University','Lagos State University','Lagos State University of Education','Landmark University','Lead City University','Madonna University','McPherson University','Michael and Cecilia Ibru University','Michael Okpara University of Agriculture','Modibbo Adama University','Mountain Top University','Nasarawa State University','National Open University of Nigeria','Niger Delta University','Nigerian Army University Biu','Nigerian Defence Academy','Nile University of Nigeria','Nnamdi Azikiwe University','Northwest University Kano','Novena University','Obafemi Awolowo University','Oduduwa University','Olabisi Onabanjo University','Ondo State University of Medical Sciences','Osun State University','Pan-Atlantic University','Paul University','Plateau State University','Redeemer’s University','Renaissance University','Rhema University','Ritman University','Rivers State University','Salem University','Samuel Adegboyega University','Skyline University Nigeria','Sokoto State University','Southwestern University Nigeria','Spiritan University','Summit University','Tai Solarin University of Education','Tansian University','Taraba State University','The University of Africa Toru-Orua','Thomas Adewumi University','Umaru Musa Yar’Adua University','University of Abuja','University of Benin','University of Calabar','University of Cross River State','University of Ibadan','University of Ilorin','University of Jos','University of Lagos','University of Maiduguri','University of Mkar','University of Nigeria Nsukka','University of Port Harcourt','University of Uyo','Usmanu Danfodiyo University','Veritas University','Wellspring University','Wesley University','Western Delta University','Yobe State University','Adamawa State Polytechnic','Auchi Polytechnic','Abia State Polytechnic','Abubakar Tatari Ali Polytechnic','Akanu Ibiam Federal Polytechnic Unwana','Akwa Ibom State Polytechnic','Benue State Polytechnic','Delta State Polytechnic Otefe-Oghara','Delta State Polytechnic Ogwashi-Uku','Edo State Polytechnic Usen','Federal Polytechnic Ado-Ekiti','Federal Polytechnic Bauchi','Federal Polytechnic Bida','Federal Polytechnic Damaturu','Federal Polytechnic Ede','Federal Polytechnic Idah','Federal Polytechnic Ilaro','Federal Polytechnic Kaura Namoda','Federal Polytechnic Mubi','Federal Polytechnic Nasarawa','Federal Polytechnic Nekede','Federal Polytechnic Offa','Federal Polytechnic Oko','Federal Polytechnic Ukana','Gateway ICT Polytechnic','Hassan Usman Katsina Polytechnic','Imo State Polytechnic','Institute of Management and Technology Enugu','Kaduna Polytechnic','Kano State Polytechnic','Kwara State Polytechnic','Lagos State Polytechnic','Moshood Abiola Polytechnic','Niger State Polytechnic','Nuhu Bamalli Polytechnic','Ogun State Institute of Technology','Osun State Polytechnic Iree','Plateau State Polytechnic','Ramat Polytechnic','Rivers State Polytechnic','The Polytechnic Ibadan','Yaba College of Technology','Adeyemi College of Education','Alvan Ikoku Federal College of Education','College of Education Agbor','College of Education Akwanga','College of Education Ekiadolor','College of Education Gindiri','College of Education Hong','College of Education Ikere-Ekiti','College of Education Katsina-Ala','College of Education Minna','College of Education Oro','College of Education Warri','Emmanuel Alayande College of Education','Federal College of Education Abeokuta','Federal College of Education Asaba','Federal College of Education Kano','Federal College of Education Kontagora','Federal College of Education Obudu','Federal College of Education Okene','Federal College of Education Omoku','Federal College of Education Pankshin','Federal College of Education (Technical) Akoka','Federal College of Education (Technical) Bichi','Federal College of Education (Technical) Gombe','Federal College of Education (Technical) Umunze','Federal College of Education Zaria','Kashim Ibrahim College of Education','Lagos State College of Education','Nwafor Orizu College of Education','Tai Solarin College of Education','Isaac Jasper Boro College of Education'
@@ -348,6 +348,8 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [statusCaption, setStatusCaption] = useState('');
   const [statusLink, setStatusLink] = useState('');
   const [statusImage, setStatusImage] = useState<File | null>(null);
+  const [statusLinkOpen, setStatusLinkOpen] = useState(false);
+  const statusFileInputRef = useRef<HTMLInputElement | null>(null);
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusViewerIndex, setStatusViewerIndex] = useState(0);
   const [statusPaused, setStatusPaused] = useState(false);
@@ -497,6 +499,40 @@ const voiceChunksRef = useRef<Blob[]>([]);
       document.documentElement.classList.remove('rc-keyboard-open');
     };
   }, []);
+
+
+  // Pin the status overlay to the real visual viewport, not the horizontally
+  // swipable application track or the layout viewport.
+  useEffect(() => {
+    if (!statusViewerOpen) return;
+    const viewport = window.visualViewport;
+    const overlay = document.querySelector<HTMLElement>('.rc-status-screen');
+    if (!overlay) return;
+    const sync = () => {
+      const vv = window.visualViewport;
+      const width = vv?.width ?? document.documentElement.clientWidth;
+      const height = vv?.height ?? window.innerHeight;
+      const left = vv?.offsetLeft ?? 0;
+      const top = vv?.offsetTop ?? 0;
+      Object.assign(overlay.style, {
+        position: 'fixed', left: `${left}px`, top: `${top}px`,
+        width: `${width}px`, height: `${height}px`,
+        minWidth: `${width}px`, maxWidth: `${width}px`,
+        minHeight: `${height}px`, maxHeight: `${height}px`,
+        right: 'auto', bottom: 'auto', transform: 'none',
+        margin: '0', padding: '0', boxSizing: 'border-box'
+      });
+    };
+    sync();
+    viewport?.addEventListener('resize', sync);
+    viewport?.addEventListener('scroll', sync);
+    window.addEventListener('resize', sync);
+    return () => {
+      viewport?.removeEventListener('resize', sync);
+      viewport?.removeEventListener('scroll', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, [statusViewerOpen]);
 
   useEffect(() => {
     if (!status) return;
@@ -3012,7 +3048,47 @@ async function playVoiceNote(message: ChatMessage) {
       </div>,
       document.body
     )}
-    {statusOpen && <div className="rc-status-compose-wrap"><form className="rc-status-compose" onSubmit={e=>{e.preventDefault();void publishStatus();}}><button type="button" className="rc-modal-close" onClick={()=>setStatusOpen(false)}><X/></button><h2>Share a status</h2>{canPostStatus?<><label>Picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/*" onChange={e=>setStatusImage(e.target.files?.[0]||null)} required/></label><label>Caption<textarea value={statusCaption} onChange={e=>setStatusCaption(e.target.value)} maxLength={500} required/></label><label>Optional link<input type="url" value={statusLink} onChange={e=>setStatusLink(e.target.value)} placeholder="https://..."/></label><button className="rc-primary" disabled={statusBusy}>{statusBusy?'Publishing…':'Publish status'}</button></>:<p>Status posting requires Premium membership and Sharp Guy rank or higher.</p>}<div className="rc-status-list">{statusRows.map((s:any)=><button type="button" key={s.id} onClick={()=>void openStatusViewer(s.user_id)}>View status</button>)}</div></form></div>}
+    {statusOpen && <div className="rc-status-page">
+      <header className="rc-status-page-header">
+        <button type="button" className="rc-icon-btn" onClick={()=>setStatusOpen(false)} aria-label="Back"><ArrowLeft size={20}/></button>
+        <div><h1>Status</h1><p>Share a moment with your community</p></div>
+      </header>
+      <div className="rc-status-page-content">
+        <form className="rc-status-compose-page" onSubmit={e=>{e.preventDefault();void publishStatus();}}>
+          <h2>Create status</h2>
+          {canPostStatus ? <>
+            <input ref={statusFileInputRef} className="rc-status-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/*" onChange={e=>setStatusImage(e.target.files?.[0]||null)} required />
+            <button type="button" className={`rc-status-photo-button ${statusImage ? 'has-image' : ''}`} onClick={()=>statusFileInputRef.current?.click()}>
+              <ImagePlus size={22}/><span>{statusImage ? statusImage.name : 'Add a photo'}</span>
+            </button>
+            <label className="rc-status-caption-field">Caption<textarea value={statusCaption} onChange={e=>setStatusCaption(e.target.value)} maxLength={500} placeholder="Write a caption…" required/></label>
+            <button type="button" className={`rc-status-link-toggle ${statusLinkOpen || statusLink ? 'active' : ''}`} onClick={()=>setStatusLinkOpen(v=>!v)}><Link2 size={18}/>{statusLink ? 'Edit link' : 'Add link'}</button>
+            {statusLinkOpen && <label className="rc-status-link-field">Link<input type="url" value={statusLink} onChange={e=>setStatusLink(e.target.value)} placeholder="https://example.com"/></label>}
+            <button className="rc-primary rc-status-publish-button" type="submit" disabled={statusBusy || !statusImage || !statusCaption.trim()}>{statusBusy ? 'Publishing…' : 'Publish status'}</button>
+          </> : <p className="rc-status-eligibility-note">Status posting requires active Premium membership and Sharp Guy rank or higher (at least 10 lifetime hours).</p>}
+        </form>
+        <section className="rc-status-members-section"><h2>Recent statuses</h2>
+          {(() => {
+            const latestByUser = Array.from(new Map(statusRows.reduce((acc:any[], row:any)=>{ if(!acc.some(x=>x.user_id===row.user_id)) acc.push(row); return acc; },[]).map((row:any)=>[row.user_id,row])).values()) as any[];
+            latestByUser.sort((a:any,b:any)=>{
+              const ap=profiles.find(p=>p.id===a.user_id)?.premium_status==='active'?1:0;
+              const bp=profiles.find(p=>p.id===b.user_id)?.premium_status==='active'?1:0;
+              return bp-ap || new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
+            });
+            return latestByUser.length ? latestByUser.map((row:any)=>{
+              const member=profiles.find(p=>p.id===row.user_id);
+              const imageUrl=supabase?.storage.from('status-images').getPublicUrl(row.image_path).data.publicUrl;
+              return <button type="button" className="rc-status-member-row" key={row.user_id} onClick={()=>void openStatusViewer(row.user_id)}>
+                <span className="rc-status-member-thumb">{imageUrl ? <img src={imageUrl} alt=""/> : <CircleDot size={18}/>}</span>
+                <span className="rc-status-member-name">@{member?.nickname || 'Member'}</span>
+                {member?.premium_status==='active' && <span className="rc-status-member-premium"><Crown size={12}/> Premium</span>}
+                <span className="rc-status-member-time">{new Date(row.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+              </button>;
+            }) : <p className="rc-status-empty-note">No active statuses yet.</p>;
+          })()}
+        </section>
+      </div>
+    </div>}
 
     {announcementOpen && <div className="rc-announcement-screen"><header className="rc-announcement-header"><button className="rc-icon-btn" onClick={() => setAnnouncementOpen(false)} aria-label="Back"><ArrowLeft size={19}/></button><div><h1>Announcements</h1><p>Offers, updates and news from the community</p></div></header><div className="rc-announcement-content">{isCurrentUserPremium && <form className="rc-announcement-compose" onSubmit={e => { e.preventDefault(); void publishAnnouncement(); }}><span className="rc-eyebrow">PREMIUM PUBLISHER</span><h2>Share an announcement</h2><label>Image<input type="file" accept="image/*" onChange={e => setAnnouncementImage(e.target.files?.[0] || null)} required/></label>{announcementImage && <small className="rc-muted">Selected image: {announcementImage.name}</small>}<label>Caption<textarea value={announcementCaption} onChange={e => setAnnouncementCaption(e.target.value)} maxLength={500} placeholder="Write your offer, update or announcement…" required/></label><button className="rc-primary rc-full" type="submit" disabled={announcementBusy}>{announcementBusy ? 'Publishing…' : 'Publish announcement'}</button></form>}{!isCurrentUserPremium && <p className="rc-announcement-view-note">You’re viewing community announcements. Posting is available to Premium members.</p>}{announcements.length ? announcements.map(item => <article className="rc-announcement-card" key={item.id}><img src={item.image_url} alt="Community announcement"/><div><strong>@{item.author_nickname}</strong><p>{item.caption}</p><small>{new Date(item.created_at).toLocaleString()}</small></div></article>) : <div className="rc-empty-state"><Megaphone size={30}/><h2>No announcements yet</h2><p>New offers and updates will appear here.</p></div>}</div></div>}
     {publicProfile && <div className="rc-public-profile-backdrop" onClick={() => setPublicProfile(null)}><section className="rc-public-profile-card" onClick={e => e.stopPropagation()}><button className="rc-modal-close" onClick={() => setPublicProfile(null)} aria-label="Close profile"><X size={20}/></button><div className="rc-public-profile-avatar">{publicProfile.avatar_url ? <img src={publicProfile.avatar_url} alt=""/> : publicProfile.nickname?.[0]?.toUpperCase() || <UserRound size={38}/>}</div><h2>@{publicProfile.nickname}{publicProfile.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={19}/>}</h2>{publicProfile.premium_status === 'active' && publicProfile.premium_title && <strong className="rc-public-premium-title">{publicProfile.premium_title}</strong>}<p>{[publicProfile.level, publicProfile.college].filter(Boolean).join(' · ') || 'Community member'}</p><p>{publicProfile.school || 'School not listed'}</p>{publicProfile.department && <p>{publicProfile.department}</p>}{publicProfile.bio && <div className="rc-public-profile-bio">{publicProfile.bio}</div>}<div className="rc-public-profile-hours"><strong>{getExperienceTitle(publicProfile.total_online_seconds)}</strong><span>{Math.floor((publicProfile.total_online_seconds || 0)/3600)} lifetime hours</span></div>{publicProfile.id !== userId && <button className="rc-primary rc-full" onClick={() => { const convo = conversationList.find(c => c.kind === 'person' && c.otherUserId === publicProfile.id); if (convo) { setSelectedConversation(convo); setTab('Messages'); void markConversationRead(convo.id); } else { void sendRequest(publicProfile.id); } setPublicProfile(null); }}>{conversationList.some(c => c.kind === 'person' && c.otherUserId === publicProfile.id) ? 'Message' : 'Connect'}</button>}</section></div>}
@@ -4361,7 +4437,45 @@ async function playVoiceNote(message: ChatMessage) {
         font-size:28px!important; line-height:1.3!important; font-style:normal!important; font-weight:400!important;
         color:initial!important; -webkit-text-fill-color:initial!important; text-indent:0!important;
       }
-    `}</style>
+      /* Requested typography and conversation styling. Android Chrome ships Roboto. */
+      .rc-chat-panel, .rc-chat-header, .rc-chat-empty, .rc-composer,
+      .rc-composer textarea, .rc-message-row, .rc-message-bubble,
+      .rc-message-bubble * { font-family:Roboto,"Arial",sans-serif!important; }
+      .rc-message-bubble.mine { background:#082b60!important;background-color:#082b60!important;border-color:rgba(96,165,250,.22)!important;color:#f8fbff!important; }
+
+      /* Status viewer is constrained to the visual viewport and preserves the full photo. */
+      .rc-status-screen { position:fixed!important; inset:auto!important; overflow:hidden!important; background:#000!important; padding:0!important; margin:0!important; }
+      .rc-status-viewer { position:absolute!important; inset:0!important; width:100%!important;height:100%!important;min-width:0!important;max-width:none!important;min-height:0!important;max-height:none!important; padding:0!important;margin:0!important;border:0!important;border-radius:0!important;overflow:hidden!important;background:#000!important;box-sizing:border-box!important; }
+      .rc-status-image { position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center!important;background:#000!important;border:0!important;border-radius:0!important; }
+      .rc-status-caption { position:absolute!important;left:0!important;right:0!important;bottom:0!important;z-index:8!important;max-height:30%!important;height:auto!important;overflow-y:auto!important;box-sizing:border-box!important;padding:12px 16px calc(18px + env(safe-area-inset-bottom))!important;background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.72) 24%,rgba(0,0,0,.94) 100%)!important; }
+      .rc-status-caption p { max-height:calc(var(--rc-visual-height,100dvh)*.24)!important;overflow-y:auto!important; }
+
+      /* Dedicated Status page with accessible photo, caption and optional-link controls. */
+      .rc-status-page { position:fixed!important;inset:0!important;z-index:2147482000!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;background:#071326!important;color:#f8fafc!important;padding-bottom:env(safe-area-inset-bottom)!important; }
+      .rc-status-page-header { flex:0 0 auto!important;display:flex!important;align-items:center!important;gap:12px!important;padding:calc(14px + env(safe-area-inset-top)) 16px 14px!important;background:#091a31!important;border-bottom:1px solid rgba(148,163,184,.2)!important; }
+      .rc-status-page-header h1 { margin:0!important;font-size:21px!important; }.rc-status-page-header p { margin:3px 0 0!important;color:#9fb0c9!important;font-size:12px!important; }
+      .rc-status-page-content { width:min(100%,680px)!important;flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;margin:0 auto!important;padding:16px!important;box-sizing:border-box!important; }
+      .rc-status-compose-page { display:flex!important;flex-direction:column!important;gap:12px!important;padding:16px!important;margin:0 0 22px!important;border:1px solid rgba(148,163,184,.22)!important;border-radius:17px!important;background:linear-gradient(145deg,#12243c,#0b1729)!important; }
+      .rc-status-compose-page h2,.rc-status-members-section h2 { margin:0!important;font-size:17px!important; }
+      .rc-status-file-input { position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important; }
+      .rc-status-photo-button,.rc-status-link-toggle { min-height:46px!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:9px!important;padding:10px 14px!important;border:1px solid rgba(96,165,250,.34)!important;border-radius:12px!important;background:rgba(37,99,235,.14)!important;color:#dbeafe!important;font-weight:700!important; }
+      .rc-status-photo-button.has-image { border-color:rgba(34,197,94,.4)!important;color:#bbf7d0!important; }
+      .rc-status-caption-field,.rc-status-link-field { display:flex!important;flex-direction:column!important;gap:7px!important;color:#dbeafe!important;font-size:13px!important; }
+      .rc-status-caption-field textarea,.rc-status-link-field input { width:100%!important;min-height:90px!important;box-sizing:border-box!important;padding:12px!important;border:1px solid rgba(148,163,184,.28)!important;border-radius:11px!important;background:#071426!important;color:#fff!important;font:inherit!important;resize:vertical!important; }
+      .rc-status-link-field input { min-height:44px!important; }
+      .rc-status-link-toggle { align-self:flex-start!important;min-height:40px!important; }
+      .rc-status-link-toggle.active { background:rgba(37,99,235,.28)!important; }
+      .rc-status-publish-button { min-height:46px!important; }
+      .rc-status-eligibility-note,.rc-status-empty-note { margin:0!important;color:#aab8cc!important;font-size:13px!important;line-height:1.5!important; }
+      .rc-status-members-section { display:flex!important;flex-direction:column!important;gap:10px!important; }
+      .rc-status-member-row { width:100%!important;display:flex!important;align-items:center!important;gap:11px!important;padding:9px 10px!important;border:1px solid rgba(148,163,184,.16)!important;border-radius:13px!important;background:rgba(15,31,52,.72)!important;color:#f8fafc!important;text-align:left!important; }
+      .rc-status-member-thumb { width:44px!important;height:44px!important;flex:0 0 44px!important;display:grid!important;place-items:center!important;overflow:hidden!important;border-radius:50%!important;border:2px solid #3b82f6!important;background:#13243c!important; }
+      .rc-status-member-thumb img { width:100%!important;height:100%!important;object-fit:cover!important; }
+      .rc-status-member-name { flex:1 1 auto!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:13px!important;font-weight:700!important; }
+      .rc-status-member-premium { display:inline-flex!important;align-items:center!important;gap:4px!important;color:#facc15!important;font-size:10px!important;font-weight:800!important;white-space:nowrap!important; }
+      .rc-status-member-time { color:#91a1b8!important;font-size:10px!important;white-space:nowrap!important; }
+    `}
+</style>
   </main>
 );
 }
