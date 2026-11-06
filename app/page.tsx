@@ -284,7 +284,7 @@ export default function Home() {
   const [groupName, setGroupName] = useState('');
   const [groupAvatarUrl, setGroupAvatarUrl] = useState('');
   const [groupAvatarUploading, setGroupAvatarUploading] = useState(false);
-  const [profileForm, setProfileForm] = useState({ nickname: '', level: '', college: '', school: '', department: '', bio: '', avatar_url: '', full_name: '', phone: '', premium_title: '' });
+  const [profileForm, setProfileForm] = useState({ nickname: '', level: '', college: '', school: '', department: '', bio: '', avatar_url: '', full_name: '', phone: '', premium_title: '', disable_chat_animation: false });
   const [profileExists, setProfileExists] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -329,6 +329,8 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [draftMessage, setDraftMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [conversationBlockStatus, setConversationBlockStatus] = useState<'you' | 'them' | 'both' | null>(null);
+  const [chatEntranceCharacter, setChatEntranceCharacter] = useState<string | null>(null);
+  const chatEntranceTimer = useRef<number | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -610,7 +612,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
     const { data: adminResult } = await supabase.rpc('is_admin');
     setIsAdmin(adminResult === true);
     const { data } = await supabase.from('profiles')
-      .select('id,nickname,level,college,school,department,bio,avatar_url,premium_status,premium_title,total_online_seconds').limit(200);
+      .select('id,nickname,level,college,school,department,bio,avatar_url,premium_status,premium_title,total_online_seconds,disable_chat_animation').limit(200);
     if (data) setProfiles(data as Profile[]);
     if (userId) {
       const { data: req } = await supabase.from('message_requests').select('id')
@@ -711,7 +713,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const loadProfile = useCallback(async (id: string) => {
     if (!supabase) return;
     const { data, error } = await supabase.from('profiles')
-      .select('id,nickname,level,college,school,department,bio,avatar_url,premium_status,premium_title,total_online_seconds')
+      .select('id,nickname,level,college,school,department,bio,avatar_url,premium_status,premium_title,total_online_seconds,disable_chat_animation')
       .eq('id', id).maybeSingle();
     if (error) {
       setStatus('Your account is signed in, but the profiles table or its access policies need to be configured.');
@@ -722,11 +724,11 @@ const voiceChunksRef = useRef<Blob[]>([]);
       setProfileExists(true);
       setNickname(data.nickname ?? '');
       const { data: privateData } = await supabase.from('private_profiles').select('full_name,phone').eq('user_id', id).maybeSingle();
-      setProfileForm({ nickname: data.nickname ?? '', level: data.level ?? '', college: data.college ?? '', school: data.school ?? '', department: data.department ?? '', bio: data.bio ?? '', avatar_url: data.avatar_url ?? '', full_name: privateData?.full_name ?? '', phone: privateData?.phone ?? '', premium_title: data.premium_title ?? '' });
+      setProfileForm({ nickname: data.nickname ?? '', level: data.level ?? '', college: data.college ?? '', school: data.school ?? '', department: data.department ?? '', bio: data.bio ?? '', avatar_url: data.avatar_url ?? '', full_name: privateData?.full_name ?? '', phone: privateData?.phone ?? '', premium_title: data.premium_title ?? '', disable_chat_animation: data.disable_chat_animation ?? false });
     } else {
       setProfileExists(false);
       setNickname('');
-      setProfileForm({ nickname: '', level: '', college: '', school: '', department: '', bio: '', avatar_url: '', full_name: '', phone: '', premium_title: '' });
+      setProfileForm({ nickname: '', level: '', college: '', school: '', department: '', bio: '', avatar_url: '', full_name: '', phone: '', premium_title: '', disable_chat_animation: false });
     }
     await refreshCommunity();
   }, [supabase, refreshCommunity]);
@@ -947,6 +949,16 @@ const voiceChunksRef = useRef<Blob[]>([]);
   };
 
   const isCurrentUserPremium = profiles.some(p => p.id === userId && p.premium_status === 'active');
+
+  useEffect(() => {
+    if (chatEntranceTimer.current) window.clearTimeout(chatEntranceTimer.current);
+    setChatEntranceCharacter(null);
+    if (!selectedConversation || !isCurrentUserPremium || profileForm.disable_chat_animation) return;
+    const characters = ['🥷', '🕴️', '💃', '🤓'];
+    setChatEntranceCharacter(characters[Math.floor(Math.random() * characters.length)]);
+    chatEntranceTimer.current = window.setTimeout(() => setChatEntranceCharacter(null), 3900);
+    return () => { if (chatEntranceTimer.current) window.clearTimeout(chatEntranceTimer.current); };
+  }, [selectedConversation?.id, isCurrentUserPremium, profileForm.disable_chat_animation]);
 
   const currentRankTitle = getExperienceTitle(profiles.find(p => p.id === userId)?.total_online_seconds);
   const canPostStatus = Boolean(userId);
@@ -1277,7 +1289,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (nicknameCheckError) { setStatus(`Could not verify nickname: ${nicknameCheckError.message}`); return; }
     if (nicknameAvailable === false) { setStatus('Nickname already taken. Choose another nickname.'); setStatusType('error'); return; }
     const isPremium = profiles.find(p => p.id === userId)?.premium_status === 'active';
-    const { error } = await supabase.from('profiles').upsert({ id: userId, nickname: clean, level: profileForm.level || null, college: profileForm.college || null, school: profileForm.school || null, department: profileForm.department || null, bio: profileForm.bio || null, avatar_url: profileForm.avatar_url || null, premium_title: isPremium ? (profileForm.premium_title.trim().slice(0, 40) || null) : null });
+    const { error } = await supabase.from('profiles').upsert({ id: userId, nickname: clean, level: profileForm.level || null, college: profileForm.college || null, school: profileForm.school || null, department: profileForm.department || null, bio: profileForm.bio || null, avatar_url: profileForm.avatar_url || null, premium_title: isPremium ? (profileForm.premium_title.trim().slice(0, 40) || null) : null, disable_chat_animation: isPremium ? profileForm.disable_chat_animation : false });
     if (error) { setStatus(error.message); return; }
     const { error: privateError } = await supabase.from('private_profiles').upsert({ user_id: userId, full_name: profileForm.full_name || null, phone: profileForm.phone || null });
     if (privateError) { setStatus(`Public profile saved, but private details could not be saved: ${privateError.message}`); return; }
@@ -2686,7 +2698,7 @@ async function playVoiceNote(message: ChatMessage) {
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
-          {selectedConversation ? <><header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={closeConversationWithMotion} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} style={{cursor:selectedConversation.kind === 'person' ? 'pointer' : 'default'}}>{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><button type="button" className="rc-chat-header-copy rc-chat-profile-trigger" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} disabled={selectedConversation.kind !== 'person'}><strong>{selectedConversation.title}{selectedConversation.kind === 'person' && profiles.find(p => p.id === selectedConversation.otherUserId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={16} />}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'View public profile'}</small></button>
+          {selectedConversation ? <>{chatEntranceCharacter && <div className="rc-chat-entrance-character" aria-hidden="true"><span>{chatEntranceCharacter}</span></div>}<header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={closeConversationWithMotion} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} style={{cursor:selectedConversation.kind === 'person' ? 'pointer' : 'default'}}>{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><button type="button" className="rc-chat-header-copy rc-chat-profile-trigger" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} disabled={selectedConversation.kind !== 'person'}><strong>{selectedConversation.title}{selectedConversation.kind === 'person' && profiles.find(p => p.id === selectedConversation.otherUserId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={16} />}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'View public profile'}</small></button>
 {selectedConversation.kind === 'person' && selectedConversation.otherUserId && (
   <button
     type="button"
@@ -3240,6 +3252,7 @@ async function playVoiceNote(message: ChatMessage) {
     {showProfile && <div className="rc-modal-backdrop" onClick={() => { setShowProfile(false); setEditingProfile(false); }}><form className="rc-modal" onSubmit={saveProfile} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => { setShowProfile(false); setEditingProfile(false); }} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">YOUR PUBLIC IDENTITY</span><h2>{editingProfile ? 'Edit profile' : 'Create your profile'}</h2><p className="rc-muted">Public details are visible to members. Private details are only readable by your own account.</p><label>Nickname<input required maxLength={24} value={profileForm.nickname} onChange={e => setProfileForm({...profileForm, nickname:e.target.value})} placeholder="@yournickname"/></label><label>Level<select value={profileForm.level} onChange={e => setProfileForm({...profileForm,level:e.target.value})}><option value="">Select level</option>{PROFILE_LEVELS.map(level=><option key={level} value={level}>{level}</option>)}</select></label><label>College<input value={profileForm.college} onChange={e => setProfileForm({...profileForm, college:e.target.value})} placeholder="Your college"/></label><label>School / institution<input value={profileForm.school} onChange={e => setProfileForm({...profileForm,school:e.target.value})} placeholder="Type to search Nigerian institutions…" autoComplete="off"/><div className="rc-school-options rc-school-search-results">{NIGERIAN_SCHOOLS.filter(s=>profileForm.school.trim().length>0 && s.toLocaleLowerCase().includes(profileForm.school.toLocaleLowerCase())).slice(0,8).map(s=><button type="button" key={s} className="rc-secondary" onClick={()=>setProfileForm({...profileForm,school:s})}>{s}</button>)}</div></label>
 <label>Department<input value={profileForm.department} onChange={e => setProfileForm({...profileForm, department:e.target.value})} placeholder="Your department"/></label>
 <label>Profile avatar (optional)<input type="file" accept="image/*" onChange={e => void uploadAvatar(e.target.files?.[0])} disabled={avatarUploading}/></label>{avatarUploading && <p className="rc-muted">Uploading avatar…</p>}{profileForm.avatar_url && <div className="rc-avatar-preview"><img src={profileForm.avatar_url} alt="Avatar preview"/><button type="button" className="rc-secondary" onClick={() => setProfileForm({...profileForm,avatar_url:''})}>Remove photo</button></div>}<label>Or paste a profile photo URL<input type="url" value={profileForm.avatar_url} onChange={e => setProfileForm({...profileForm,avatar_url:e.target.value})} placeholder="https://..."/></label>
+{profiles.find(p => p.id === userId)?.premium_status === 'active' && <label className="rc-setting-check"><span>Disable chat entrance animation</span><input type="checkbox" checked={profileForm.disable_chat_animation} onChange={e=>setProfileForm({...profileForm,disable_chat_animation:e.target.checked})}/></label>}
 {profiles.find(p => p.id === userId)?.premium_status === 'active' && <label>Premium title (shown beside your name)<input maxLength={40} value={profileForm.premium_title} onChange={e=>setProfileForm({...profileForm,premium_title:e.target.value})} placeholder="e.g. Forex Trader"/><small className="rc-muted">Up to 40 characters. Available while your Premium membership is active.</small></label>}<label>About me (public)<textarea value={profileForm.bio} onChange={e => setProfileForm({...profileForm, bio:e.target.value})} placeholder="Short introduction"/></label>
 <h3>Private information — only you can read this</h3>
 <label>Full name<input value={profileForm.full_name} onChange={e => setProfileForm({...profileForm, full_name:e.target.value})} placeholder="Your real name"/></label>
@@ -3249,6 +3262,19 @@ async function playVoiceNote(message: ChatMessage) {
     {showGroup && <div className="rc-modal-backdrop" onClick={() => setShowGroup(false)}><form className="rc-modal" onSubmit={createGroup} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setShowGroup(false)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="rc-muted">Start a space around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><label>Group image (optional)<input type="file" accept="image/*" onChange={e => void uploadGroupAvatar(e.target.files?.[0])} disabled={groupAvatarUploading}/></label>{groupAvatarUploading && <p className="rc-muted">Uploading group image…</p>}{groupAvatarUrl && <div className="rc-avatar-preview"><img src={groupAvatarUrl} alt="Group avatar preview"/><button type="button" className="rc-secondary" onClick={() => setGroupAvatarUrl('')}>Remove image</button></div>}<button className="rc-primary rc-full" type="submit" disabled={groupAvatarUploading}>{groupAvatarUploading ? 'Uploading…' : 'Create group'}</button></form></div>}
     {!authReady && <div className="rc-loading" aria-label="Loading"/>}
     <style jsx global>{`
+      @keyframes rc-character-enter-exit { 0%{transform:translateX(115%);opacity:0} 12%{transform:translateX(0);opacity:1} 22%{transform:translateX(0);opacity:1} 32%{transform:translateX(0) rotate(-5deg);opacity:1} 42%{transform:translateX(0) rotate(5deg);opacity:1} 55%{transform:translateX(0);opacity:1} 100%{transform:translateX(-125%);opacity:0} }
+      .rc-chat-panel{position:relative!important;isolation:isolate!important}
+      .rc-chat-entrance-character{position:absolute;right:10px;top:58px;z-index:8;pointer-events:none;width:132px;height:180px;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;animation:rc-character-enter-exit 3.9s cubic-bezier(.2,.7,.25,1) both}
+      .rc-chat-entrance-character span{font-size:112px;line-height:1;filter:drop-shadow(0 10px 16px #0009);transform:scaleX(-1);}
+      .rc-chat-panel .rc-chat-empty,.rc-chat-panel .rc-composer-wrap{position:relative;z-index:10}
+      @media(prefers-reduced-motion:reduce){.rc-chat-entrance-character{animation:none!important;display:none!important}}
+      /* Final status layout: reserve a dedicated strip for Visit Link so the caption never overlaps it. */
+      .rc-status-viewer{padding:0!important;overflow:hidden!important;}
+      .rc-status-viewer .rc-status-image{width:100%!important;height:100%!important;max-height:100%!important;object-fit:contain!important;border-radius:0!important;}
+      .rc-status-viewer .rc-status-caption{left:0!important;right:0!important;bottom:calc(58px + env(safe-area-inset-bottom))!important;max-height:30%!important;padding:12px 16px!important;box-sizing:border-box!important;overflow-y:auto!important;}
+      .rc-status-viewer .rc-status-visit-link{bottom:calc(10px + env(safe-area-inset-bottom))!important;}
+      .rc-status-tap-zone{ -webkit-tap-highlight-color:transparent!important;outline:none!important; }
+      .rc-status-tap-zone:focus,.rc-status-tap-zone:focus-visible,.rc-status-tap-zone:active{outline:none!important;box-shadow:none!important;background:transparent!important;}
       @keyframes rc-page-swipe-in { from { opacity: .55; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
       @keyframes rc-chat-swipe-in { from { opacity: .55; transform: translateX(32px); } to { opacity: 1; transform: translateX(0); } }
       @keyframes rc-chat-swipe-out { from { opacity: 1; transform: translateX(0); } to { opacity: .5; transform: translateX(42px); } }
@@ -4313,7 +4339,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-emoji-grid button { min-width:0 !important; min-height:46px !important; display:grid !important; place-items:center !important; border:1px solid rgba(147,197,253,.16) !important; border-radius:11px !important; background:linear-gradient(145deg,rgba(96,165,250,.16),rgba(30,41,59,.72)) !important; padding:5px 2px !important; color:#ffffff !important; font-size:25px !important; line-height:1.2 !important; opacity:1 !important; visibility:visible !important; text-indent:0 !important; cursor:pointer; -webkit-tap-highlight-color:transparent; }
       .rc-emoji-grid .rc-emoji-glyph { display:inline-block !important; position:relative !important; visibility:visible !important; opacity:1 !important; color:inherit !important; -webkit-text-fill-color:initial !important; font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",system-ui,sans-serif !important; font-size:29px !important; font-style:normal !important; font-weight:400 !important; font-variant-emoji:emoji !important; line-height:1.25 !important; text-indent:0 !important; white-space:nowrap !important; color:inherit !important; -webkit-text-fill-color:initial !important; }
       .rc-emoji-grid button:active { background:rgba(37,99,235,.42); transform:scale(.94); }
-      .rc-floating-announcements { position:fixed; z-index:56; right:16px; bottom:calc(248px + env(safe-area-inset-bottom)); width:48px; height:48px; display:grid; place-items:center; border:1px solid rgba(250,204,21,.85); border-radius:16px; background:#facc15; color:#172033; box-shadow:0 8px 28px rgba(0,0,0,.38); touch-action:none; cursor:grab; } .rc-floating-announcements:active { cursor:grabbing; transform:scale(.97); }
+      .rc-floating-announcements { position:fixed; z-index:56; right:16px; bottom:calc(88px + env(safe-area-inset-bottom)); width:48px; height:48px; display:grid; place-items:center; border:1px solid rgba(250,204,21,.85); border-radius:16px; background:#facc15; color:#172033; box-shadow:0 8px 28px rgba(0,0,0,.38); touch-action:none; cursor:grab; } .rc-floating-announcements:active { cursor:grabbing; transform:scale(.97); }
       .rc-announcement-screen { position:fixed; inset:0; z-index:110; display:flex; flex-direction:column; background:#071326; color:#fff; overflow:auto; padding-bottom:env(safe-area-inset-bottom); }
       .rc-announcement-header { position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:12px; padding:calc(14px + env(safe-area-inset-top)) 16px 14px; background:rgba(7,19,38,.96); border-bottom:1px solid rgba(96,165,250,.2); }
       .rc-announcement-header h1 { margin:0; font-size:22px; }.rc-announcement-header p { margin:3px 0 0; color:#9fb0c9; font-size:12px; }
@@ -4329,9 +4355,9 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-public-profile-card { position:relative; width:min(100%,390px); max-height:calc(100dvh - 36px); overflow:auto; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; gap:9px; padding:28px 22px 22px; border:1px solid rgba(96,165,250,.3); border-radius:22px; background:linear-gradient(155deg,#14243d,#081326); text-align:center; }
       .rc-public-profile-avatar { width:104px; height:104px; display:grid; place-items:center; overflow:hidden; border:2px solid #60a5fa; border-radius:50%; background:#102b58; font-size:34px; }.rc-public-profile-avatar img { width:100%; height:100%; object-fit:cover; }
       .rc-public-profile-card h2 { display:flex; align-items:center; margin:4px 0; font-size:22px; }.rc-public-profile-card p { margin:0; color:#cbd5e1; font-size:13px; }.rc-public-profile-bio { width:100%; margin:7px 0; padding:12px; box-sizing:border-box; border-radius:12px; background:rgba(148,163,184,.08); color:#e2e8f0; white-space:pre-wrap; line-height:1.5; }.rc-public-profile-hours { display:flex; flex-direction:column; gap:3px; margin:6px 0 10px; }.rc-public-profile-hours strong { color:#93c5fd; }.rc-public-profile-hours span { color:#94a3b8; font-size:12px; }
-      @media (max-width:800px) { .rc-floating-announcements { bottom:calc(248px + env(safe-area-inset-bottom)); } }
+      @media (max-width:800px) { .rc-floating-announcements { bottom:calc(88px + env(safe-area-inset-bottom)); } }
 
-      .rc-features-wrap{position:fixed;z-index:70;right:16px;bottom:calc(248px + env(safe-area-inset-bottom));width:52px;height:52px;touch-action:none}.rc-features-button{position:relative;display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;background:#facc15;color:#172033;border:1px solid #fde68a;border-radius:17px;font-weight:900;box-shadow:0 8px 28px #0007;cursor:grab}.rc-features-button:active{cursor:grabbing}.rc-features-badge{position:absolute;top:-7px;right:-7px;font-style:normal;background:#2563eb;color:white;border:2px solid #101b2d;border-radius:99px;min-width:19px;height:19px;display:grid;place-items:center;padding:0 4px;font-size:10px}.rc-features-menu{position:absolute;right:0;bottom:calc(100% + 12px);display:flex;flex-direction:column;width:min(210px,calc(100vw - 24px));max-height:min(220px,calc(100dvh - 250px));overflow-y:auto;padding:7px;border:1px solid #334155;border-radius:15px;background:#101b2d;box-shadow:0 12px 32px #0009;gap:3px}.rc-features-menu button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:white;padding:11px;border-radius:9px;text-align:left;white-space:nowrap}.rc-status-screen,.rc-status-compose-wrap{position:fixed;inset:0;z-index:2147483600;background:#050914ed;display:grid;place-items:center;padding:16px}.rc-status-viewer,.rc-status-compose{position:relative;width:min(100%,440px);max-height:88dvh;overflow:auto;background:#111c2e;border:1px solid #334155;border-radius:20px;padding:18px;color:white}.rc-status-viewer>img{width:100%;max-height:65dvh;object-fit:contain;border-radius:12px}.rc-status-caption{padding:10px}.rc-status-controls{display:flex;justify-content:space-between}.rc-status-compose label{display:grid;gap:7px;margin:12px 0}.rc-status-compose input,.rc-status-compose textarea{width:100%;background:#0b1424;color:white;border:1px solid #334155;border-radius:10px;padding:10px}.rc-status-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+      .rc-features-wrap{position:fixed;z-index:70;right:16px;bottom:calc(88px + env(safe-area-inset-bottom));width:52px;height:52px;touch-action:none}.rc-features-button{position:relative;display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;background:#facc15;color:#172033;border:1px solid #fde68a;border-radius:17px;font-weight:900;box-shadow:0 8px 28px #0007;cursor:grab}.rc-features-button:active{cursor:grabbing}.rc-features-badge{position:absolute;top:-7px;right:-7px;font-style:normal;background:#2563eb;color:white;border:2px solid #101b2d;border-radius:99px;min-width:19px;height:19px;display:grid;place-items:center;padding:0 4px;font-size:10px}.rc-features-menu{position:absolute;right:0;bottom:calc(100% + 12px);display:flex;flex-direction:column;width:min(210px,calc(100vw - 24px));max-height:min(220px,calc(100dvh - 250px));overflow-y:auto;padding:7px;border:1px solid #334155;border-radius:15px;background:#101b2d;box-shadow:0 12px 32px #0009;gap:3px}.rc-features-menu button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:white;padding:11px;border-radius:9px;text-align:left;white-space:nowrap}.rc-status-screen,.rc-status-compose-wrap{position:fixed;inset:0;z-index:2147483600;background:#050914ed;display:grid;place-items:center;padding:16px}.rc-status-viewer,.rc-status-compose{position:relative;width:min(100%,440px);max-height:88dvh;overflow:auto;background:#111c2e;border:1px solid #334155;border-radius:20px;padding:18px;color:white}.rc-status-viewer>img{width:100%;max-height:65dvh;object-fit:contain;border-radius:12px}.rc-status-caption{padding:10px}.rc-status-controls{display:flex;justify-content:space-between}.rc-status-compose label{display:grid;gap:7px;margin:12px 0}.rc-status-compose input,.rc-status-compose textarea{width:100%;background:#0b1424;color:white;border:1px solid #334155;border-radius:10px;padding:10px}.rc-status-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
       /* Final overrides: preserve native full-colour emoji rendering and keep
          the conversation identity row fixed above the keyboard-adjusted scroller. */
       .rc-emoji-picker{display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;z-index:2147483647!important;max-height:min(58dvh,460px)!important;overflow-y:auto!important;bottom:calc(84px + env(safe-area-inset-bottom))!important}
@@ -4433,14 +4459,14 @@ async function playVoiceNote(message: ChatMessage) {
          background:rgba(2,6,23,.45)!important;color:#fff!important;
        }
        .rc-status-caption {
-         position:absolute!important;left:0!important;right:0!important;bottom:calc(76px + env(safe-area-inset-bottom))!important;
+         position:absolute!important;left:0!important;right:0!important;bottom:calc(68px + env(safe-area-inset-bottom))!important;
          z-index:7!important;padding:16px 18px!important;box-sizing:border-box!important;
          background:rgba(2,6,23,.32)!important;backdrop-filter:blur(9px)!important;
          -webkit-backdrop-filter:blur(9px)!important;color:#fff!important;
        }
        .rc-status-caption p { margin:0!important;color:#fff!important;font-size:15px!important;line-height:1.5!important;white-space:pre-wrap!important; }
        .rc-status-visit-link {
-         position:absolute!important;left:50%!important;bottom:calc(18px + env(safe-area-inset-bottom))!important;
+         position:absolute!important;left:50%!important;bottom:calc(12px + env(safe-area-inset-bottom))!important;
          z-index:12!important;transform:translateX(-50%)!important;
          min-width:132px!important;padding:11px 24px!important;box-sizing:border-box!important;
          display:flex!important;align-items:center!important;justify-content:center!important;
@@ -4450,11 +4476,13 @@ async function playVoiceNote(message: ChatMessage) {
        }
        .rc-status-visit-link.is-disabled { opacity:.55!important; }
        .rc-status-tap-zone {
+         -webkit-tap-highlight-color:transparent!important;touch-action:manipulation!important;user-select:none!important;
          position:absolute!important;top:48px!important;bottom:0!important;width:34%!important;
          z-index:5!important;border:0!important;border-radius:0!important;background:transparent!important;
          padding:0!important;outline:none!important;
        }
        .rc-status-tap-zone.previous { left:0!important; }
+       .rc-status-tap-zone:focus,.rc-status-tap-zone:focus-visible,.rc-status-tap-zone:active{outline:none!important;background:transparent!important;box-shadow:none!important}
        .rc-status-tap-zone.next { right:0!important; }
        .rc-status-viewer.is-paused .rc-status-progress-bar { animation-play-state:paused!important; }
 
@@ -4462,7 +4490,7 @@ async function playVoiceNote(message: ChatMessage) {
        .rc-status-screen { position:fixed!important;left:0!important;top:var(--rc-visual-offset,0px)!important;right:auto!important;bottom:auto!important;width:100dvw!important;height:var(--rc-visual-height,100dvh)!important;min-width:100dvw!important;max-width:100dvw!important;transform:none!important;margin:0!important;padding:0!important;overflow:hidden!important;z-index:2147483647!important;contain:layout paint!important; }
        .rc-status-viewer { position:absolute!important;left:0!important;top:0!important;right:0!important;bottom:0!important;width:100%!important;height:100%!important;min-width:100%!important;max-width:none!important;transform:none!important; }
        .rc-status-image { position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-width:100%!important;max-width:none!important;object-fit:cover!important; }
-       .rc-emoji-picker { position:fixed!important;display:block!important;visibility:visible!important;opacity:1!important;left:8px!important;right:8px!important;bottom:calc(76px + env(safe-area-inset-bottom))!important;width:auto!important;max-width:none!important;max-height:55dvh!important;overflow-y:auto!important;background:#101b2d!important;border:1px solid rgba(148,163,184,.38)!important;border-radius:16px!important;padding:12px!important;z-index:2147483647!important; }
+       .rc-emoji-picker { position:fixed!important;display:block!important;visibility:visible!important;opacity:1!important;left:8px!important;right:8px!important;bottom:calc(68px + env(safe-area-inset-bottom))!important;width:auto!important;max-width:none!important;max-height:55dvh!important;overflow-y:auto!important;background:#101b2d!important;border:1px solid rgba(148,163,184,.38)!important;border-radius:16px!important;padding:12px!important;z-index:2147483647!important; }
        .rc-emoji-grid { display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:7px!important;min-height:80px!important; }
        .rc-emoji-grid button { display:flex!important;align-items:center!important;justify-content:center!important;min-height:44px!important;visibility:visible!important;opacity:1!important; }
        .rc-emoji-grid .rc-emoji-glyph { font-family:"Apple Color Emoji","Noto Color Emoji","Segoe UI Emoji",sans-serif!important;font-size:27px!important;line-height:1.35!important;color:initial!important;-webkit-text-fill-color:initial!important; }
@@ -4532,7 +4560,7 @@ async function playVoiceNote(message: ChatMessage) {
       /* Emoji content is a plain text glyph grid; avoid inherited icon/text clipping styles. */
       .rc-emoji-picker {
         position:fixed!important; display:block!important; visibility:visible!important; opacity:1!important;
-        pointer-events:auto!important; left:8px!important; right:8px!important; bottom:calc(76px + env(safe-area-inset-bottom))!important;
+        pointer-events:auto!important; left:8px!important; right:8px!important; bottom:calc(68px + env(safe-area-inset-bottom))!important;
         width:auto!important; height:auto!important; min-height:150px!important; max-height:55dvh!important;
         overflow-y:auto!important; z-index:2147483647!important; background:#101b2d!important;
         color:#fff!important; padding:12px!important; box-sizing:border-box!important;
@@ -4564,7 +4592,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-status-screen { position:fixed!important; inset:auto!important; overflow:hidden!important; background:#000!important; padding:0!important; margin:0!important; }
       .rc-status-viewer { position:absolute!important; inset:0!important; width:100%!important;height:100%!important;min-width:0!important;max-width:none!important;min-height:0!important;max-height:none!important; padding:0!important;margin:0!important;border:0!important;border-radius:0!important;overflow:hidden!important;background:#000!important;box-sizing:border-box!important; }
       .rc-status-image { position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center!important;background:#000!important;border:0!important;border-radius:0!important; }
-      .rc-status-caption { position:absolute!important;left:0!important;right:0!important;bottom:0!important;z-index:8!important;max-height:30%!important;height:auto!important;overflow-y:auto!important;box-sizing:border-box!important;padding:12px 16px calc(18px + env(safe-area-inset-bottom))!important;background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.72) 24%,rgba(0,0,0,.94) 100%)!important; }
+      .rc-status-caption { position:absolute!important;left:0!important;right:0!important;bottom:0!important;z-index:8!important;max-height:30%!important;height:auto!important;overflow-y:auto!important;right:0!important;box-sizing:border-box!important;padding:12px 16px calc(18px + env(safe-area-inset-bottom))!important;background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.72) 24%,rgba(0,0,0,.94) 100%)!important; }
       .rc-status-caption p { max-height:calc(var(--rc-visual-height,100dvh)*.24)!important;overflow-y:auto!important; }
 
       /* Dedicated Status page with accessible photo, caption and optional-link controls. */
