@@ -83,7 +83,7 @@ type AdCampaign = {
 
 type CommunityAnnouncement = { id: string; author_id: string; caption: string; image_url: string; created_at: string; author_nickname?: string; };
 type ContestOption = { id?: string; caption: string; image_path?: string | null; imageFile?: File | null; votes?: number; percentage?: number };
-type CommunityContest = { id: string; author_id: string; question: string; cover_image_path: string | null; created_at: string; author_nickname?: string; options: ContestOption[]; results?: ContestOption[]; voted_option_id?: string | null };
+type CommunityContest = { id: string; author_id: string; question: string; cover_image_path: string | null; created_at: string; expires_at: string; author_nickname?: string; options: ContestOption[]; results?: ContestOption[]; voted_option_id?: string | null };
 
 type Conversation = {
   id: string;
@@ -343,6 +343,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [contestComposerOpen, setContestComposerOpen] = useState(false);
   const [contests, setContests] = useState<CommunityContest[]>([]);
   const [contestQuestion, setContestQuestion] = useState('');
+  const [contestExpiresAt, setContestExpiresAt] = useState('');
   const [contestCover, setContestCover] = useState<File | null>(null);
   const [contestOptions, setContestOptions] = useState<ContestOption[]>([{caption:''},{caption:''}]);
   const [contestBusy, setContestBusy] = useState(false);
@@ -367,6 +368,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const statusFileInputRef = useRef<HTMLInputElement | null>(null);
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusViewerIndex, setStatusViewerIndex] = useState(0);
+  const [statusViewerItems, setStatusViewerItems] = useState<any[]>([]);
   const [statusPaused, setStatusPaused] = useState(false);
   const [statusRemainingMs, setStatusRemainingMs] = useState(5000);
   const [statusProgressRun, setStatusProgressRun] = useState(0);
@@ -870,9 +872,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
   }
 
   const contestImageUrl = (path?: string | null) => path && supabase ? supabase.storage.from('contest-images').getPublicUrl(path).data.publicUrl : '';
+  const contestExpiryBounds = () => { const now = new Date(); const max = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); const local = (d:Date) => new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); return { min: local(new Date(now.getTime()+5*60000)), max: local(max) }; };
   const loadContests = useCallback(async () => {
     if (!supabase) return;
-    const { data, error } = await supabase.from('rc_contests').select('id,author_id,question,cover_image_path,created_at').eq('is_published', true).order('created_at', { ascending: false }).limit(30);
+    const { data, error } = await supabase.from('rc_contests').select('id,author_id,question,cover_image_path,created_at,expires_at').eq('is_published', true).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(30);
     if (error) { setStatus(`Could not load contests: ${error.message}`); return; }
     const rows = data || [];
     const ids = rows.map((r:any) => r.id);
@@ -887,6 +890,9 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!supabase || !userId) return;
     const validOptions = contestOptions.filter(o => o.caption.trim() || o.imageFile);
     if (!contestQuestion.trim() || validOptions.length < 2) { setStatus('Add a contest question and at least two answer options.'); return; }
+    const expiry = new Date(contestExpiresAt);
+    const now = new Date();
+    if (!contestExpiresAt || Number.isNaN(expiry.getTime()) || expiry <= now || expiry.getTime() > now.getTime() + 7*24*60*60*1000) { setStatus('Choose an expiry date and time within the next 7 days.'); setStatusType('error'); return; }
     setContestBusy(true);
     let coverPath: string | null = null;
     let contestId: string | null = null;
@@ -897,7 +903,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
         if (error) throw error;
         coverPath = path;
       }
-      const { data, error } = await supabase.from('rc_contests').insert({ author_id:userId, question:contestQuestion.trim(), cover_image_path:coverPath, is_published:true }).select('id').single();
+      const { data, error } = await supabase.from('rc_contests').insert({ author_id:userId, question:contestQuestion.trim(), cover_image_path:coverPath, expires_at:expiry.toISOString(), is_published:true }).select('id').single();
       if (error) throw error;
       contestId = data.id;
       const optionRows: any[] = [];
@@ -912,7 +918,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       }
       const {error:optionsError}=await supabase.from('rc_contest_options').insert(optionRows);
       if(optionsError) throw optionsError;
-      setContestQuestion('');setContestCover(null);setContestOptions([{caption:''},{caption:''}]);setContestComposerOpen(false);
+      setContestQuestion('');setContestCover(null);setContestOptions([{caption:''},{caption:''}]);setContestExpiresAt('');setContestComposerOpen(false);
       await loadContests();setStatus('Contest published.');
     } catch(error:any) {
       if(contestId) await supabase.from('rc_contests').delete().eq('id',contestId);
@@ -931,6 +937,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   };
   const voteContest = async () => {
     if(!supabase || !activeContest || !contestVotedOption) return;
+    if (new Date(activeContest.expires_at).getTime() <= Date.now()) { setStatus('This contest has expired.'); setStatusType('error'); await loadContests(); setActiveContest(null); return; }
     setContestVoteBusy(true);
     const {data,error}=await supabase.rpc('rc_vote_contest',{p_contest_id:activeContest.id,p_option_id:contestVotedOption});
     if(error) setStatus(`Could not submit vote: ${error.message}`);
@@ -1064,12 +1071,12 @@ const voiceChunksRef = useRef<Blob[]>([]);
   }, [statusViewerOpen, statusViewerIndex]);
 
   useEffect(() => {
-    if (!statusViewerOpen || statusPaused || statusRows.length < 1) return;
+    if (!statusViewerOpen || statusPaused || statusViewerItems.length < 1) return;
     statusStartedAt.current = Date.now();
     statusTimer.current = window.setTimeout(() => {
       statusTimer.current = null;
       setStatusRemainingMs(5000);
-      if (statusViewerIndex < statusRows.length - 1) setStatusViewerIndex(index => index + 1);
+      if (statusViewerIndex < statusViewerItems.length - 1) setStatusViewerIndex(index => index + 1);
       else setStatusViewerOpen(false);
     }, Math.max(0, statusRemainingMs));
     return () => {
@@ -1078,7 +1085,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
         statusTimer.current = null;
       }
     };
-  }, [statusViewerOpen, statusPaused, statusViewerIndex, statusRows.length, statusRemainingMs]);
+  }, [statusViewerOpen, statusPaused, statusViewerIndex, statusViewerItems.length, statusRemainingMs]);
 
   function pauseStatusViewer() {
     if (!statusViewerOpen || statusPaused) return;
@@ -1098,17 +1105,21 @@ const voiceChunksRef = useRef<Blob[]>([]);
 
   function moveStatusViewer(direction: -1 | 1) {
     setStatusViewerIndex(index => {
-      const next = Math.max(0, Math.min(statusRows.length - 1, index + direction));
+      const next = Math.max(0, Math.min(statusViewerItems.length - 1, index + direction));
       return next;
     });
   }
   async function openStatusViewer(userIdToView: string) {
     if (!supabase || !userId) return;
-    const { data, error } = await supabase.from('user_statuses').select('id,user_id,caption,link_url,image_path,created_at,expires_at').eq('user_id',userIdToView).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:true});
-    if (error) { setStatus(`Could not open status: ${error.message}`); return; }
-    if (!data?.length) { setStatus('No active status available.'); return; }
-    setStatusRows(data);setStatusViewerIndex(0);setStatusViewerOpen(true);
-    await supabase.from('status_views').upsert(data.map((row:any)=>({status_id:row.id,viewer_id:userId})),{onConflict:'status_id,viewer_id'});
+    // The feed already contains the rows permitted by RLS. Re-querying here
+    // can fail under a stricter per-row policy and leave the viewer unopened.
+    const activeRows = statusRows
+      .filter((row:any) => row.user_id === userIdToView && new Date(row.expires_at).getTime() > Date.now())
+      .sort((a:any,b:any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    if (!activeRows.length) { setStatus('No active status available.'); setStatusType('error'); return; }
+    setStatusViewerItems(activeRows);
+    setStatusViewerIndex(0);setStatusViewerOpen(true);
+    void supabase.from('status_views').upsert(activeRows.map((row:any)=>({status_id:row.id,viewer_id:userId})),{onConflict:'status_id,viewer_id'});
   }
   const loadAnnouncements = useCallback(async () => {
     if (!supabase) return;
@@ -3005,7 +3016,7 @@ async function playVoiceNote(message: ChatMessage) {
 >
   {voiceBusy ? '…' : isRecordingVoice ? <Square size={19} fill="currentColor" /> : <Mic size={21} />}
 </button>
-<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{"😀 😃 😄 😁 😆 😅 😂 🤣 🥹 😊 😍 🥰 😘 😎 🤔 🙄 😭 😱 🥳 😴 🤗 🤫 🤨 😤 😡 💀 👻 🤖 👋 👍 👎 👏 🙌 🫶 🙏 💪 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💕 💯 🔥 ✨ ⭐ 🌈 🌹 🌻 🌸 🦋 🐱 🐶 🦁 🐼 🦄 🍎 🍉 🍕 🍔 🍟 ☕ 🎂 🎉 🎊 🎁 🏆 ⚽ 🏀 🎮 🚀 💎 👑 📱 💻".split(" ").map((emoji,i)=><button type="button" key={`${emoji}-${i}`} onClick={()=>{setDraftMessage(v=>v+emoji);setShowEmojiPicker(false);window.setTimeout(()=>document.querySelector<HTMLTextAreaElement>('textarea[name="chat-message"]')?.focus(),50);}} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}><span className="rc-emoji-glyph">{emoji}</span></button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{"😀 😃 😄 😁 😆 😅 😂 🤣 🥹 😊 😍 🥰 😘 😎 🤔 🙄 😭 😱 🥳 😴 🤗 🤫 🤨 😤 😡 💀 👻 🤖 👋 👍 👎 👏 🙌 🫶 🙏 💪 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💕 💯 🔥 ✨ ⭐ 🌈 🌹 🌻 🌸 🦋 🐱 🐶 🦁 🐼 🦄 🍎 🍉 🍕 🍔 🍟 ☕ 🎂 🎉 🎊 🎁 🏆 ⚽ 🏀 🎮 🚀 💎 👑 📱 💻".split(" ").map((emoji,i)=><button type="button" key={`${emoji}-${i}`} onClick={()=>{setDraftMessage(v=>v+emoji);setShowEmojiPicker(false);window.setTimeout(()=>document.querySelector<HTMLTextAreaElement>('textarea[name="chat-message"]')?.focus(),50);}} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}>{emoji}</button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -3104,12 +3115,13 @@ async function playVoiceNote(message: ChatMessage) {
           {contestComposerOpen && <div className="rc-feature-compose-page"><div className="rc-feature-compose-top"><button type="button" className="rc-icon-btn" onClick={()=>setContestComposerOpen(false)} aria-label="Back to contests"><ArrowLeft size={20}/></button><strong>New contest</strong></div><form className="rc-contest-composer" onSubmit={publishContest}>
             <div className="rc-contest-composer-title"><Trophy size={20}/><h2>Add contest</h2></div>
             <label className="rc-contest-label">Contest question<textarea value={contestQuestion} onChange={e=>setContestQuestion(e.target.value)} maxLength={500} placeholder="What would you like the community to choose?" required/></label>
+            <label className="rc-contest-label">Contest expiry date &amp; time<input type="datetime-local" value={contestExpiresAt} min={contestExpiryBounds().min} max={contestExpiryBounds().max} onChange={e=>setContestExpiresAt(e.target.value)} required/><small>Choose when voting should close. The expiry must be within 7 days of publishing.</small></label>
             <input ref={contestCoverInputRef} type="file" accept="image/*" hidden onChange={e=>setContestCover(e.target.files?.[0]||null)}/>
             <button type="button" className="rc-contest-image-button" onClick={()=>contestCoverInputRef.current?.click()}><ImagePlus size={18}/>{contestCover ? contestCover.name : 'Add optional cover image (16:5)'}</button>
             {contestCover && <img className="rc-contest-cover-preview" src={URL.createObjectURL(contestCover)} alt="Contest cover preview"/>}
             <div className="rc-contest-options-heading"><strong>Answer options</strong><small>Add a caption and optional image for each answer.</small></div>
             {contestOptions.map((option,index)=><div className="rc-contest-option-editor" key={index}><label className="rc-contest-label">Option {index+1}<input value={option.caption} onChange={e=>setContestOptions(old=>{const next=old.map((o,i)=>i===index?{...o,caption:e.target.value}:o);if(index===old.length-1&&e.target.value.trim())next.push({caption:''});return next;})} placeholder="Type an answer…"/></label><label className="rc-contest-image-button"><ImagePlus size={16}/>{option.imageFile ? option.imageFile.name : 'Add option image'}<input type="file" accept="image/*" onChange={e=>setContestOptions(old=>old.map((o,i)=>i===index?{...o,imageFile:e.target.files?.[0]||null}:o))}/></label>{option.imageFile && <img className="rc-contest-option-preview" src={URL.createObjectURL(option.imageFile)} alt="Option preview"/>}</div>)}
-            <button type="submit" className="rc-primary rc-full" disabled={contestBusy}>{contestBusy?'Publishing…':'Publish contest'}</button>
+            <button type="submit" className="rc-primary rc-full" disabled={contestBusy || !contestExpiresAt}>{contestBusy?'Publishing…':'Publish contest'}</button>
           </form></div>}
           {!contestComposerOpen && <><section className="rc-contest-recent"><h2>Recent contests</h2><div className="rc-contest-strip">{contests.length?contests.map(contest=><button type="button" className="rc-contest-bubble" key={contest.id} onClick={()=>void openContest(contest)}>{contest.cover_image_path?<img src={contestImageUrl(contest.cover_image_path)} alt=""/>:<span className="rc-contest-no-cover"><Trophy size={22}/></span>}<strong>{contest.question}</strong><small>@{contest.author_nickname}</small></button>):<p className="rc-contest-empty">No contests have been published yet.</p>}</div></section><button type="button" className="rc-feature-fab" onClick={()=>setContestComposerOpen(true)}><Plus size={19}/> Add Contest</button></>}
         </>}
@@ -3128,8 +3140,8 @@ async function playVoiceNote(message: ChatMessage) {
           onContextMenu={e => e.preventDefault()}
           aria-label="Status viewer"
         >
-          {statusRows[statusViewerIndex] && <>
-            <img className="rc-status-image" src={supabase?.storage.from('status-images').getPublicUrl(statusRows[statusViewerIndex].image_path).data.publicUrl} alt="Status"/>
+          {statusViewerItems[statusViewerIndex] && <>
+            <img className="rc-status-image" src={supabase?.storage.from('status-images').getPublicUrl(statusViewerItems[statusViewerIndex].image_path).data.publicUrl} alt="Status"/>
             <div className="rc-status-progress-track" aria-hidden="true">
               <span key={statusProgressRun} className="rc-status-progress-bar" style={{ animationDuration: '5000ms', animationPlayState: statusPaused ? 'paused' : 'running' }}/>
             </div>
@@ -3137,15 +3149,15 @@ async function playVoiceNote(message: ChatMessage) {
             <button type="button" className="rc-status-tap-zone previous" aria-label="Previous status" onClick={() => moveStatusViewer(-1)}/>
             <button type="button" className="rc-status-tap-zone next" aria-label="Next status" onClick={() => moveStatusViewer(1)}/>
             <div className="rc-status-caption">
-              <p>{statusRows[statusViewerIndex].caption}</p>
+              <p>{statusViewerItems[statusViewerIndex].caption}</p>
             </div>
             <a
-              className={`rc-status-visit-link ${!statusRows[statusViewerIndex].link_url ? 'is-disabled' : ''}`}
-              href={statusRows[statusViewerIndex].link_url || undefined}
+              className={`rc-status-visit-link ${!statusViewerItems[statusViewerIndex].link_url ? 'is-disabled' : ''}`}
+              href={statusViewerItems[statusViewerIndex].link_url || undefined}
               target="_blank"
               rel="noreferrer"
-              aria-disabled={!statusRows[statusViewerIndex].link_url}
-              onClick={e => { e.stopPropagation(); if (!statusRows[statusViewerIndex].link_url) e.preventDefault(); }}
+              aria-disabled={!statusViewerItems[statusViewerIndex].link_url}
+              onClick={e => { e.stopPropagation(); if (!statusViewerItems[statusViewerIndex].link_url) e.preventDefault(); }}
             >Visit Link</a>
           </>}
         </section>
@@ -4318,7 +4330,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-public-profile-card h2 { display:flex; align-items:center; margin:4px 0; font-size:22px; }.rc-public-profile-card p { margin:0; color:#cbd5e1; font-size:13px; }.rc-public-profile-bio { width:100%; margin:7px 0; padding:12px; box-sizing:border-box; border-radius:12px; background:rgba(148,163,184,.08); color:#e2e8f0; white-space:pre-wrap; line-height:1.5; }.rc-public-profile-hours { display:flex; flex-direction:column; gap:3px; margin:6px 0 10px; }.rc-public-profile-hours strong { color:#93c5fd; }.rc-public-profile-hours span { color:#94a3b8; font-size:12px; }
       @media (max-width:800px) { .rc-floating-announcements { bottom:calc(248px + env(safe-area-inset-bottom)); } }
 
-      .rc-features-wrap{position:fixed;z-index:70;right:16px;bottom:calc(248px + env(safe-area-inset-bottom));width:52px;height:52px;touch-action:none}.rc-features-button{position:relative;display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;background:#facc15;color:#172033;border:1px solid #fde68a;border-radius:17px;font-weight:900;box-shadow:0 8px 28px #0007;cursor:grab}.rc-features-button:active{cursor:grabbing}.rc-features-badge{position:absolute;top:-7px;right:-7px;font-style:normal;background:#2563eb;color:white;border:2px solid #101b2d;border-radius:99px;min-width:19px;height:19px;display:grid;place-items:center;padding:0 4px;font-size:10px}.rc-features-menu{position:absolute;right:0;bottom:calc(100% + 12px);display:flex;flex-direction:column;width:min(210px,calc(100vw - 24px));max-height:min(220px,calc(100dvh - 250px));overflow-y:auto;padding:7px;border:1px solid #334155;border-radius:15px;background:#101b2d;box-shadow:0 12px 32px #0009;gap:3px}.rc-features-menu button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:white;padding:11px;border-radius:9px;text-align:left;white-space:nowrap}.rc-status-screen,.rc-status-compose-wrap{position:fixed;inset:0;z-index:110;background:#050914ed;display:grid;place-items:center;padding:16px}.rc-status-viewer,.rc-status-compose{position:relative;width:min(100%,440px);max-height:88dvh;overflow:auto;background:#111c2e;border:1px solid #334155;border-radius:20px;padding:18px;color:white}.rc-status-viewer>img{width:100%;max-height:65dvh;object-fit:contain;border-radius:12px}.rc-status-caption{padding:10px}.rc-status-controls{display:flex;justify-content:space-between}.rc-status-compose label{display:grid;gap:7px;margin:12px 0}.rc-status-compose input,.rc-status-compose textarea{width:100%;background:#0b1424;color:white;border:1px solid #334155;border-radius:10px;padding:10px}.rc-status-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+      .rc-features-wrap{position:fixed;z-index:70;right:16px;bottom:calc(248px + env(safe-area-inset-bottom));width:52px;height:52px;touch-action:none}.rc-features-button{position:relative;display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;background:#facc15;color:#172033;border:1px solid #fde68a;border-radius:17px;font-weight:900;box-shadow:0 8px 28px #0007;cursor:grab}.rc-features-button:active{cursor:grabbing}.rc-features-badge{position:absolute;top:-7px;right:-7px;font-style:normal;background:#2563eb;color:white;border:2px solid #101b2d;border-radius:99px;min-width:19px;height:19px;display:grid;place-items:center;padding:0 4px;font-size:10px}.rc-features-menu{position:absolute;right:0;bottom:calc(100% + 12px);display:flex;flex-direction:column;width:min(210px,calc(100vw - 24px));max-height:min(220px,calc(100dvh - 250px));overflow-y:auto;padding:7px;border:1px solid #334155;border-radius:15px;background:#101b2d;box-shadow:0 12px 32px #0009;gap:3px}.rc-features-menu button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:white;padding:11px;border-radius:9px;text-align:left;white-space:nowrap}.rc-status-screen,.rc-status-compose-wrap{position:fixed;inset:0;z-index:2147483600;background:#050914ed;display:grid;place-items:center;padding:16px}.rc-status-viewer,.rc-status-compose{position:relative;width:min(100%,440px);max-height:88dvh;overflow:auto;background:#111c2e;border:1px solid #334155;border-radius:20px;padding:18px;color:white}.rc-status-viewer>img{width:100%;max-height:65dvh;object-fit:contain;border-radius:12px}.rc-status-caption{padding:10px}.rc-status-controls{display:flex;justify-content:space-between}.rc-status-compose label{display:grid;gap:7px;margin:12px 0}.rc-status-compose input,.rc-status-compose textarea{width:100%;background:#0b1424;color:white;border:1px solid #334155;border-radius:10px;padding:10px}.rc-status-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
       /* Final overrides: preserve native full-colour emoji rendering and keep
          the conversation identity row fixed above the keyboard-adjusted scroller. */
       .rc-emoji-picker{display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;z-index:2147483647!important;max-height:min(58dvh,460px)!important;overflow-y:auto!important;bottom:calc(84px + env(safe-area-inset-bottom))!important}
@@ -4676,7 +4688,23 @@ async function playVoiceNote(message: ChatMessage) {
         font-size: 29px !important; font-weight: 400 !important; line-height: 1.25 !important;
         font-variant-emoji: emoji !important; color: initial !important; -webkit-text-fill-color: initial !important;
         text-indent: 0 !important; }
+      /* Authoritative final chat layout: only the message list scrolls. */
+      .rc-messages-layout.has-chat { min-height:0!important; overflow:hidden!important; }
+      .rc-messages-layout.has-chat .rc-chat-panel { display:grid!important; grid-template-rows:64px minmax(0,1fr) auto!important; grid-template-columns:minmax(0,1fr)!important; height:100%!important; min-height:0!important; max-height:100%!important; overflow:hidden!important; position:relative!important; transform:none!important; }
+      .rc-messages-layout.has-chat .rc-chat-header { grid-row:1!important; grid-column:1!important; position:relative!important; top:auto!important; inset:auto!important; z-index:5!important; display:flex!important; flex:none!important; height:64px!important; min-height:64px!important; max-height:64px!important; overflow:hidden!important; transform:none!important; }
+      .rc-messages-layout.has-chat .rc-chat-empty { grid-row:2!important; grid-column:1!important; min-height:0!important; height:auto!important; max-height:none!important; overflow-y:auto!important; overflow-x:hidden!important; }
+      .rc-messages-layout.has-chat .rc-composer-wrap { grid-row:3!important; grid-column:1!important; position:relative!important; inset:auto!important; z-index:6!important; min-height:0!important; flex:none!important; margin:0!important; }
+      /* New native emoji grid; glyphs are the button text, not nested spans. */
+      .rc-emoji-picker { position:fixed!important; left:12px!important; right:12px!important; bottom:calc(86px + env(safe-area-inset-bottom))!important; z-index:2147483647!important; display:block!important; visibility:visible!important; opacity:1!important; width:auto!important; max-height:55dvh!important; min-height:220px!important; overflow-y:auto!important; background:#101b2d!important; color:#f8fafc!important; }
+      .rc-emoji-grid { display:grid!important; grid-template-columns:repeat(7,minmax(0,1fr))!important; gap:8px!important; min-height:160px!important; }
+      .rc-emoji-grid>button { display:grid!important; place-items:center!important; min-width:0!important; min-height:46px!important; padding:2px!important; font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif!important; font-size:28px!important; line-height:1.25!important; font-weight:400!important; color:#fff!important; -webkit-text-fill-color:currentColor!important; visibility:visible!important; opacity:1!important; background:rgba(148,163,184,.08)!important; border:1px solid rgba(148,163,184,.16)!important; border-radius:9px!important; }
+      .rc-status-screen { z-index:2147483600!important; position:fixed!important; inset:0!important; display:grid!important; place-items:center!important; background:#050914f5!important; }
+      .rc-status-viewer { position:relative!important; z-index:1!important; width:min(100%,440px)!important; max-height:92dvh!important; overflow:hidden!important; }
+      .rc-contest-label input[type="datetime-local"] { color-scheme:dark!important; }
+      .rc-contest-label small { color:#9fb0c9!important; font-size:11px!important; font-weight:400!important; }
     `}
+
+
 
 
 
