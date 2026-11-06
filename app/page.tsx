@@ -4740,6 +4740,60 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-emoji-grid-v2 { grid-template-columns:repeat(7,minmax(0,1fr))!important; gap:6px!important; }
       .rc-emoji-grid-v2>button { min-height:46px!important; font-size:28px!important; background:linear-gradient(145deg,#1c3556,#102039)!important; border-color:rgba(125,170,225,.22)!important; }
 
+
+      /* MR RICH CONNECT conversation finish: black through charcoal-black into navy. */
+      .rc-conversation-row {
+        background: linear-gradient(100deg, #000000 0%, #050608 52%, #071a33 100%) !important;
+        border: 1px solid rgba(115, 145, 185, .24) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 5px 16px rgba(0,0,0,.28) !important;
+      }
+      .rc-conversation-row.active {
+        background: linear-gradient(100deg, #020304 0%, #080b10 48%, #0b2a50 100%) !important;
+        border-color: rgba(96,165,250,.48) !important;
+        box-shadow: inset 0 0 0 1px rgba(96,165,250,.08), 0 6px 18px rgba(0,0,0,.34) !important;
+      }
+
+      /* MR RICH CONNECT emoji tiles: preserve native emoji glyph rendering. */
+      .rc-emoji-picker-v2 {
+        background: radial-gradient(ellipse at top right, #17365b 0%, #0c1728 52%, #070d17 100%) !important;
+        border: 1px solid rgba(96,165,250,.38) !important;
+        border-radius: 20px !important;
+        box-shadow: 0 18px 50px rgba(0,0,0,.68), inset 0 1px 0 rgba(255,255,255,.06) !important;
+      }
+      .rc-emoji-picker-v2-head {
+        padding: 2px 2px 12px !important;
+        border-bottom: 1px solid rgba(96,165,250,.22) !important;
+      }
+      .rc-emoji-picker-v2-head strong {
+        letter-spacing: .04em !important;
+        text-transform: uppercase !important;
+        background: linear-gradient(90deg,#fff 0%,#bfdbfe 70%,#60a5fa 100%) !important;
+        -webkit-background-clip: text !important;
+        background-clip: text !important;
+        color: transparent !important;
+      }
+      .rc-emoji-grid-v2 { gap: 8px !important; }
+      .rc-emoji-grid-v2 > button {
+        min-height: 46px !important;
+        border: 1px solid rgba(125,170,225,.18) !important;
+        border-radius: 12px !important;
+        background: linear-gradient(145deg,rgba(34,58,88,.94),rgba(12,25,43,.98)) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.055), 0 3px 8px rgba(0,0,0,.2) !important;
+        transition: transform .12s ease, border-color .12s ease, background .12s ease !important;
+      }
+      .rc-emoji-grid-v2 > button:active {
+        transform: scale(.91) !important;
+        border-color: rgba(96,165,250,.8) !important;
+        background: linear-gradient(145deg,#28558a,#142b49) !important;
+      }
+      .rc-emoji-grid-v2 > button > span {
+        font-family: "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif !important;
+        font-size: 27px !important;
+        line-height: 1.25 !important;
+        font-variant-emoji: emoji !important;
+        color: initial !important;
+        -webkit-text-fill-color: initial !important;
+      }
       .rc-announcement-compose-top { display:flex!important; align-items:center!important; gap:12px!important; margin:0 0 14px!important; color:#f8fafc!important; font-weight:800!important; }
     `}
 
