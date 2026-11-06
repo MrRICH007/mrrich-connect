@@ -257,6 +257,44 @@ function VoiceNotePlayer({ src }: { src: string }) {
 }
 
 
+function ChatEntranceArt({ character }: { character: string }) {
+  const palette: Record<string, { hair: string; outfit: string; accent: string; skin: string; label: string }> = {
+    gojo: { hair: '#f4f7ff', outfit: '#18243a', accent: '#72c8ff', skin: '#e8b99f', label: 'Anime sorcerer' },
+    ronaldo: { hair: '#38251f', outfit: '#a51f32', accent: '#f4d6a0', skin: '#d99b79', label: 'Footballer in red kit' },
+    messi: { hair: '#49352d', outfit: '#6aa9e8', accent: '#f4f4f4', skin: '#dca889', label: 'Footballer in sky-blue kit' },
+    model: { hair: '#251a1a', outfit: '#7c3aed', accent: '#e9b8cf', skin: '#c98768', label: 'Fashion model' },
+    barbie: { hair: '#f2b7cf', outfit: '#f06ca8', accent: '#ffd8eb', skin: '#f0c4a9', label: 'Pink fashion doll' },
+  };
+  const c = palette[character] || palette.gojo;
+  const isGojo = character === 'gojo';
+  const isRonaldo = character === 'ronaldo';
+  const isMessi = character === 'messi';
+  const isBarbie = character === 'barbie';
+  return <svg className={`rc-character-art rc-character-${character}`} viewBox="0 0 180 230" role="img" aria-label={c.label}>
+    <defs><linearGradient id={`rc-shirt-${character}`} x1="0" x2="1" y1="0" y2="1"><stop offset="0" stopColor={c.outfit}/><stop offset="1" stopColor={c.accent}/></linearGradient></defs>
+    {/* waist-up body */}
+    <path d="M34 226 Q35 174 55 157 Q70 145 90 145 Q112 145 127 157 Q147 174 148 226Z" fill={`url(#rc-shirt-${character})`} stroke="#101827" strokeWidth="3"/>
+    {isRonaldo && <><path d="M90 151v73" stroke="#f8e6c7" strokeWidth="3"/><path d="M71 170h38" stroke="#f8e6c7" strokeWidth="2"/><text x="90" y="207" fill="#fff" fontSize="25" fontWeight="900" textAnchor="middle">7</text></>}
+    {isMessi && <><path d="M90 151v75" stroke="#fff" strokeWidth="3"/><path d="M48 178h84" stroke="#fff" strokeWidth="5" opacity=".85"/><text x="90" y="210" fill="#fff" fontSize="23" fontWeight="900" textAnchor="middle">10</text></>}
+    {isGojo && <path d="M53 155 Q90 173 127 155 L116 226H64Z" fill="#101a2b" opacity=".9"/>}
+    {/* neck and ears */}
+    <path d="M77 130h26v29q-13 13-26 0Z" fill={c.skin}/>
+    <ellipse cx="54" cy="91" rx="10" ry="15" fill={c.skin}/><ellipse cx="126" cy="91" rx="10" ry="15" fill={c.skin}/>
+    <path d="M54 78 Q54 35 90 34 Q128 34 127 80 L121 111 Q113 139 90 142 Q67 139 59 111Z" fill={c.skin} stroke="#7a5145" strokeWidth="1.5"/>
+    {/* hair silhouette */}
+    {isGojo ? <path d="M51 91 Q34 54 61 28 Q82 7 105 23 Q139 20 137 62 L127 89 117 63 106 76 99 49 85 72 76 48 65 83 57 103Z" fill={c.hair} stroke="#b6c8db" strokeWidth="2"/> : isBarbie ? <><path d="M51 97 Q38 36 78 25 Q120 9 137 58 Q143 93 130 145 Q119 164 116 127 L119 75 Q91 49 66 77 L63 137 Q52 153 46 127Z" fill={c.hair} stroke="#c66b9b" strokeWidth="2"/><path d="M57 51Q91 4 126 47" fill="none" stroke="#ffe3ef" strokeWidth="7"/></> : <path d={isMessi ? 'M51 91Q42 47 70 29Q99 14 126 43L132 83 119 72 110 56 95 66 80 53 66 84 59 104Z' : 'M50 93Q39 49 66 29Q95 10 121 34Q141 53 129 91L119 73 109 58 98 72 83 55 68 86 59 104Z'} fill={c.hair} stroke="#211b20" strokeWidth="2"/>}
+    {/* face */}
+    {isGojo ? <><path d="M59 83Q90 72 121 83L119 100Q90 108 61 100Z" fill="#111827"/><path d="M63 88Q90 80 117 88" stroke="#7dd3fc" strokeWidth="3"/><path d="M82 119q8 6 16 0" stroke="#8a4f49" strokeWidth="2" fill="none"/></> : <><ellipse cx="76" cy="96" rx="3" ry="4" fill="#27212a"/><ellipse cx="104" cy="96" rx="3" ry="4" fill="#27212a"/><path d="M86 111q4 3 8 0" stroke="#9c5d53" strokeWidth="2" fill="none"/><path d="M73 119q17 12 34 0" stroke={isBarbie ? '#b54e79' : '#8f4c4c'} strokeWidth="2.5" fill="none" strokeLinecap="round"/></>}
+    {isBarbie && <><path d="M64 94q12-9 23 0M96 94q12-9 22 0" stroke="#3c2634" strokeWidth="2" fill="none"/><path d="M74 121q16 8 32 0" stroke="#e65d98" strokeWidth="3" fill="none"/></>}
+    {/* waving arm, independently animated */}
+    <g className="rc-character-wave-arm"><path d="M124 165Q139 143 145 119" stroke={c.skin} strokeWidth="17" strokeLinecap="round" fill="none"/><path d="M145 120Q139 107 143 94M145 120Q155 107 158 98M145 120Q164 115 168 106M145 120Q134 108 130 100" stroke={c.skin} strokeWidth="7" strokeLinecap="round" fill="none"/><path d="M119 162Q130 153 136 143" stroke={c.outfit} strokeWidth="22" strokeLinecap="round" fill="none"/></g>
+    {/* opposite shoulder */}
+    <path d="M53 166Q39 173 31 197" stroke={c.skin} strokeWidth="15" strokeLinecap="round" fill="none"/>
+    {isGojo && <path d="M55 142Q90 155 125 142" stroke="#31445f" strokeWidth="5" fill="none"/>}
+    {(isRonaldo || isMessi) && <path d="M78 145l12 13 12-13" stroke="#f5f5f4" strokeWidth="4" fill="none"/>}
+  </svg>;
+}
+
 export default function Home() {
   const [supabase] = useState(() => { try { return createClient(); } catch { return null; } });
   const [email, setEmail] = useState('');
@@ -954,9 +992,9 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (chatEntranceTimer.current) window.clearTimeout(chatEntranceTimer.current);
     setChatEntranceCharacter(null);
     if (!selectedConversation || !isCurrentUserPremium || profileForm.disable_chat_animation) return;
-    const characters = ['🥷', '🕴️', '💃', '🤓'];
+    const characters = ['gojo', 'ronaldo', 'messi', 'model', 'barbie'];
     setChatEntranceCharacter(characters[Math.floor(Math.random() * characters.length)]);
-    chatEntranceTimer.current = window.setTimeout(() => setChatEntranceCharacter(null), 3900);
+    chatEntranceTimer.current = window.setTimeout(() => setChatEntranceCharacter(null), 4700);
     return () => { if (chatEntranceTimer.current) window.clearTimeout(chatEntranceTimer.current); };
   }, [selectedConversation?.id, isCurrentUserPremium, profileForm.disable_chat_animation]);
 
@@ -2698,7 +2736,7 @@ async function playVoiceNote(message: ChatMessage) {
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
         <section className="rc-chat-panel">
-          {selectedConversation ? <>{chatEntranceCharacter && <div className="rc-chat-entrance-character" aria-hidden="true"><span>{chatEntranceCharacter}</span></div>}<header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={closeConversationWithMotion} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} style={{cursor:selectedConversation.kind === 'person' ? 'pointer' : 'default'}}>{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><button type="button" className="rc-chat-header-copy rc-chat-profile-trigger" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} disabled={selectedConversation.kind !== 'person'}><strong>{selectedConversation.title}{selectedConversation.kind === 'person' && profiles.find(p => p.id === selectedConversation.otherUserId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={16} />}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'View public profile'}</small></button>
+          {selectedConversation ? <>{chatEntranceCharacter && <div className={`rc-chat-entrance-character rc-chat-entrance-${chatEntranceCharacter}`} aria-hidden="true"><ChatEntranceArt character={chatEntranceCharacter}/></div>}<header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={closeConversationWithMotion} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} style={{cursor:selectedConversation.kind === 'person' ? 'pointer' : 'default'}}>{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><button type="button" className="rc-chat-header-copy rc-chat-profile-trigger" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} disabled={selectedConversation.kind !== 'person'}><strong>{selectedConversation.title}{selectedConversation.kind === 'person' && profiles.find(p => p.id === selectedConversation.otherUserId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={16} />}</strong><small>{selectedConversation.kind === 'group' ? 'Group conversation' : 'View public profile'}</small></button>
 {selectedConversation.kind === 'person' && selectedConversation.otherUserId && (
   <button
     type="button"
@@ -3262,12 +3300,19 @@ async function playVoiceNote(message: ChatMessage) {
     {showGroup && <div className="rc-modal-backdrop" onClick={() => setShowGroup(false)}><form className="rc-modal" onSubmit={createGroup} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setShowGroup(false)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="rc-muted">Start a space around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><label>Group image (optional)<input type="file" accept="image/*" onChange={e => void uploadGroupAvatar(e.target.files?.[0])} disabled={groupAvatarUploading}/></label>{groupAvatarUploading && <p className="rc-muted">Uploading group image…</p>}{groupAvatarUrl && <div className="rc-avatar-preview"><img src={groupAvatarUrl} alt="Group avatar preview"/><button type="button" className="rc-secondary" onClick={() => setGroupAvatarUrl('')}>Remove image</button></div>}<button className="rc-primary rc-full" type="submit" disabled={groupAvatarUploading}>{groupAvatarUploading ? 'Uploading…' : 'Create group'}</button></form></div>}
     {!authReady && <div className="rc-loading" aria-label="Loading"/>}
     <style jsx global>{`
-      @keyframes rc-character-enter-exit { 0%{transform:translateX(115%);opacity:0} 12%{transform:translateX(0);opacity:1} 22%{transform:translateX(0);opacity:1} 32%{transform:translateX(0) rotate(-5deg);opacity:1} 42%{transform:translateX(0) rotate(5deg);opacity:1} 55%{transform:translateX(0);opacity:1} 100%{transform:translateX(-125%);opacity:0} }
+      @keyframes rc-character-enter-exit { 0%{transform:translateX(125%);opacity:0} 12%{transform:translateX(0);opacity:1} 22%{transform:translateX(-5px);opacity:1} 30%{transform:translateX(0);opacity:1} 78%{transform:translateX(0);opacity:1} 100%{transform:translateX(-145%);opacity:0} }
+      @keyframes rc-character-walk { 0%,100%{translate:0 0} 18%,42%,66%{translate:0 -5px} 30%,54%,78%{translate:0 1px} }
+      @keyframes rc-character-wave { 0%,20%,100%{transform:rotate(0deg)} 28%,38%,48%,58%,68%{transform:rotate(-43deg)} 33%,43%,53%,63%,73%{transform:rotate(12deg)} }
       .rc-chat-panel{position:relative!important;isolation:isolate!important}
-      .rc-chat-entrance-character{position:absolute;right:10px;top:58px;z-index:8;pointer-events:none;width:132px;height:180px;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;animation:rc-character-enter-exit 3.9s cubic-bezier(.2,.7,.25,1) both}
-      .rc-chat-entrance-character span{font-size:112px;line-height:1;filter:drop-shadow(0 10px 16px #0009);transform:scaleX(-1);}
-      .rc-chat-panel .rc-chat-empty,.rc-chat-panel .rc-composer-wrap{position:relative;z-index:10}
-      @media(prefers-reduced-motion:reduce){.rc-chat-entrance-character{animation:none!important;display:none!important}}
+      /* This overlay occupies the message grid row: it sits above the panel's CSS background,
+         behind message bubbles, and naturally stays above the keyboard/composer when it opens. */
+      .rc-chat-entrance-character{grid-row:2!important;grid-column:1!important;align-self:stretch!important;justify-self:stretch!important;position:relative!important;z-index:2!important;pointer-events:none!important;overflow:visible!important;min-height:0!important;margin:0!important;display:flex!important;align-items:flex-end!important;justify-content:flex-end!important;padding:0 12px 0 0!important;animation:rc-character-enter-exit 4.7s cubic-bezier(.2,.7,.25,1) both!important}
+      .rc-character-art{width:clamp(116px,34vw,166px)!important;height:min(205px,100%)!important;max-height:205px!important;overflow:visible!important;filter:drop-shadow(0 8px 10px rgba(0,0,0,.4));animation:rc-character-walk .52s ease-in-out infinite}
+      .rc-character-wave-arm{transform-box:fill-box;transform-origin:20% 85%;animation:rc-character-wave 1.05s ease-in-out 1.05s 2 both}
+      .rc-messages-layout.has-chat .rc-chat-empty{position:relative!important;z-index:3!important;background:transparent!important;background-color:transparent!important}
+      .rc-messages-layout.has-chat .rc-message-row{position:relative!important;z-index:3!important}
+      .rc-messages-layout.has-chat .rc-composer-wrap{position:relative!important;z-index:101!important}
+      @media(prefers-reduced-motion:reduce){.rc-chat-entrance-character,.rc-character-art,.rc-character-wave-arm{animation:none!important;display:none!important}}
       /* Final status layout: reserve a dedicated strip for Visit Link so the caption never overlaps it. */
       .rc-status-viewer{padding:0!important;overflow:hidden!important;}
       .rc-status-viewer .rc-status-image{width:100%!important;height:100%!important;max-height:100%!important;object-fit:contain!important;border-radius:0!important;}
@@ -4823,6 +4868,15 @@ async function playVoiceNote(message: ChatMessage) {
         -webkit-text-fill-color: initial !important;
       }
       .rc-announcement-compose-top { display:flex!important; align-items:center!important; gap:12px!important; margin:0 0 14px!important; color:#f8fafc!important; font-weight:800!important; }
+      /* Final stacking order for the 2D chat entrance scene. */
+      .rc-chat-panel .rc-chat-entrance-character{grid-row:2!important;grid-column:1!important;position:relative!important;z-index:2!important;align-self:stretch!important;justify-self:stretch!important;pointer-events:none!important;display:flex!important;align-items:flex-end!important;justify-content:flex-end!important;overflow:visible!important;margin:0!important;padding:0 12px 0 0!important;animation:rc-character-enter-exit 4.7s cubic-bezier(.2,.7,.25,1) both!important}
+      .rc-chat-panel .rc-chat-empty{position:relative!important;z-index:3!important;background:transparent!important;background-color:transparent!important}
+      .rc-chat-panel .rc-message-row{position:relative!important;z-index:3!important}
+      .rc-chat-panel .rc-composer-wrap{position:relative!important;z-index:101!important}
+      .rc-chat-panel .rc-chat-header{position:relative!important;z-index:100!important}
+      .rc-chat-panel .rc-character-art{width:clamp(116px,34vw,166px)!important;height:min(205px,100%)!important;max-height:205px!important;overflow:visible!important;filter:drop-shadow(0 8px 10px rgba(0,0,0,.4));animation:rc-character-walk .52s ease-in-out infinite}
+      .rc-chat-panel .rc-character-wave-arm{transform-box:fill-box!important;transform-origin:20% 85%!important;animation:rc-character-wave 1.05s ease-in-out 1.05s 2 both!important}
+      @media(prefers-reduced-motion:reduce){.rc-chat-panel .rc-chat-entrance-character,.rc-chat-panel .rc-character-art,.rc-chat-panel .rc-character-wave-arm{animation:none!important;display:none!important}}
     `}
 
 
