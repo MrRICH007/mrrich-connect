@@ -264,7 +264,7 @@ function ChatEntranceArt({ character }: { character: string }) {
     : '/chat-characters/gojo-wave.webp';
   const label = isRonaldo ? 'Cristiano Ronaldo waving' : 'Gojo waving';
   return <img
-    className={`rc-character-art rc-character-${character} rc-character-webp`}
+    className={`rc-character-art rc-character-${character} rc-character-webp rc-character-two-frame-webp`}
     src={asset}
     alt={label}
     draggable={false}
