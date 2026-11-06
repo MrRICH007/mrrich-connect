@@ -287,7 +287,7 @@ function ChatEntranceArt({ character }: { character: string }) {
     {isGojo ? <><path d="M59 83Q90 72 121 83L119 100Q90 108 61 100Z" fill="#111827"/><path d="M63 88Q90 80 117 88" stroke="#7dd3fc" strokeWidth="3"/><path d="M82 119q8 6 16 0" stroke="#8a4f49" strokeWidth="2" fill="none"/></> : <><ellipse cx="76" cy="96" rx="3" ry="4" fill="#27212a"/><ellipse cx="104" cy="96" rx="3" ry="4" fill="#27212a"/><path d="M86 111q4 3 8 0" stroke="#9c5d53" strokeWidth="2" fill="none"/><path d="M73 119q17 12 34 0" stroke={isBarbie ? '#b54e79' : '#8f4c4c'} strokeWidth="2.5" fill="none" strokeLinecap="round"/></>}
     {isBarbie && <><path d="M64 94q12-9 23 0M96 94q12-9 22 0" stroke="#3c2634" strokeWidth="2" fill="none"/><path d="M74 121q16 8 32 0" stroke="#e65d98" strokeWidth="3" fill="none"/></>}
     {/* waving arm, independently animated */}
-    <g className="rc-character-wave-arm"><path d="M124 165Q139 143 145 119" stroke={c.skin} strokeWidth="17" strokeLinecap="round" fill="none"/><path d="M145 120Q139 107 143 94M145 120Q155 107 158 98M145 120Q164 115 168 106M145 120Q134 108 130 100" stroke={c.skin} strokeWidth="7" strokeLinecap="round" fill="none"/><path d="M119 162Q130 153 136 143" stroke={c.outfit} strokeWidth="22" strokeLinecap="round" fill="none"/></g>
+    <g className="rc-character-wave-arm"><path d="M124 165Q139 143 145 119" stroke={c.skin} strokeWidth="17" strokeLinecap="round" fill="none"/><g className="rc-character-wave-hand" transform="translate(145 120)"><path d="M0 2Q-6 -12 -3 -25M0 2Q8 -13 13 -23M0 2Q17 -7 22 -17M0 2Q-13 -8 -17 -20M0 2Q-1 -11 2 -29" stroke={c.skin} strokeWidth="7" strokeLinecap="round" fill="none"/><path d="M-5 4Q-1 -4 7 -2Q14 1 10 10Q4 17 -3 11Z" fill={c.skin}/></g><path d="M119 162Q130 153 136 143" stroke={c.outfit} strokeWidth="22" strokeLinecap="round" fill="none"/></g>
     {/* opposite shoulder */}
     <path d="M53 166Q39 173 31 197" stroke={c.skin} strokeWidth="15" strokeLinecap="round" fill="none"/>
     {isGojo && <path d="M55 142Q90 155 125 142" stroke="#31445f" strokeWidth="5" fill="none"/>}
@@ -3300,14 +3300,15 @@ async function playVoiceNote(message: ChatMessage) {
     {showGroup && <div className="rc-modal-backdrop" onClick={() => setShowGroup(false)}><form className="rc-modal" onSubmit={createGroup} onClick={e => e.stopPropagation()}><button type="button" className="rc-modal-close" onClick={() => setShowGroup(false)} aria-label="Close"><X size={20}/></button><span className="rc-eyebrow">BRING PEOPLE TOGETHER</span><h2>Create a group</h2><p className="rc-muted">Start a space around a course, club or interest.</p><label>Group name<input required maxLength={60} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Campus Creators"/></label><label>Group image (optional)<input type="file" accept="image/*" onChange={e => void uploadGroupAvatar(e.target.files?.[0])} disabled={groupAvatarUploading}/></label>{groupAvatarUploading && <p className="rc-muted">Uploading group image…</p>}{groupAvatarUrl && <div className="rc-avatar-preview"><img src={groupAvatarUrl} alt="Group avatar preview"/><button type="button" className="rc-secondary" onClick={() => setGroupAvatarUrl('')}>Remove image</button></div>}<button className="rc-primary rc-full" type="submit" disabled={groupAvatarUploading}>{groupAvatarUploading ? 'Uploading…' : 'Create group'}</button></form></div>}
     {!authReady && <div className="rc-loading" aria-label="Loading"/>}
     <style jsx global>{`
-      @keyframes rc-character-enter-exit { 0%{transform:translateX(125%);opacity:0} 12%{transform:translateX(0);opacity:1} 22%{transform:translateX(-5px);opacity:1} 30%{transform:translateX(0);opacity:1} 78%{transform:translateX(0);opacity:1} 100%{transform:translateX(-145%);opacity:0} }
-      @keyframes rc-character-walk { 0%,100%{translate:0 0} 18%,42%,66%{translate:0 -5px} 30%,54%,78%{translate:0 1px} }
-      @keyframes rc-character-wave { 0%,20%,100%{transform:rotate(0deg)} 28%,38%,48%,58%,68%{transform:rotate(-43deg)} 33%,43%,53%,63%,73%{transform:rotate(12deg)} }
+      @keyframes rc-character-enter-exit { 0%{transform:translate3d(115%,0,0);opacity:0} 10%{transform:translate3d(0,0,0);opacity:1} 16%{transform:translate3d(-7px,0,0);opacity:1} 22%,78%{transform:translate3d(0,0,0);opacity:1} 100%{transform:translate3d(-125%,0,0);opacity:0} }
+      @keyframes rc-character-walk { 0%,100%{translate:0 0;rotate:0deg} 12%,36%,60%{translate:0 -7px;rotate:-.8deg} 24%,48%,72%{translate:0 2px;rotate:.8deg} }
+      @keyframes rc-character-wave { 0%,18%,100%{transform:rotate(0deg)} 25%,37%,49%,61%,73%{transform:rotate(-38deg)} 31%,43%,55%,67%,79%{transform:rotate(18deg)} }
+      @keyframes rc-character-hand-wave { 0%,100%{transform:rotate(0deg)} 20%,60%{transform:rotate(-24deg)} 40%,80%{transform:rotate(22deg)} }
       .rc-chat-panel{position:relative!important;isolation:isolate!important}
       /* This overlay occupies the message grid row: it sits above the panel's CSS background,
          behind message bubbles, and naturally stays above the keyboard/composer when it opens. */
       .rc-chat-entrance-character{grid-row:2!important;grid-column:1!important;align-self:stretch!important;justify-self:stretch!important;position:relative!important;z-index:2!important;pointer-events:none!important;overflow:visible!important;min-height:0!important;margin:0!important;display:flex!important;align-items:flex-end!important;justify-content:flex-end!important;padding:0 12px 0 0!important;animation:rc-character-enter-exit 4.7s cubic-bezier(.2,.7,.25,1) both!important}
-      .rc-character-art{width:clamp(116px,34vw,166px)!important;height:min(205px,100%)!important;max-height:205px!important;overflow:visible!important;filter:drop-shadow(0 8px 10px rgba(0,0,0,.4));animation:rc-character-walk .52s ease-in-out infinite}
+      .rc-character-art{width:auto!important;height:min(70%,560px)!important;max-height:70%!important;max-width:min(78vw,420px)!important;aspect-ratio:180/230!important;overflow:visible!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.48));animation:rc-character-walk .58s ease-in-out 0s 5 both!important;transform-origin:50% 100%!important}
       .rc-character-wave-arm{transform-box:fill-box;transform-origin:20% 85%;animation:rc-character-wave 1.05s ease-in-out 1.05s 2 both}
       .rc-messages-layout.has-chat .rc-chat-empty{position:relative!important;z-index:3!important;background:transparent!important;background-color:transparent!important}
       .rc-messages-layout.has-chat .rc-message-row{position:relative!important;z-index:3!important}
@@ -4869,14 +4870,15 @@ async function playVoiceNote(message: ChatMessage) {
       }
       .rc-announcement-compose-top { display:flex!important; align-items:center!important; gap:12px!important; margin:0 0 14px!important; color:#f8fafc!important; font-weight:800!important; }
       /* Final stacking order for the 2D chat entrance scene. */
-      .rc-chat-panel .rc-chat-entrance-character{grid-row:2!important;grid-column:1!important;position:relative!important;z-index:2!important;align-self:stretch!important;justify-self:stretch!important;pointer-events:none!important;display:flex!important;align-items:flex-end!important;justify-content:flex-end!important;overflow:visible!important;margin:0!important;padding:0 12px 0 0!important;animation:rc-character-enter-exit 4.7s cubic-bezier(.2,.7,.25,1) both!important}
+      .rc-chat-panel .rc-chat-entrance-character{position:absolute!important;inset:64px 0 0!important;z-index:2!important;pointer-events:none!important;display:flex!important;align-items:flex-end!important;justify-content:flex-end!important;overflow:visible!important;margin:0!important;padding:0 10px 0 0!important;animation:rc-character-enter-exit 5.4s cubic-bezier(.2,.7,.25,1) both!important}
       .rc-chat-panel .rc-chat-empty{position:relative!important;z-index:3!important;background:transparent!important;background-color:transparent!important}
       .rc-chat-panel .rc-message-row{position:relative!important;z-index:3!important}
       .rc-chat-panel .rc-composer-wrap{position:relative!important;z-index:101!important}
       .rc-chat-panel .rc-chat-header{position:relative!important;z-index:100!important}
       .rc-chat-panel .rc-character-art{width:clamp(116px,34vw,166px)!important;height:min(205px,100%)!important;max-height:205px!important;overflow:visible!important;filter:drop-shadow(0 8px 10px rgba(0,0,0,.4));animation:rc-character-walk .52s ease-in-out infinite}
-      .rc-chat-panel .rc-character-wave-arm{transform-box:fill-box!important;transform-origin:20% 85%!important;animation:rc-character-wave 1.05s ease-in-out 1.05s 2 both!important}
-      @media(prefers-reduced-motion:reduce){.rc-chat-panel .rc-chat-entrance-character,.rc-chat-panel .rc-character-art,.rc-chat-panel .rc-character-wave-arm{animation:none!important;display:none!important}}
+      .rc-chat-panel .rc-character-wave-arm{transform-box:fill-box!important;transform-origin:12% 88%!important;animation:rc-character-wave 1.1s ease-in-out 1.15s 3 both!important}
+      .rc-chat-panel .rc-character-wave-hand{transform-box:fill-box!important;transform-origin:50% 90%!important;animation:rc-character-hand-wave .42s ease-in-out 1.2s 7 both!important}
+      @media(prefers-reduced-motion:reduce){.rc-chat-panel .rc-chat-entrance-character,.rc-chat-panel .rc-character-art,.rc-chat-panel .rc-character-wave-arm,.rc-chat-panel .rc-character-wave-hand{animation:none!important;display:none!important}}
     `}
 
 
