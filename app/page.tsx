@@ -340,6 +340,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [announcementImage, setAnnouncementImage] = useState<File | null>(null);
   const [announcementBusy, setAnnouncementBusy] = useState(false);
   const [contestOpen, setContestOpen] = useState(false);
+  const [contestComposerOpen, setContestComposerOpen] = useState(false);
   const [contests, setContests] = useState<CommunityContest[]>([]);
   const [contestQuestion, setContestQuestion] = useState('');
   const [contestCover, setContestCover] = useState<File | null>(null);
@@ -356,6 +357,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [featuresMenuOpen, setFeaturesMenuOpen] = useState(false);
   const [unreadAnnouncementCount, setUnreadAnnouncementCount] = useState(0);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [statusComposerOpen, setStatusComposerOpen] = useState(false);
   const [statusViewerOpen, setStatusViewerOpen] = useState(false);
   const [statusRows, setStatusRows] = useState<any[]>([]);
   const [statusCaption, setStatusCaption] = useState('');
@@ -910,7 +912,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       }
       const {error:optionsError}=await supabase.from('rc_contest_options').insert(optionRows);
       if(optionsError) throw optionsError;
-      setContestQuestion('');setContestCover(null);setContestOptions([{caption:''},{caption:''}]);
+      setContestQuestion('');setContestCover(null);setContestOptions([{caption:''},{caption:''}]);setContestComposerOpen(false);
       await loadContests();setStatus('Contest published.');
     } catch(error:any) {
       if(contestId) await supabase.from('rc_contests').delete().eq('id',contestId);
@@ -1039,7 +1041,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
 
       // Close the composer before showing confirmation; otherwise the toast
       // can sit behind the modal and make a successful publish look unresponsive.
-      setStatusOpen(false);
+      setStatusComposerOpen(false);
       setStatusCaption('');
       setStatusLink('');
       setStatusImage(null);
@@ -2879,7 +2881,7 @@ async function playVoiceNote(message: ChatMessage) {
             </div>
 
           </div>;
-        })}</div>{showScrollToLatest && <button type="button" className="rc-scroll-latest" onClick={() => scrollChatToLatest('smooth')} aria-label="Scroll to latest message" title="Latest message"><ArrowDown size={20}/></button>}{(() => { const activeGroup = selectedConversation.kind === 'group' ? groups.find(g => g.conversation_id === selectedConversation.id) : null; const isGroupAdmin = !!activeGroup && (activeGroup.created_by === userId || isAdmin); const adminOnly = !!activeGroup && activeGroup.members_can_message === false && !isGroupAdmin; return conversationBlockStatus ? <div className="rc-blocked-chat-notice">{conversationBlockStatus === 'you' ? 'You have blocked this user. Messaging is unavailable.' : conversationBlockStatus === 'them' ? 'This user has blocked you. You cannot send messages in this conversation.' : 'You and this user have blocked each other. Messages are unavailable.'}</div> : adminOnly ? <div className="rc-admin-only-notice">Only Admin can Send Messages</div> : <div className="rc-composer-wrap">{replyTo && <div className="rc-reply-preview"><div><strong>Replying to {replyTo.sender_id === userId ? 'yourself' : '@' + (replyTo.sender_nickname || 'Member')}</strong><small>{replyTo.body.slice(0, 110)}{replyTo.body.length > 110 ? '…' : ''}</small></div><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X size={16}/></button></div>}
+        })}{showScrollToLatest && <button type="button" className="rc-scroll-latest" onClick={() => scrollChatToLatest('smooth')} aria-label="Scroll to latest message" title="Latest message"><ArrowDown size={20}/></button>}</div>{(() => { const activeGroup = selectedConversation.kind === 'group' ? groups.find(g => g.conversation_id === selectedConversation.id) : null; const isGroupAdmin = !!activeGroup && (activeGroup.created_by === userId || isAdmin); const adminOnly = !!activeGroup && activeGroup.members_can_message === false && !isGroupAdmin; return conversationBlockStatus ? <div className="rc-blocked-chat-notice">{conversationBlockStatus === 'you' ? 'You have blocked this user. Messaging is unavailable.' : conversationBlockStatus === 'them' ? 'This user has blocked you. You cannot send messages in this conversation.' : 'You and this user have blocked each other. Messages are unavailable.'}</div> : adminOnly ? <div className="rc-admin-only-notice">Only Admin can Send Messages</div> : <div className="rc-composer-wrap">{replyTo && <div className="rc-reply-preview"><div><strong>Replying to {replyTo.sender_id === userId ? 'yourself' : '@' + (replyTo.sender_nickname || 'Member')}</strong><small>{replyTo.body.slice(0, 110)}{replyTo.body.length > 110 ? '…' : ''}</small></div><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X size={16}/></button></div>}
 {voicePreviewUrl && (
   <div
     style={{
@@ -3003,7 +3005,7 @@ async function playVoiceNote(message: ChatMessage) {
 >
   {voiceBusy ? '…' : isRecordingVoice ? <Square size={19} fill="currentColor" /> : <Mic size={21} />}
 </button>
-<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{"😀 😃 😄 😁 😆 😅 😂 🤣 🥹 😊 😍 🥰 😘 😎 🤔 🙄 😭 😱 🥳 😴 🤗 🤫 🤨 😤 😡 💀 👻 🤖 👋 👍 👎 👏 🙌 🫶 🙏 💪 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💕 💯 🔥 ✨ ⭐ 🌈 🌹 🌻 🌸 🦋 🐱 🐶 🦁 🐼 🦄 🍎 🍉 🍕 🍔 🍟 ☕ 🎂 🎉 🎊 🎁 🏆 ⚽ 🏀 🎮 🚀 💎 👑 📱 💻".split(" ").map((emoji,i)=><button type="button" key={`${emoji}-${i}`} onClick={()=>{setDraftMessage(v=>v+emoji);setShowEmojiPicker(false);window.setTimeout(()=>document.querySelector<HTMLTextAreaElement>('textarea[name="chat-message"]')?.focus(),50);}} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}>{emoji}</button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{"😀 😃 😄 😁 😆 😅 😂 🤣 🥹 😊 😍 🥰 😘 😎 🤔 🙄 😭 😱 🥳 😴 🤗 🤫 🤨 😤 😡 💀 👻 🤖 👋 👍 👎 👏 🙌 🫶 🙏 💪 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💕 💯 🔥 ✨ ⭐ 🌈 🌹 🌻 🌸 🦋 🐱 🐶 🦁 🐼 🦄 🍎 🍉 🍕 🍔 🍟 ☕ 🎂 🎉 🎊 🎁 🏆 ⚽ 🏀 🎮 🚀 💎 👑 📱 💻".split(" ").map((emoji,i)=><button type="button" key={`${emoji}-${i}`} onClick={()=>{setDraftMessage(v=>v+emoji);setShowEmojiPicker(false);window.setTimeout(()=>document.querySelector<HTMLTextAreaElement>('textarea[name="chat-message"]')?.focus(),50);}} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}><span className="rc-emoji-glyph">{emoji}</span></button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -3096,10 +3098,10 @@ async function playVoiceNote(message: ChatMessage) {
 
 
     {contestOpen && <div className="rc-contest-screen">
-      <header className="rc-contest-header"><button type="button" className="rc-icon-btn" onClick={()=>{setContestOpen(false);setActiveContest(null);}} aria-label="Back"><ArrowLeft size={20}/></button><div><h1>Contests</h1><p>Share your choice. See the community result.</p></div></header>
+      <header className="rc-contest-header"><button type="button" className="rc-icon-btn" onClick={()=>{if(contestComposerOpen){setContestComposerOpen(false);}else{setContestOpen(false);setActiveContest(null);}}} aria-label="Back"><ArrowLeft size={20}/></button><div><h1>Contests</h1><p>Share your choice. See the community result.</p></div></header>
       <div className="rc-contest-content">
         {!activeContest && <>
-          <form className="rc-contest-composer" onSubmit={publishContest}>
+          {contestComposerOpen && <div className="rc-feature-compose-page"><div className="rc-feature-compose-top"><button type="button" className="rc-icon-btn" onClick={()=>setContestComposerOpen(false)} aria-label="Back to contests"><ArrowLeft size={20}/></button><strong>New contest</strong></div><form className="rc-contest-composer" onSubmit={publishContest}>
             <div className="rc-contest-composer-title"><Trophy size={20}/><h2>Add contest</h2></div>
             <label className="rc-contest-label">Contest question<textarea value={contestQuestion} onChange={e=>setContestQuestion(e.target.value)} maxLength={500} placeholder="What would you like the community to choose?" required/></label>
             <input ref={contestCoverInputRef} type="file" accept="image/*" hidden onChange={e=>setContestCover(e.target.files?.[0]||null)}/>
@@ -3108,8 +3110,8 @@ async function playVoiceNote(message: ChatMessage) {
             <div className="rc-contest-options-heading"><strong>Answer options</strong><small>Add a caption and optional image for each answer.</small></div>
             {contestOptions.map((option,index)=><div className="rc-contest-option-editor" key={index}><label className="rc-contest-label">Option {index+1}<input value={option.caption} onChange={e=>setContestOptions(old=>{const next=old.map((o,i)=>i===index?{...o,caption:e.target.value}:o);if(index===old.length-1&&e.target.value.trim())next.push({caption:''});return next;})} placeholder="Type an answer…"/></label><label className="rc-contest-image-button"><ImagePlus size={16}/>{option.imageFile ? option.imageFile.name : 'Add option image'}<input type="file" accept="image/*" onChange={e=>setContestOptions(old=>old.map((o,i)=>i===index?{...o,imageFile:e.target.files?.[0]||null}:o))}/></label>{option.imageFile && <img className="rc-contest-option-preview" src={URL.createObjectURL(option.imageFile)} alt="Option preview"/>}</div>)}
             <button type="submit" className="rc-primary rc-full" disabled={contestBusy}>{contestBusy?'Publishing…':'Publish contest'}</button>
-          </form>
-          <section className="rc-contest-recent"><h2>Recent contests</h2><div className="rc-contest-strip">{contests.length?contests.map(contest=><button type="button" className="rc-contest-bubble" key={contest.id} onClick={()=>void openContest(contest)}>{contest.cover_image_path?<img src={contestImageUrl(contest.cover_image_path)} alt=""/>:<span className="rc-contest-no-cover"><Trophy size={22}/></span>}<strong>{contest.question}</strong><small>@{contest.author_nickname}</small></button>):<p className="rc-contest-empty">No contests have been published yet.</p>}</div></section>
+          </form></div>}
+          {!contestComposerOpen && <><section className="rc-contest-recent"><h2>Recent contests</h2><div className="rc-contest-strip">{contests.length?contests.map(contest=><button type="button" className="rc-contest-bubble" key={contest.id} onClick={()=>void openContest(contest)}>{contest.cover_image_path?<img src={contestImageUrl(contest.cover_image_path)} alt=""/>:<span className="rc-contest-no-cover"><Trophy size={22}/></span>}<strong>{contest.question}</strong><small>@{contest.author_nickname}</small></button>):<p className="rc-contest-empty">No contests have been published yet.</p>}</div></section><button type="button" className="rc-feature-fab" onClick={()=>setContestComposerOpen(true)}><Plus size={19}/> Add Contest</button></>}
         </>}
         {activeContest && <section className="rc-contest-vote-card"><button type="button" className="rc-secondary" onClick={()=>{setActiveContest(null);setContestResults(null);}}> <ArrowLeft size={16}/> All contests</button>{activeContest.cover_image_path&&<img className="rc-contest-view-cover" src={contestImageUrl(activeContest.cover_image_path)} alt="Contest cover"/>}<h2>{activeContest.question}</h2><p className="rc-contest-author">Posted by @{activeContest.author_nickname}</p><div className="rc-contest-vote-options">{activeContest.options.map((option,index)=>{const result=contestResults?.find(r=>r.id===option.id);const pct=Number(result?.percentage)||0;const voted=!!contestResults;return <button type="button" key={option.id||index} className={`rc-contest-vote-option ${contestVotedOption===option.id?'selected':''} ${voted?'has-results':''}`} disabled={voted||!!contestVotedOption&&!!contestResults} onClick={()=>setContestVotedOption(option.id||null)}>{option.image_path&&<img src={contestImageUrl(option.image_path)} alt=""/>}<span className="rc-contest-vote-option-text">{option.caption}</span>{voted&&<><span className="rc-contest-result-track"><i style={{width:`${pct}%`}}/></span><small>{pct.toFixed(1)}% · {result?.votes||0} votes</small></>}</button>})}</div>{!contestResults&&<button type="button" className="rc-primary rc-full" disabled={!contestVotedOption||contestVoteBusy} onClick={()=>void voteContest()}>{contestVoteBusy?'Submitting vote…':'Vote'}</button>}{contestResults&&<p className="rc-contest-result-note">Current results · updated after your vote</p>}</section>}
       </div>
@@ -3152,11 +3154,11 @@ async function playVoiceNote(message: ChatMessage) {
     )}
     {statusOpen && <div className="rc-status-page">
       <header className="rc-status-page-header">
-        <button type="button" className="rc-icon-btn" onClick={()=>setStatusOpen(false)} aria-label="Back"><ArrowLeft size={20}/></button>
+        <button type="button" className="rc-icon-btn" onClick={()=>{if(statusComposerOpen){setStatusComposerOpen(false);}else{setStatusOpen(false);}}} aria-label="Back"><ArrowLeft size={20}/></button>
         <div><h1>Status</h1><p>Share a moment with your community</p></div>
       </header>
       <div className="rc-status-page-content">
-        <form className="rc-status-compose-page" onSubmit={e=>{e.preventDefault();void publishStatus();}}>
+        {statusComposerOpen && <div className="rc-feature-compose-page"><div className="rc-feature-compose-top"><button type="button" className="rc-icon-btn" onClick={()=>setStatusComposerOpen(false)} aria-label="Back to statuses"><ArrowLeft size={20}/></button><strong>New status</strong></div><form className="rc-status-compose-page" onSubmit={e=>{e.preventDefault();void publishStatus();}}>
           <h2>Create status</h2>
           {canPostStatus ? <>
             <input ref={statusFileInputRef} className="rc-status-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/*" onChange={e=>setStatusImage(e.target.files?.[0]||null)} required />
@@ -3168,8 +3170,8 @@ async function playVoiceNote(message: ChatMessage) {
             {statusLinkOpen && <label className="rc-status-link-field">Link<input type="url" value={statusLink} onChange={e=>setStatusLink(e.target.value)} placeholder="https://example.com"/></label>}
             <button className="rc-primary rc-status-publish-button" type="submit" disabled={statusBusy || !statusImage || !statusCaption.trim()}>{statusBusy ? 'Publishing…' : 'Publish status'}</button>
           </> : <p className="rc-status-eligibility-note">Status posting requires active Premium membership and Sharp Guy rank or higher (at least 10 lifetime hours).</p>}
-        </form>
-        <section className="rc-status-members-section"><h2>Recent statuses</h2>
+        </form></div>}
+        {!statusComposerOpen && <><section className="rc-status-members-section"><h2>Recent statuses</h2>
           {(() => {
             const latestByUser = Array.from(new Map(statusRows.reduce((acc:any[], row:any)=>{ if(!acc.some(x=>x.user_id===row.user_id)) acc.push(row); return acc; },[]).map((row:any)=>[row.user_id,row])).values()) as any[];
             latestByUser.sort((a:any,b:any)=>{
@@ -3188,7 +3190,7 @@ async function playVoiceNote(message: ChatMessage) {
               </button>;
             }) : <p className="rc-status-empty-note">No active statuses yet.</p>;
           })()}
-        </section>
+        </section><button type="button" className="rc-feature-fab" onClick={()=>setStatusComposerOpen(true)}><Plus size={19}/> Add Status</button></>}
       </div>
     </div>}
 
@@ -4613,7 +4615,70 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-messages-layout.has-chat .rc-chat-empty{grid-row:2!important;min-height:0!important;height:auto!important;max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important}
       .rc-messages-layout.has-chat .rc-composer-wrap{grid-row:3!important;position:relative!important;inset:auto!important;z-index:101!important;flex:none!important;min-height:0!important;overflow:visible!important}
       .rc-features-menu{max-height:min(70dvh,480px)!important}
+      .rc-feature-compose-page{position:fixed!important;inset:0!important;z-index:2147483000!important;overflow-y:auto!important;background:#071326!important;padding:calc(78px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom))!important;box-sizing:border-box!important}
+      .rc-feature-compose-page .rc-contest-composer,.rc-feature-compose-page .rc-status-compose-page{width:min(100%,680px)!important;margin:0 auto!important}.rc-feature-compose-top{width:min(100%,680px)!important;margin:0 auto 14px!important;display:flex!important;align-items:center!important;gap:12px!important;color:#f8fafc!important;font-size:17px!important;font-weight:800!important}
+      .rc-feature-fab{position:fixed!important;right:20px!important;bottom:calc(24px + env(safe-area-inset-bottom))!important;z-index:2147482600!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;min-height:50px!important;padding:0 18px!important;border:1px solid rgba(147,197,253,.38)!important;border-radius:999px!important;background:linear-gradient(135deg,#2563eb,#17428a)!important;color:#fff!important;font-size:13px!important;font-weight:800!important;box-shadow:0 10px 30px rgba(0,0,0,.38)!important}
+      .rc-contest-recent{margin:4px 0 16px!important}.rc-contest-strip{display:flex!important;flex-direction:column!important;overflow:visible!important;gap:10px!important}
+      .rc-contest-bubble{width:100%!important;flex:0 0 auto!important;display:grid!important;grid-template-columns:116px minmax(0,1fr)!important;grid-template-rows:auto auto!important;align-items:center!important;column-gap:12px!important;text-align:left!important}
+      .rc-contest-bubble>img,.rc-contest-no-cover{grid-row:1/3!important;grid-column:1!important;width:116px!important;aspect-ratio:16/5!important}
+      .rc-contest-bubble strong{grid-column:2!important;grid-row:1!important}.rc-contest-bubble small{grid-column:2!important;grid-row:2!important}
+      .rc-status-members-section{margin:0!important}.rc-status-member-row{min-height:64px!important}
+      /* Conversation cards: deepest navy at left, fading to a softer navy at right. */
+      .rc-conversation-row {
+        background: linear-gradient(100deg, #020711 0%, #071426 42%, #10294a 100%) !important;
+        border: 1px solid rgba(148,163,184,.22) !important;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.012), 0 4px 12px rgba(0,0,0,.18) !important;
+      }
+      .rc-conversation-row.active {
+        background: linear-gradient(100deg, #030914 0%, #0a1b31 46%, #17365c 100%) !important;
+        border-color: rgba(148,163,184,.38) !important;
+      }
+      /* The message scroller is a sibling of the header and composer, never their parent. */
+      .rc-messages-layout.has-chat .rc-chat-panel {
+        display: grid !important;
+        grid-template-rows: 64px minmax(0, 1fr) auto !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        height: 100% !important; min-height: 0 !important; max-height: 100% !important;
+        overflow: hidden !important; position: relative !important; transform: none !important;
+        contain: layout paint !important;
+      }
+      .rc-messages-layout.has-chat .rc-chat-header {
+        grid-row: 1 !important; grid-column: 1 !important;
+        position: relative !important; inset: auto !important; z-index: 20 !important;
+        height: 64px !important; min-height: 64px !important; max-height: 64px !important;
+        align-self: stretch !important; overflow: hidden !important; transform: none !important;
+        background: #0b1729 !important; border-bottom: 1px solid rgba(148,163,184,.24) !important;
+      }
+      .rc-messages-layout.has-chat .rc-chat-empty {
+        grid-row: 2 !important; grid-column: 1 !important;
+        display: flex !important; min-height: 0 !important; height: auto !important;
+        overflow-y: auto !important; overflow-x: hidden !important;
+        overscroll-behavior: contain !important; -webkit-overflow-scrolling: touch !important;
+      }
+      .rc-messages-layout.has-chat .rc-composer-wrap {
+        grid-row: 3 !important; grid-column: 1 !important;
+        position: relative !important; inset: auto !important; z-index: 21 !important;
+        min-height: 0 !important; max-height: none !important; overflow: visible !important;
+        background: #0b1729 !important; padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+      }
+      /* A dedicated emoji glyph element avoids inherited button text clipping. */
+      .rc-emoji-picker { position: fixed !important; left: 8px !important; right: 8px !important;
+        bottom: calc(78px + env(safe-area-inset-bottom)) !important; width: auto !important;
+        max-height: min(58dvh, 460px) !important; overflow-y: auto !important; }
+      .rc-emoji-grid { display: grid !important; grid-template-columns: repeat(7, minmax(0,1fr)) !important;
+        gap: 7px !important; min-height: 0 !important; }
+      .rc-emoji-grid > button { display: flex !important; align-items: center !important; justify-content: center !important;
+        min-width: 0 !important; min-height: 48px !important; padding: 3px !important;
+        font-size: 0 !important; line-height: 1 !important; color: inherit !important;
+        -webkit-text-fill-color: initial !important; overflow: visible !important; }
+      .rc-emoji-grid .rc-emoji-glyph { display: block !important; visibility: visible !important; opacity: 1 !important;
+        font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif !important;
+        font-size: 29px !important; font-weight: 400 !important; line-height: 1.25 !important;
+        font-variant-emoji: emoji !important; color: initial !important; -webkit-text-fill-color: initial !important;
+        text-indent: 0 !important; }
     `}
+
+
 
 </style>
   </main>
