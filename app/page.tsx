@@ -258,15 +258,16 @@ function VoiceNotePlayer({ src }: { src: string }) {
 
 
 function ChatEntranceArt({ character }: { character: string }) {
-  const asset = character === 'ronaldo'
-    ? '/chat-characters/ronaldo-wave.gif'
-    : '/chat-characters/gojo-wave.gif';
-  const label = character === 'ronaldo' ? 'Cristiano Ronaldo waving' : 'Gojo waving';
-  return <img
-    className={`rc-character-art rc-character-${character}`}
-    src={asset}
-    alt={label}
-    draggable={false}
+  const isRonaldo = character === 'ronaldo';
+  const asset = isRonaldo
+    ? '/chat-characters/ronaldo-wave-sprites.png'
+    : '/chat-characters/gojo-wave-sprites.png';
+  const label = isRonaldo ? 'Cristiano Ronaldo waving' : 'Gojo waving';
+  return <div
+    className={`rc-character-art rc-character-${character} rc-character-sprite`}
+    role="img"
+    aria-label={label}
+    style={{ backgroundImage: `url(${asset})` }}
   />;
 }
 
@@ -3283,6 +3284,8 @@ async function playVoiceNote(message: ChatMessage) {
       /* This overlay occupies the message grid row: it sits above the panel's CSS background,
          behind message bubbles, and naturally stays above the keyboard/composer when it opens. */
       .rc-chat-entrance-character{grid-row:2!important;grid-column:1!important;align-self:stretch!important;justify-self:stretch!important;position:relative!important;z-index:2!important;pointer-events:none!important;overflow:visible!important;min-height:0!important;margin:0!important;display:flex!important;align-items:flex-end!important;justify-content:flex-end!important;padding:0 12px 0 0!important;animation:rc-character-enter-exit 4.7s cubic-bezier(.2,.7,.25,1) both!important}
+      @keyframes rc-character-sprite-frames { from { background-position: 0 0; } to { background-position: 100% 0; } }
+      .rc-character-sprite{width:min(82vw,460px)!important;height:70%!important;max-height:70%!important;max-width:82vw!important;aspect-ratio:384/341!important;flex:0 1 auto!important;background-repeat:no-repeat!important;background-size:1200% 100%!important;background-position:0 0;animation:rc-character-sprite-frames 1.44s steps(12,end) 0s 3 both!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.42))!important;}
       .rc-character-art{width:auto!important;height:min(70%,560px)!important;max-height:70%!important;max-width:min(78vw,420px)!important;aspect-ratio:180/230!important;overflow:visible!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.48));animation:rc-character-walk .58s ease-in-out 0s 5 both!important;transform-origin:50% 100%!important}
       .rc-character-wave-arm{transform-box:fill-box;transform-origin:20% 85%;animation:rc-character-wave 1.05s ease-in-out 1.05s 2 both}
       .rc-messages-layout.has-chat .rc-chat-empty{position:relative!important;z-index:3!important;background:transparent!important;background-color:transparent!important}
@@ -4850,7 +4853,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-chat-panel .rc-message-row{position:relative!important;z-index:3!important}
       .rc-chat-panel .rc-composer-wrap{position:relative!important;z-index:101!important}
       .rc-chat-panel .rc-chat-header{position:relative!important;z-index:100!important}
-      .rc-chat-panel .rc-character-art{display:block!important;width:auto!important;height:70%!important;max-height:70%!important;max-width:min(82vw,460px)!important;object-fit:contain!important;object-position:center bottom!important;overflow:visible!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.42))!important;animation:none!important;flex:0 1 auto!important;}
+      .rc-chat-panel .rc-character-art{display:block!important;width:min(82vw,460px)!important;height:70%!important;max-height:70%!important;max-width:82vw!important;overflow:visible!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.42))!important;flex:0 1 auto!important;} .rc-chat-panel .rc-character-sprite{background-size:1200% 100%!important;animation:rc-character-sprite-frames 1.44s steps(12,end) 0s 3 both!important;}
       .rc-chat-panel .rc-chat-entrance-character{bottom:76px!important;}
       @media(prefers-reduced-motion:reduce){.rc-chat-panel .rc-chat-entrance-character{animation:none!important;display:none!important}}
     `}
