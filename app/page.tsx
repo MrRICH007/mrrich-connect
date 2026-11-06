@@ -258,41 +258,16 @@ function VoiceNotePlayer({ src }: { src: string }) {
 
 
 function ChatEntranceArt({ character }: { character: string }) {
-  const palette: Record<string, { hair: string; outfit: string; accent: string; skin: string; label: string }> = {
-    gojo: { hair: '#f4f7ff', outfit: '#18243a', accent: '#72c8ff', skin: '#e8b99f', label: 'Anime sorcerer' },
-    ronaldo: { hair: '#38251f', outfit: '#a51f32', accent: '#f4d6a0', skin: '#d99b79', label: 'Footballer in red kit' },
-    messi: { hair: '#49352d', outfit: '#6aa9e8', accent: '#f4f4f4', skin: '#dca889', label: 'Footballer in sky-blue kit' },
-    model: { hair: '#251a1a', outfit: '#7c3aed', accent: '#e9b8cf', skin: '#c98768', label: 'Fashion model' },
-    barbie: { hair: '#f2b7cf', outfit: '#f06ca8', accent: '#ffd8eb', skin: '#f0c4a9', label: 'Pink fashion doll' },
-  };
-  const c = palette[character] || palette.gojo;
-  const isGojo = character === 'gojo';
-  const isRonaldo = character === 'ronaldo';
-  const isMessi = character === 'messi';
-  const isBarbie = character === 'barbie';
-  return <svg className={`rc-character-art rc-character-${character}`} viewBox="0 0 180 230" role="img" aria-label={c.label}>
-    <defs><linearGradient id={`rc-shirt-${character}`} x1="0" x2="1" y1="0" y2="1"><stop offset="0" stopColor={c.outfit}/><stop offset="1" stopColor={c.accent}/></linearGradient></defs>
-    {/* waist-up body */}
-    <path d="M34 226 Q35 174 55 157 Q70 145 90 145 Q112 145 127 157 Q147 174 148 226Z" fill={`url(#rc-shirt-${character})`} stroke="#101827" strokeWidth="3"/>
-    {isRonaldo && <><path d="M90 151v73" stroke="#f8e6c7" strokeWidth="3"/><path d="M71 170h38" stroke="#f8e6c7" strokeWidth="2"/><text x="90" y="207" fill="#fff" fontSize="25" fontWeight="900" textAnchor="middle">7</text></>}
-    {isMessi && <><path d="M90 151v75" stroke="#fff" strokeWidth="3"/><path d="M48 178h84" stroke="#fff" strokeWidth="5" opacity=".85"/><text x="90" y="210" fill="#fff" fontSize="23" fontWeight="900" textAnchor="middle">10</text></>}
-    {isGojo && <path d="M53 155 Q90 173 127 155 L116 226H64Z" fill="#101a2b" opacity=".9"/>}
-    {/* neck and ears */}
-    <path d="M77 130h26v29q-13 13-26 0Z" fill={c.skin}/>
-    <ellipse cx="54" cy="91" rx="10" ry="15" fill={c.skin}/><ellipse cx="126" cy="91" rx="10" ry="15" fill={c.skin}/>
-    <path d="M54 78 Q54 35 90 34 Q128 34 127 80 L121 111 Q113 139 90 142 Q67 139 59 111Z" fill={c.skin} stroke="#7a5145" strokeWidth="1.5"/>
-    {/* hair silhouette */}
-    {isGojo ? <path d="M51 91 Q34 54 61 28 Q82 7 105 23 Q139 20 137 62 L127 89 117 63 106 76 99 49 85 72 76 48 65 83 57 103Z" fill={c.hair} stroke="#b6c8db" strokeWidth="2"/> : isBarbie ? <><path d="M51 97 Q38 36 78 25 Q120 9 137 58 Q143 93 130 145 Q119 164 116 127 L119 75 Q91 49 66 77 L63 137 Q52 153 46 127Z" fill={c.hair} stroke="#c66b9b" strokeWidth="2"/><path d="M57 51Q91 4 126 47" fill="none" stroke="#ffe3ef" strokeWidth="7"/></> : <path d={isMessi ? 'M51 91Q42 47 70 29Q99 14 126 43L132 83 119 72 110 56 95 66 80 53 66 84 59 104Z' : 'M50 93Q39 49 66 29Q95 10 121 34Q141 53 129 91L119 73 109 58 98 72 83 55 68 86 59 104Z'} fill={c.hair} stroke="#211b20" strokeWidth="2"/>}
-    {/* face */}
-    {isGojo ? <><path d="M59 83Q90 72 121 83L119 100Q90 108 61 100Z" fill="#111827"/><path d="M63 88Q90 80 117 88" stroke="#7dd3fc" strokeWidth="3"/><path d="M82 119q8 6 16 0" stroke="#8a4f49" strokeWidth="2" fill="none"/></> : <><ellipse cx="76" cy="96" rx="3" ry="4" fill="#27212a"/><ellipse cx="104" cy="96" rx="3" ry="4" fill="#27212a"/><path d="M86 111q4 3 8 0" stroke="#9c5d53" strokeWidth="2" fill="none"/><path d="M73 119q17 12 34 0" stroke={isBarbie ? '#b54e79' : '#8f4c4c'} strokeWidth="2.5" fill="none" strokeLinecap="round"/></>}
-    {isBarbie && <><path d="M64 94q12-9 23 0M96 94q12-9 22 0" stroke="#3c2634" strokeWidth="2" fill="none"/><path d="M74 121q16 8 32 0" stroke="#e65d98" strokeWidth="3" fill="none"/></>}
-    {/* waving arm, independently animated */}
-    <g className="rc-character-wave-arm"><path d="M124 165Q139 143 145 119" stroke={c.skin} strokeWidth="17" strokeLinecap="round" fill="none"/><g className="rc-character-wave-hand" transform="translate(145 120)"><path d="M0 2Q-6 -12 -3 -25M0 2Q8 -13 13 -23M0 2Q17 -7 22 -17M0 2Q-13 -8 -17 -20M0 2Q-1 -11 2 -29" stroke={c.skin} strokeWidth="7" strokeLinecap="round" fill="none"/><path d="M-5 4Q-1 -4 7 -2Q14 1 10 10Q4 17 -3 11Z" fill={c.skin}/></g><path d="M119 162Q130 153 136 143" stroke={c.outfit} strokeWidth="22" strokeLinecap="round" fill="none"/></g>
-    {/* opposite shoulder */}
-    <path d="M53 166Q39 173 31 197" stroke={c.skin} strokeWidth="15" strokeLinecap="round" fill="none"/>
-    {isGojo && <path d="M55 142Q90 155 125 142" stroke="#31445f" strokeWidth="5" fill="none"/>}
-    {(isRonaldo || isMessi) && <path d="M78 145l12 13 12-13" stroke="#f5f5f4" strokeWidth="4" fill="none"/>}
-  </svg>;
+  const asset = character === 'ronaldo'
+    ? '/chat-characters/ronaldo-wave.gif'
+    : '/chat-characters/gojo-wave.gif';
+  const label = character === 'ronaldo' ? 'Cristiano Ronaldo waving' : 'Gojo waving';
+  return <img
+    className={`rc-character-art rc-character-${character}`}
+    src={asset}
+    alt={label}
+    draggable={false}
+  />;
 }
 
 export default function Home() {
@@ -992,7 +967,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (chatEntranceTimer.current) window.clearTimeout(chatEntranceTimer.current);
     setChatEntranceCharacter(null);
     if (!selectedConversation || !isCurrentUserPremium || profileForm.disable_chat_animation) return;
-    const characters = ['gojo', 'ronaldo', 'messi', 'model', 'barbie'];
+    const characters = ['gojo', 'ronaldo'];
     setChatEntranceCharacter(characters[Math.floor(Math.random() * characters.length)]);
     chatEntranceTimer.current = window.setTimeout(() => setChatEntranceCharacter(null), 4700);
     return () => { if (chatEntranceTimer.current) window.clearTimeout(chatEntranceTimer.current); };
@@ -4875,10 +4850,9 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-chat-panel .rc-message-row{position:relative!important;z-index:3!important}
       .rc-chat-panel .rc-composer-wrap{position:relative!important;z-index:101!important}
       .rc-chat-panel .rc-chat-header{position:relative!important;z-index:100!important}
-      .rc-chat-panel .rc-character-art{width:clamp(116px,34vw,166px)!important;height:min(205px,100%)!important;max-height:205px!important;overflow:visible!important;filter:drop-shadow(0 8px 10px rgba(0,0,0,.4));animation:rc-character-walk .52s ease-in-out infinite}
-      .rc-chat-panel .rc-character-wave-arm{transform-box:fill-box!important;transform-origin:12% 88%!important;animation:rc-character-wave 1.1s ease-in-out 1.15s 3 both!important}
-      .rc-chat-panel .rc-character-wave-hand{transform-box:fill-box!important;transform-origin:50% 90%!important;animation:rc-character-hand-wave .42s ease-in-out 1.2s 7 both!important}
-      @media(prefers-reduced-motion:reduce){.rc-chat-panel .rc-chat-entrance-character,.rc-chat-panel .rc-character-art,.rc-chat-panel .rc-character-wave-arm,.rc-chat-panel .rc-character-wave-hand{animation:none!important;display:none!important}}
+      .rc-chat-panel .rc-character-art{display:block!important;width:auto!important;height:70%!important;max-height:70%!important;max-width:min(82vw,460px)!important;object-fit:contain!important;object-position:center bottom!important;overflow:visible!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.42))!important;animation:none!important;flex:0 1 auto!important;}
+      .rc-chat-panel .rc-chat-entrance-character{bottom:76px!important;}
+      @media(prefers-reduced-motion:reduce){.rc-chat-panel .rc-chat-entrance-character{animation:none!important;display:none!important}}
     `}
 
 
