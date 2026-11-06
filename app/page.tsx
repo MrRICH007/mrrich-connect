@@ -8,7 +8,7 @@ import {
   Bell, Crown, Hash, LogIn, LogOut, MessageCircle, Search, ShieldCheck,
   Users, UserRound, Wifi, Pencil, Plus, Send, Smile, ArrowLeft, RefreshCw,
   X, Sparkles, Zap, ArrowDown, Store, Settings, CircleDot, Check, Megaphone, BadgeCheck,
-  Mic, Square, Play, Pause, AudioLines, Trash2, Share2, Copy, QrCode, UserPlus, ImagePlus, Link2
+  Mic, Square, Play, Pause, AudioLines, Trash2, Share2, Copy, QrCode, UserPlus, ImagePlus, Link2, Trophy
 } from 'lucide-react';
 const NIGERIAN_SCHOOLS = [
   'Abia State University','Abubakar Tafawa Balewa University','Achievers University','Adekunle Ajasin University','Adeleke University','Admiralty University of Nigeria','Ahmadu Bello University','Ajayi Crowther University','Akwa Ibom State University','Al-Hikmah University','Ambrose Alli University','American University of Nigeria','Anchor University','Arthur Jarvis University','Atiba University','Augustine University','Babcock University','Bauchi State University','Bayero University Kano','Baze University','Bells University of Technology','Benson Idahosa University','Benue State University','Bingham University','Bowen University','Caleb University','Caritas University','Chrisland University','Christopher University','Clifford University','Coal City University','Covenant University','Crawford University','Crescent University','Delta State University','Dennis Osadebay University','Dominican University','Ebonyi State University','Edo State University Uzairue','Edwin Clark University','Ekiti State University','Elizade University','Evangel University','Federal University Gashua','Federal University Of Petroleum Resources, Effurun (FUPRE)','Federal University Gusau','Federal University Kashere','Federal University Lafia','Federal University Lokoja','Federal University Otuoke','Federal University Oye-Ekiti','Federal University of Agriculture Abeokuta','Federal University of Technology Akure','Federal University of Technology Minna','Federal University of Technology Owerri','Federal University Dutse','Federal University Birnin Kebbi','Federal University Dutsin-Ma','Federal University Wukari','Fountain University','Godfrey Okoye University','Gombe State University','Gregory University','Hallmark University','Hezekiah University','Ibrahim Badamasi Babangida University','Igbinedion University','Ignatius Ajuru University of Education','Imo State University','Joseph Ayo Babalola University','Kaduna State University','Kano University of Science and Technology','Kebbi State University of Science and Technology','Kings University','Kogi State University','KolaDaisi University','Kwara State University','Lagos State University','Lagos State University of Education','Landmark University','Lead City University','Madonna University','McPherson University','Michael and Cecilia Ibru University','Michael Okpara University of Agriculture','Modibbo Adama University','Mountain Top University','Nasarawa State University','National Open University of Nigeria','Niger Delta University','Nigerian Army University Biu','Nigerian Defence Academy','Nile University of Nigeria','Nnamdi Azikiwe University','Northwest University Kano','Novena University','Obafemi Awolowo University','Oduduwa University','Olabisi Onabanjo University','Ondo State University of Medical Sciences','Osun State University','Pan-Atlantic University','Paul University','Plateau State University','Redeemer’s University','Renaissance University','Rhema University','Ritman University','Rivers State University','Salem University','Samuel Adegboyega University','Skyline University Nigeria','Sokoto State University','Southwestern University Nigeria','Spiritan University','Summit University','Tai Solarin University of Education','Tansian University','Taraba State University','The University of Africa Toru-Orua','Thomas Adewumi University','Umaru Musa Yar’Adua University','University of Abuja','University of Benin','University of Calabar','University of Cross River State','University of Ibadan','University of Ilorin','University of Jos','University of Lagos','University of Maiduguri','University of Mkar','University of Nigeria Nsukka','University of Port Harcourt','University of Uyo','Usmanu Danfodiyo University','Veritas University','Wellspring University','Wesley University','Western Delta University','Yobe State University','Adamawa State Polytechnic','Auchi Polytechnic','Abia State Polytechnic','Abubakar Tatari Ali Polytechnic','Akanu Ibiam Federal Polytechnic Unwana','Akwa Ibom State Polytechnic','Benue State Polytechnic','Delta State Polytechnic Otefe-Oghara','Delta State Polytechnic Ogwashi-Uku','Edo State Polytechnic Usen','Federal Polytechnic Ado-Ekiti','Federal Polytechnic Bauchi','Federal Polytechnic Bida','Federal Polytechnic Damaturu','Federal Polytechnic Ede','Federal Polytechnic Idah','Federal Polytechnic Ilaro','Federal Polytechnic Kaura Namoda','Federal Polytechnic Mubi','Federal Polytechnic Nasarawa','Federal Polytechnic Nekede','Federal Polytechnic Offa','Federal Polytechnic Oko','Federal Polytechnic Ukana','Gateway ICT Polytechnic','Hassan Usman Katsina Polytechnic','Imo State Polytechnic','Institute of Management and Technology Enugu','Kaduna Polytechnic','Kano State Polytechnic','Kwara State Polytechnic','Lagos State Polytechnic','Moshood Abiola Polytechnic','Niger State Polytechnic','Nuhu Bamalli Polytechnic','Ogun State Institute of Technology','Osun State Polytechnic Iree','Plateau State Polytechnic','Ramat Polytechnic','Rivers State Polytechnic','The Polytechnic Ibadan','Yaba College of Technology','Adeyemi College of Education','Alvan Ikoku Federal College of Education','College of Education Agbor','College of Education Akwanga','College of Education Ekiadolor','College of Education Gindiri','College of Education Hong','College of Education Ikere-Ekiti','College of Education Katsina-Ala','College of Education Minna','College of Education Oro','College of Education Warri','Emmanuel Alayande College of Education','Federal College of Education Abeokuta','Federal College of Education Asaba','Federal College of Education Kano','Federal College of Education Kontagora','Federal College of Education Obudu','Federal College of Education Okene','Federal College of Education Omoku','Federal College of Education Pankshin','Federal College of Education (Technical) Akoka','Federal College of Education (Technical) Bichi','Federal College of Education (Technical) Gombe','Federal College of Education (Technical) Umunze','Federal College of Education Zaria','Kashim Ibrahim College of Education','Lagos State College of Education','Nwafor Orizu College of Education','Tai Solarin College of Education','Isaac Jasper Boro College of Education'
@@ -82,6 +82,8 @@ type AdCampaign = {
 };
 
 type CommunityAnnouncement = { id: string; author_id: string; caption: string; image_url: string; created_at: string; author_nickname?: string; };
+type ContestOption = { id?: string; caption: string; image_path?: string | null; imageFile?: File | null; votes?: number; percentage?: number };
+type CommunityContest = { id: string; author_id: string; question: string; cover_image_path: string | null; created_at: string; author_nickname?: string; options: ContestOption[]; results?: ContestOption[]; voted_option_id?: string | null };
 
 type Conversation = {
   id: string;
@@ -337,6 +339,17 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [announcementCaption, setAnnouncementCaption] = useState('');
   const [announcementImage, setAnnouncementImage] = useState<File | null>(null);
   const [announcementBusy, setAnnouncementBusy] = useState(false);
+  const [contestOpen, setContestOpen] = useState(false);
+  const [contests, setContests] = useState<CommunityContest[]>([]);
+  const [contestQuestion, setContestQuestion] = useState('');
+  const [contestCover, setContestCover] = useState<File | null>(null);
+  const [contestOptions, setContestOptions] = useState<ContestOption[]>([{caption:''},{caption:''}]);
+  const [contestBusy, setContestBusy] = useState(false);
+  const [activeContest, setActiveContest] = useState<CommunityContest | null>(null);
+  const [contestVoteBusy, setContestVoteBusy] = useState(false);
+  const [contestResults, setContestResults] = useState<ContestOption[] | null>(null);
+  const [contestVotedOption, setContestVotedOption] = useState<string | null>(null);
+  const contestCoverInputRef = useRef<HTMLInputElement | null>(null);
   const [announcementPosition, setAnnouncementPosition] = useState<{ x: number; y: number } | null>(null);
   const announcementDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const announcementWasDragged = useRef(false);
@@ -853,6 +866,75 @@ const voiceChunksRef = useRef<Blob[]>([]);
     setInviteToken(String(data));
     setInviteOpen(true);
   }
+
+  const contestImageUrl = (path?: string | null) => path && supabase ? supabase.storage.from('contest-images').getPublicUrl(path).data.publicUrl : '';
+  const loadContests = useCallback(async () => {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('rc_contests').select('id,author_id,question,cover_image_path,created_at').eq('is_published', true).order('created_at', { ascending: false }).limit(30);
+    if (error) { setStatus(`Could not load contests: ${error.message}`); return; }
+    const rows = data || [];
+    const ids = rows.map((r:any) => r.id);
+    const { data: optionRows, error: optionError } = ids.length ? await supabase.from('rc_contest_options').select('id,contest_id,caption,image_path,position').in('contest_id', ids).order('position') : { data: [], error: null } as any;
+    if (optionError) { setStatus(`Could not load contest options: ${optionError.message}`); return; }
+    const { data: authorRows } = await supabase.from('profiles').select('id,nickname').in('id', [...new Set(rows.map((r:any)=>r.author_id))]);
+    const names = new Map((authorRows || []).map((p:any)=>[p.id,p.nickname]));
+    setContests(rows.map((r:any)=>({...r,author_nickname:names.get(r.author_id)||'Member',options:(optionRows||[]).filter((o:any)=>o.contest_id===r.id)})));
+  }, [supabase]);
+  const publishContest = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase || !userId) return;
+    const validOptions = contestOptions.filter(o => o.caption.trim() || o.imageFile);
+    if (!contestQuestion.trim() || validOptions.length < 2) { setStatus('Add a contest question and at least two answer options.'); return; }
+    setContestBusy(true);
+    let coverPath: string | null = null;
+    let contestId: string | null = null;
+    try {
+      if (contestCover) {
+        const path = `${userId}/${crypto.randomUUID()}-${contestCover.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+        const { error } = await supabase.storage.from('contest-images').upload(path, contestCover, { upsert:false, contentType:contestCover.type });
+        if (error) throw error;
+        coverPath = path;
+      }
+      const { data, error } = await supabase.from('rc_contests').insert({ author_id:userId, question:contestQuestion.trim(), cover_image_path:coverPath, is_published:true }).select('id').single();
+      if (error) throw error;
+      contestId = data.id;
+      const optionRows: any[] = [];
+      for (let i=0;i<validOptions.length;i++) {
+        const option=validOptions[i]; let imagePath: string | null=null;
+        if (option.imageFile) {
+          const path=`${userId}/${contestId}/${crypto.randomUUID()}-${option.imageFile.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+          const {error:uploadError}=await supabase.storage.from('contest-images').upload(path,option.imageFile,{upsert:false,contentType:option.imageFile.type});
+          if(uploadError) throw uploadError; imagePath=path;
+        }
+        optionRows.push({contest_id:contestId,caption:option.caption.trim() || `Option ${i+1}`,image_path:imagePath,position:i});
+      }
+      const {error:optionsError}=await supabase.from('rc_contest_options').insert(optionRows);
+      if(optionsError) throw optionsError;
+      setContestQuestion('');setContestCover(null);setContestOptions([{caption:''},{caption:''}]);
+      await loadContests();setStatus('Contest published.');
+    } catch(error:any) {
+      if(contestId) await supabase.from('rc_contests').delete().eq('id',contestId);
+      setStatus(`Could not publish contest: ${error?.message || 'Unknown error'}`);
+    } finally { setContestBusy(false); }
+  };
+  const openContest = async (contest: CommunityContest) => {
+    if (!supabase) return;
+    setActiveContest(contest);setContestResults(null);setContestVotedOption(null);
+    const {data:mine}=await supabase.from('rc_contest_votes').select('option_id').eq('contest_id',contest.id).eq('user_id',userId).maybeSingle();
+    setContestVotedOption(mine?.option_id || null);
+    if (mine?.option_id) {
+      const {data: voteData}=await supabase.rpc('rc_get_contest_results',{p_contest_id:contest.id});
+      if(Array.isArray(voteData)) setContestResults(voteData as ContestOption[]);
+    }
+  };
+  const voteContest = async () => {
+    if(!supabase || !activeContest || !contestVotedOption) return;
+    setContestVoteBusy(true);
+    const {data,error}=await supabase.rpc('rc_vote_contest',{p_contest_id:activeContest.id,p_option_id:contestVotedOption});
+    if(error) setStatus(`Could not submit vote: ${error.message}`);
+    else if(Array.isArray(data)) setContestResults(data as ContestOption[]);
+    setContestVoteBusy(false);
+  };
 
   const isCurrentUserPremium = profiles.some(p => p.id === userId && p.premium_status === 'active');
 
@@ -2921,7 +3003,7 @@ async function playVoiceNote(message: ChatMessage) {
 >
   {voiceBusy ? '…' : isRecordingVoice ? <Square size={19} fill="currentColor" /> : <Mic size={21} />}
 </button>
-<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{(EMOJIS.length ? EMOJIS : ["😀","😂","🥰","😍","😊","😉","😭","🔥","❤️","👍","🙏","🎉","✨","💯","🤔","😎"]).map((emoji, i)=><button type="button" key={`${emoji}-${i}`} onClick={() => { setDraftMessage(v=>v+emoji); setShowEmojiPicker(false); window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('textarea[name=\"chat-message\"]')?.focus(), 0); }} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}><span className="rc-emoji-glyph" role="img" aria-label={emoji}>{emoji}</span></button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
+<textarea name="chat-message" rows={1} autoComplete="off" autoCorrect="on" autoCapitalize="sentences" spellCheck={true} enterKeyHint="enter" data-form-type="other" data-lpignore="true" value={draftMessage} onChange={e=>{setDraftMessage(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight, 120)}px`;}} onFocus={e=>{ window.setTimeout(() => e.currentTarget.scrollIntoView({block:'nearest',behavior:'smooth'}), 180); }} placeholder="Write a message…" aria-label="Message"/><button className="rc-send-btn" onClick={() => void sendDraft()} disabled={!draftMessage.trim() || sendingMessage} aria-label="Send message"><Send size={18}/></button></div>{showEmojiPicker && typeof document !== 'undefined' && createPortal(<div className="rc-emoji-picker" role="dialog" aria-label="MR RICH CONNECT emoji picker"><div className="rc-emoji-picker-header"><div><strong>Emojis</strong><small>Choose an emoji to add to your message</small></div><button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="Close emoji picker"><X size={18}/></button></div><div className="rc-emoji-grid">{"😀 😃 😄 😁 😆 😅 😂 🤣 🥹 😊 😍 🥰 😘 😎 🤔 🙄 😭 😱 🥳 😴 🤗 🤫 🤨 😤 😡 💀 👻 🤖 👋 👍 👎 👏 🙌 🫶 🙏 💪 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💕 💯 🔥 ✨ ⭐ 🌈 🌹 🌻 🌸 🦋 🐱 🐶 🦁 🐼 🦄 🍎 🍉 🍕 🍔 🍟 ☕ 🎂 🎉 🎊 🎁 🏆 ⚽ 🏀 🎮 🚀 💎 👑 📱 💻".split(" ").map((emoji,i)=><button type="button" key={`${emoji}-${i}`} onClick={()=>{setDraftMessage(v=>v+emoji);setShowEmojiPicker(false);window.setTimeout(()=>document.querySelector<HTMLTextAreaElement>('textarea[name="chat-message"]')?.focus(),50);}} aria-label={`Add ${emoji}`} title={`Add ${emoji}`}>{emoji}</button>)}</div></div>, document.body)}</div>; })()}</> : <div className="rc-chat-no-selection"><div className="rc-chat-big-icon"><MessageCircle size={35}/><Wifi size={16}/></div><h2>Select a conversation</h2><p>Choose a person or group to open your chat.</p></div>}
         </section>
       </section>}
 
@@ -3009,9 +3091,29 @@ async function playVoiceNote(message: ChatMessage) {
     {userId && tab === 'My Profile' && !selectedConversation && !showProfile && !showGroup && !marketplaceOpen && <button className="rc-floating-premium" onClick={() => setTab('Premium')}><Crown size={17}/> Premium</button>}
     {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && !inviteOpen && <div className="rc-features-wrap" style={invitePosition ? { left: invitePosition.x, top: invitePosition.y, right: 'auto', bottom: 'auto' } : undefined}>
       <button type="button" className="rc-features-button" onPointerDown={e => { inviteWasDragged.current=false; const r=e.currentTarget.getBoundingClientRect(); inviteDrag.current={pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,originX:invitePosition?.x??r.left,originY:invitePosition?.y??r.top}; e.currentTarget.setPointerCapture(e.pointerId); }} onPointerMove={e=>{const d=inviteDrag.current;if(!d||d.pointerId!==e.pointerId)return;if(Math.abs(e.clientX-d.startX)>5||Math.abs(e.clientY-d.startY)>5)inviteWasDragged.current=true;const r=e.currentTarget.getBoundingClientRect();const minY=Math.min(220,Math.max(8,window.innerHeight-r.height-8));setInvitePosition({x:Math.max(8,Math.min(window.innerWidth-r.width-8,d.originX+e.clientX-d.startX)),y:Math.max(minY,Math.min(window.innerHeight-r.height-8,d.originY+e.clientY-d.startY))});}} onPointerUp={e=>{if(inviteDrag.current?.pointerId===e.pointerId)inviteDrag.current=null;}} onPointerCancel={()=>{inviteDrag.current=null;}} onClick={()=>{if(inviteWasDragged.current){inviteWasDragged.current=false;return;}setFeaturesMenuOpen(v=>!v);}} aria-label="Open Features menu" aria-expanded={featuresMenuOpen}><Sparkles size={22}/>{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount>99?'99+':unreadAnnouncementCount}</i>}</button>
-      {featuresMenuOpen&&<div className="rc-features-menu"><button onClick={()=>{setFeaturesMenuOpen(false);setStatusOpen(true);void loadStatuses();}}> <CircleDot size={17}/> Status</button><button onClick={()=>{setFeaturesMenuOpen(false);setMarketplaceOpen(true);}}><Store size={17}/> Marketplace</button><button onClick={()=>{setFeaturesMenuOpen(false);void openInviteCard();}}><UserPlus size={17}/> Invite</button><button onClick={()=>{setFeaturesMenuOpen(false);void loadAnnouncements();setAnnouncementOpen(true);setUnreadAnnouncementCount(0);}}><Megaphone size={17}/> Announcements{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount}</i>}</button></div>}
+      {featuresMenuOpen&&<div className="rc-features-menu"><button onClick={()=>{setFeaturesMenuOpen(false);setContestOpen(true);setActiveContest(null);setContestResults(null);void loadContests();}}> <Trophy size={17}/> Contest</button><button onClick={()=>{setFeaturesMenuOpen(false);setStatusOpen(true);void loadStatuses();}}> <CircleDot size={17}/> Status</button><button onClick={()=>{setFeaturesMenuOpen(false);setMarketplaceOpen(true);}}><Store size={17}/> Marketplace</button><button onClick={()=>{setFeaturesMenuOpen(false);void openInviteCard();}}><UserPlus size={17}/> Invite</button><button onClick={()=>{setFeaturesMenuOpen(false);void loadAnnouncements();setAnnouncementOpen(true);setUnreadAnnouncementCount(0);}}><Megaphone size={17}/> Announcements{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount}</i>}</button></div>}
     </div>}
 
+
+    {contestOpen && <div className="rc-contest-screen">
+      <header className="rc-contest-header"><button type="button" className="rc-icon-btn" onClick={()=>{setContestOpen(false);setActiveContest(null);}} aria-label="Back"><ArrowLeft size={20}/></button><div><h1>Contests</h1><p>Share your choice. See the community result.</p></div></header>
+      <div className="rc-contest-content">
+        {!activeContest && <>
+          <form className="rc-contest-composer" onSubmit={publishContest}>
+            <div className="rc-contest-composer-title"><Trophy size={20}/><h2>Add contest</h2></div>
+            <label className="rc-contest-label">Contest question<textarea value={contestQuestion} onChange={e=>setContestQuestion(e.target.value)} maxLength={500} placeholder="What would you like the community to choose?" required/></label>
+            <input ref={contestCoverInputRef} type="file" accept="image/*" hidden onChange={e=>setContestCover(e.target.files?.[0]||null)}/>
+            <button type="button" className="rc-contest-image-button" onClick={()=>contestCoverInputRef.current?.click()}><ImagePlus size={18}/>{contestCover ? contestCover.name : 'Add optional cover image (16:5)'}</button>
+            {contestCover && <img className="rc-contest-cover-preview" src={URL.createObjectURL(contestCover)} alt="Contest cover preview"/>}
+            <div className="rc-contest-options-heading"><strong>Answer options</strong><small>Add a caption and optional image for each answer.</small></div>
+            {contestOptions.map((option,index)=><div className="rc-contest-option-editor" key={index}><label className="rc-contest-label">Option {index+1}<input value={option.caption} onChange={e=>setContestOptions(old=>{const next=old.map((o,i)=>i===index?{...o,caption:e.target.value}:o);if(index===old.length-1&&e.target.value.trim())next.push({caption:''});return next;})} placeholder="Type an answer…"/></label><label className="rc-contest-image-button"><ImagePlus size={16}/>{option.imageFile ? option.imageFile.name : 'Add option image'}<input type="file" accept="image/*" onChange={e=>setContestOptions(old=>old.map((o,i)=>i===index?{...o,imageFile:e.target.files?.[0]||null}:o))}/></label>{option.imageFile && <img className="rc-contest-option-preview" src={URL.createObjectURL(option.imageFile)} alt="Option preview"/>}</div>)}
+            <button type="submit" className="rc-primary rc-full" disabled={contestBusy}>{contestBusy?'Publishing…':'Publish contest'}</button>
+          </form>
+          <section className="rc-contest-recent"><h2>Recent contests</h2><div className="rc-contest-strip">{contests.length?contests.map(contest=><button type="button" className="rc-contest-bubble" key={contest.id} onClick={()=>void openContest(contest)}>{contest.cover_image_path?<img src={contestImageUrl(contest.cover_image_path)} alt=""/>:<span className="rc-contest-no-cover"><Trophy size={22}/></span>}<strong>{contest.question}</strong><small>@{contest.author_nickname}</small></button>):<p className="rc-contest-empty">No contests have been published yet.</p>}</div></section>
+        </>}
+        {activeContest && <section className="rc-contest-vote-card"><button type="button" className="rc-secondary" onClick={()=>{setActiveContest(null);setContestResults(null);}}> <ArrowLeft size={16}/> All contests</button>{activeContest.cover_image_path&&<img className="rc-contest-view-cover" src={contestImageUrl(activeContest.cover_image_path)} alt="Contest cover"/>}<h2>{activeContest.question}</h2><p className="rc-contest-author">Posted by @{activeContest.author_nickname}</p><div className="rc-contest-vote-options">{activeContest.options.map((option,index)=>{const result=contestResults?.find(r=>r.id===option.id);const pct=Number(result?.percentage)||0;const voted=!!contestResults;return <button type="button" key={option.id||index} className={`rc-contest-vote-option ${contestVotedOption===option.id?'selected':''} ${voted?'has-results':''}`} disabled={voted||!!contestVotedOption&&!!contestResults} onClick={()=>setContestVotedOption(option.id||null)}>{option.image_path&&<img src={contestImageUrl(option.image_path)} alt=""/>}<span className="rc-contest-vote-option-text">{option.caption}</span>{voted&&<><span className="rc-contest-result-track"><i style={{width:`${pct}%`}}/></span><small>{pct.toFixed(1)}% · {result?.votes||0} votes</small></>}</button>})}</div>{!contestResults&&<button type="button" className="rc-primary rc-full" disabled={!contestVotedOption||contestVoteBusy} onClick={()=>void voteContest()}>{contestVoteBusy?'Submitting vote…':'Vote'}</button>}{contestResults&&<p className="rc-contest-result-note">Current results · updated after your vote</p>}</section>}
+      </div>
+    </div>}
 
     {statusViewerOpen && typeof document !== 'undefined' && createPortal(
       <div className="rc-status-screen" onClick={() => setStatusViewerOpen(false)}>
@@ -4474,7 +4576,45 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-status-member-name { flex:1 1 auto!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:13px!important;font-weight:700!important; }
       .rc-status-member-premium { display:inline-flex!important;align-items:center!important;gap:4px!important;color:#facc15!important;font-size:10px!important;font-weight:800!important;white-space:nowrap!important; }
       .rc-status-member-time { color:#91a1b8!important;font-size:10px!important;white-space:nowrap!important; }
+      /* Contest UI and persistent vote results. */
+      .rc-contest-screen{position:fixed;inset:0;z-index:2147482500;display:flex;flex-direction:column;overflow:hidden;background:#071326;color:#f8fafc;padding-bottom:env(safe-area-inset-bottom)}
+      .rc-contest-header{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;background:#091a31;border-bottom:1px solid rgba(148,163,184,.2)}
+      .rc-contest-header h1{margin:0;font-size:21px}.rc-contest-header p{margin:3px 0 0;color:#9fb0c9;font-size:12px}
+      .rc-contest-content{width:min(100%,720px);margin:0 auto;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:14px;box-sizing:border-box}
+      .rc-contest-composer,.rc-contest-vote-card{display:flex;flex-direction:column;gap:13px;padding:16px;border:1px solid rgba(148,163,184,.2);border-radius:17px;background:linear-gradient(145deg,#132640,#0b1729)}
+      .rc-contest-composer-title{display:flex;align-items:center;gap:9px;color:#bfdbfe}.rc-contest-composer-title h2,.rc-contest-recent h2{margin:0;font-size:17px}
+      .rc-contest-label{display:flex;flex-direction:column;gap:7px;color:#dbeafe;font-size:13px;font-weight:700}
+      .rc-contest-label textarea,.rc-contest-label input{width:100%;box-sizing:border-box;min-height:44px;padding:11px 12px;border:1px solid rgba(148,163,184,.28);border-radius:11px;background:#071426;color:white;font:inherit;font-weight:400}
+      .rc-contest-label textarea{min-height:86px;resize:vertical}
+      .rc-contest-image-button{display:flex;align-items:center;gap:8px;min-height:40px;padding:9px 12px;border:1px dashed rgba(96,165,250,.42);border-radius:10px;color:#bfdbfe;background:rgba(37,99,235,.1);font-size:12px;font-weight:700;cursor:pointer}
+      .rc-contest-image-button input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+      .rc-contest-cover-preview{width:100%;aspect-ratio:16/5;object-fit:cover;border-radius:10px}.rc-contest-option-preview{width:100%;max-height:180px;object-fit:contain;background:#050b14;border-radius:9px}
+      .rc-contest-options-heading{display:flex;flex-direction:column;gap:3px;margin-top:3px}.rc-contest-options-heading small,.rc-contest-author,.rc-contest-result-note{color:#94a3b8;font-size:11px}
+      .rc-contest-option-editor{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:11px;border:1px solid rgba(148,163,184,.16);border-radius:12px;background:rgba(3,10,20,.36)}
+      .rc-contest-recent{margin:22px 0 8px;display:flex;flex-direction:column;gap:11px}.rc-contest-strip{display:flex;gap:10px;overflow-x:auto;padding:2px 1px 10px;scroll-snap-type:x mandatory}
+      .rc-contest-bubble{flex:0 0 164px;display:flex;flex-direction:column;gap:7px;padding:8px;text-align:left;border:1px solid rgba(148,163,184,.2);border-radius:13px;background:#101d30;color:#f8fafc;scroll-snap-align:start}
+      .rc-contest-bubble>img,.rc-contest-no-cover{width:100%;aspect-ratio:16/5;object-fit:cover;border-radius:8px}.rc-contest-no-cover{display:grid;place-items:center;background:#152c4b;color:#93c5fd}
+      .rc-contest-bubble strong{font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.rc-contest-bubble small{color:#93a4bd;font-size:10px}
+      .rc-contest-empty{color:#94a3b8;font-size:12px}.rc-contest-view-cover{width:100%;aspect-ratio:16/5;object-fit:cover;border-radius:12px}.rc-contest-vote-card h2{margin:0;font-size:19px;line-height:1.35}.rc-contest-vote-options{display:flex;flex-direction:column;gap:9px}
+      .rc-contest-vote-option{position:relative;display:flex;flex-direction:column;gap:8px;width:100%;padding:11px;border:1px solid rgba(148,163,184,.25);border-radius:12px;background:#0a1728;color:#f8fafc;text-align:left}
+      .rc-contest-vote-option.selected{border-color:#60a5fa;background:#102b4d}.rc-contest-vote-option>img{width:100%;max-height:210px;object-fit:contain;border-radius:8px;background:#050b14}.rc-contest-vote-option-text{font-size:13px;font-weight:700}.rc-contest-vote-option small{color:#bfdbfe;font-size:11px}
+      .rc-contest-result-track{display:block;width:100%;height:8px;overflow:hidden;border-radius:99px;background:#1e293b}.rc-contest-result-track i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#2563eb,#60a5fa);transition:width .35s ease}
+      /* Make emoji glyphs actual button text (no inherited nested-span clipping). */
+      .rc-emoji-picker{z-index:2147483647!important;isolation:isolate!important;visibility:visible!important;opacity:1!important;display:block!important;min-height:180px!important;background:#111d30!important;border:1px solid rgba(148,163,184,.35)!important;box-shadow:0 16px 48px rgba(0,0,0,.6)!important;color:#fff!important}
+      .rc-emoji-grid{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:6px!important;min-height:120px!important}
+      .rc-emoji-grid>button{font-family:"Apple Color Emoji","Noto Color Emoji","Segoe UI Emoji",sans-serif!important;font-size:27px!important;line-height:1.2!important;color:#fff!important;-webkit-text-fill-color:initial!important;background:rgba(148,163,184,.08)!important;border:1px solid rgba(148,163,184,.12)!important;border-radius:9px!important;min-height:42px!important;display:grid!important;place-items:center!important}
+      /* Bold Roboto chat typography. */
+      .rc-chat-panel,.rc-chat-header,.rc-chat-empty,.rc-composer,.rc-composer textarea,.rc-message-row,.rc-message-bubble,.rc-message-bubble *{font-family:Roboto,"Arial",sans-serif!important}
+      .rc-chat-header,.rc-chat-header strong,.rc-message-bubble,.rc-message-bubble strong,.rc-composer textarea{font-weight:700!important}
+      /* Chrome-safe pinned header: grid rows own header, message scroller and composer. */
+      .rc-messages-layout.has-chat{height:100%!important;min-height:0!important;overflow:hidden!important;align-items:stretch!important}
+      .rc-messages-layout.has-chat .rc-chat-panel{display:grid!important;grid-template-rows:64px minmax(0,1fr) auto!important;grid-template-columns:minmax(0,1fr)!important;position:relative!important;height:100%!important;min-height:0!important;max-height:100%!important;overflow:hidden!important;contain:layout paint!important;transform:none!important}
+      .rc-messages-layout.has-chat .rc-chat-header{grid-row:1!important;position:relative!important;inset:auto!important;top:auto!important;z-index:100!important;display:flex!important;min-height:64px!important;max-height:64px!important;height:64px!important;overflow:hidden!important;align-self:stretch!important;transform:none!important;flex:none!important;background:#101b2d!important;border-bottom:1px solid rgba(148,163,184,.24)!important}
+      .rc-messages-layout.has-chat .rc-chat-empty{grid-row:2!important;min-height:0!important;height:auto!important;max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important}
+      .rc-messages-layout.has-chat .rc-composer-wrap{grid-row:3!important;position:relative!important;inset:auto!important;z-index:101!important;flex:none!important;min-height:0!important;overflow:visible!important}
+      .rc-features-menu{max-height:min(70dvh,480px)!important}
     `}
+
 </style>
   </main>
 );
