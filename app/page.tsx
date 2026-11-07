@@ -1009,10 +1009,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const voteContest = async () => {
     if (!activeContest || !contestVotedOption) return;
     if (!userId) {
+      setStatus('Sign-in/up to vote');
+      setStatusType('info');
       setShowContestAuth(true);
       setAuthMode('signin');
-      setStatus('Sign in or create an account to submit your vote. Your selected answer will be kept.');
-      setStatusType('info');
       return;
     }
     if(!supabase) return;
@@ -2605,6 +2605,7 @@ async function playVoiceNote(message: ChatMessage) {
         <div className="rc-brand"><div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div><div className="rc-brand-type"><strong>MR RICH</strong><span>CONNECT</span></div></div>
         <button className="rc-small-login" onClick={() => { setShowContestAuth(true); setAuthMode('signin'); }}>Sign in</button>
       </header>
+      {status && typeof document !== 'undefined' && createPortal(<div className={`rc-toast rc-toast-${statusType}`} role={statusType === 'error' ? 'alert' : 'status'}>{status}<button aria-label="Dismiss notice" onClick={() => setStatus('')}><X size={14}/></button></div>, document.body)}
       <section className="rc-contest-screen rc-shared-public-contest">
         <div className="rc-contest-content">
           <section className="rc-contest-vote-card">
