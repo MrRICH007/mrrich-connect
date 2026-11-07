@@ -411,6 +411,13 @@ const voiceChunksRef = useRef<Blob[]>([]);
     const params = new URLSearchParams(window.location.search);
     const token = params.get('invite');
     const sharedContestId = params.get('contest');
+    const authRedirect = params.get('auth') === 'signin';
+    if (authRedirect) {
+      setAuthMode('signin');
+      setShowContestAuth(true);
+      setStatus('Sign-in/up to vote');
+      setStatusType('info');
+    }
     if (token && /^[0-9a-f-]{36}$/i.test(token)) {
       inviteTokenFromUrl.current = token;
       setAuthMode('signup');
@@ -1009,11 +1016,16 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const voteContest = async () => {
     if (!activeContest || !contestVotedOption) return;
     if (!userId) {
-      // Switch from the public contest to the sign-in screen immediately.
-      setAuthMode('signin');
-      setStatusType('info');
-      setStatus('Sign-in/up to vote');
-      setShowContestAuth(true);
+      // Persist the selected answer, then navigate through the app's auth entry
+      // so the sign-in screen is rendered even if the current view is stale.
+      try {
+        sessionStorage.setItem(`rc_pending_contest_vote_${activeContest.id}`, contestVotedOption);
+      } catch {}
+      const nextUrl = new URL('/', window.location.origin);
+      nextUrl.searchParams.set('contest', activeContest.id);
+      nextUrl.searchParams.set('auth', 'signin');
+      if (inviteTokenFromUrl.current) nextUrl.searchParams.set('invite', inviteTokenFromUrl.current);
+      window.location.assign(nextUrl.toString());
       return;
     }
     if(!supabase) return;
@@ -1029,11 +1041,19 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!pendingSharedContestId || !contests.length) return;
     const sharedContest = contests.find(contest => contest.id === pendingSharedContestId);
     if (sharedContest) {
+      let savedOption: string | null = null;
+      try {
+        savedOption = sessionStorage.getItem(`rc_pending_contest_vote_${sharedContest.id}`);
+      } catch {}
+      if (savedOption && sharedContest.options.some(option => option.id === savedOption)) {
+        setContestVotedOption(savedOption);
+      }
       void openContest(sharedContest);
       setContestOpen(true);
       // Keep the ID while signed out so the same contest can be reopened after
       // authentication. The selected option remains in component state.
       if (userId) {
+        try { sessionStorage.removeItem(`rc_pending_contest_vote_${sharedContest.id}`); } catch {}
         setPendingSharedContestId(null);
         setShowContestAuth(false);
         const cleanUrl = new URL(window.location.href);
