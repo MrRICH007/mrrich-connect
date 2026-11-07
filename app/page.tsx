@@ -1055,6 +1055,9 @@ const voiceChunksRef = useRef<Blob[]>([]);
       setPendingSharedContestId(activeContest.id);
       setAuthMode(inviteTokenFromUrl.current ? 'signup' : 'signin');
       setShowContestAuth(true);
+      // Close the fixed contest overlay before showing the auth screen.
+      // Otherwise its very high z-index keeps it visually above sign-up.
+      setContestOpen(false);
       setStatus(inviteTokenFromUrl.current ? 'Create your account through this invitation to vote.' : 'Sign in to vote.');
       setStatusType('info');
       return;
@@ -3307,7 +3310,7 @@ async function playVoiceNote(message: ChatMessage) {
     </div>}
 
 
-    {contestOpen && <div className="rc-contest-screen">
+    {userId && contestOpen && <div className="rc-contest-screen">
       <header className="rc-contest-header"><button type="button" className="rc-icon-btn" onClick={()=>{if(contestComposerOpen){setContestComposerOpen(false);}else{setContestOpen(false);setActiveContest(null);}}} aria-label="Back"><ArrowLeft size={20}/></button><div><h1>Contests</h1><p>Share your choice. See the community result.</p></div></header>
       <div className="rc-contest-content">
         {!activeContest && <>
