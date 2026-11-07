@@ -413,14 +413,20 @@ const voiceChunksRef = useRef<Blob[]>([]);
     const sharedContestId = params.get('contest');
     const authRedirect = params.get('auth') === 'signin';
     if (authRedirect) {
+      // This URL is reached only after an unauthenticated visitor chooses Vote.
+      // Clear any stale cached Supabase session so the sign-in screen cannot
+      // be bypassed by a briefly restored user state.
       setAuthMode('signin');
       setShowContestAuth(true);
       setStatus('Sign-in/up to vote');
       setStatusType('info');
+      void supabase?.auth.signOut();
     }
     if (token && /^[0-9a-f-]{36}$/i.test(token)) {
       inviteTokenFromUrl.current = token;
-      setAuthMode('signup');
+      // An explicit vote redirect must remain on sign-in, even when an invite
+      // token is also present in the URL.
+      if (!authRedirect) setAuthMode('signup');
     }
     if (sharedContestId && /^[0-9a-f-]{8}-[0-9a-f-]{4}-[1-8][0-9a-f-]{3}-[89ab][0-9a-f-]{3}-[0-9a-f-]{12}$/i.test(sharedContestId)) {
       setPendingSharedContestId(sharedContestId);
@@ -1059,6 +1065,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('contest');
         cleanUrl.searchParams.delete('invite');
+        cleanUrl.searchParams.delete('auth');
         window.history.replaceState(window.history.state, '', cleanUrl.toString());
       }
     } else {
