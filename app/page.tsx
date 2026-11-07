@@ -1039,16 +1039,21 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const voteContest = async () => {
     if (!activeContest || !contestVotedOption) return;
     if (!userId) {
-      // Persist the selected answer, then navigate through the app's auth entry
-      // so the sign-in screen is rendered even if the current view is stale.
+      // Keep this transition inside the current React app. A full-page reload
+      // races Supabase session restoration and can reopen the public contest.
       try {
         sessionStorage.setItem(`rc_pending_contest_vote_${activeContest.id}`, contestVotedOption);
       } catch {}
-      const nextUrl = new URL('/', window.location.origin);
+      setAuthMode('signin');
+      setStatus('Sign-in/up to vote');
+      setStatusType('info');
+      setShowContestAuth(true);
+      setForceContestAuth(true);
+      const nextUrl = new URL(window.location.href);
       nextUrl.searchParams.set('contest', activeContest.id);
       nextUrl.searchParams.set('auth', 'signin');
       if (inviteTokenFromUrl.current) nextUrl.searchParams.set('invite', inviteTokenFromUrl.current);
-      window.location.assign(nextUrl.toString());
+      window.history.pushState({ ...(window.history.state || {}), rcVoteAuth: true }, '', nextUrl.toString());
       return;
     }
     if(!supabase) return;
@@ -1078,7 +1083,8 @@ const voiceChunksRef = useRef<Blob[]>([]);
       if (userId) {
         try { sessionStorage.removeItem(`rc_pending_contest_vote_${sharedContest.id}`); } catch {}
         setPendingSharedContestId(null);
-        setShowContestAuth(false);
+        // Do not change the auth gate here; signIn() is the only place that
+        // releases an explicit vote-auth redirect.
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('contest');
         cleanUrl.searchParams.delete('invite');
