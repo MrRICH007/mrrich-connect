@@ -1009,10 +1009,11 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const voteContest = async () => {
     if (!activeContest || !contestVotedOption) return;
     if (!userId) {
-      setStatus('Sign-in/up to vote');
-      setStatusType('info');
-      setShowContestAuth(true);
+      // Switch from the public contest to the sign-in screen immediately.
       setAuthMode('signin');
+      setStatusType('info');
+      setStatus('Sign-in/up to vote');
+      setShowContestAuth(true);
       return;
     }
     if(!supabase) return;
@@ -2600,12 +2601,18 @@ async function playVoiceNote(message: ChatMessage) {
       onTouchMove={handlePageTouchMove}
       onTouchEnd={handlePageTouchEnd}
     >
+    {status && typeof document !== 'undefined' && createPortal(
+      <div className={`rc-toast rc-toast-${statusType}`} role={statusType === 'error' ? 'alert' : 'status'}>
+        {status}
+        <button aria-label="Dismiss notice" onClick={() => setStatus('')}><X size={14}/></button>
+      </div>,
+      document.body
+    )}
     {!userId ? (pendingSharedContestId && activeContest && !showContestAuth ? <>
       <header className="rc-mobile-header">
         <div className="rc-brand"><div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div><div className="rc-brand-type"><strong>MR RICH</strong><span>CONNECT</span></div></div>
         <button className="rc-small-login" onClick={() => { setShowContestAuth(true); setAuthMode('signin'); }}>Sign in</button>
       </header>
-      {status && typeof document !== 'undefined' && createPortal(<div className={`rc-toast rc-toast-${statusType}`} role={statusType === 'error' ? 'alert' : 'status'}>{status}<button aria-label="Dismiss notice" onClick={() => setStatus('')}><X size={14}/></button></div>, document.body)}
       <section className="rc-contest-screen rc-shared-public-contest">
         <div className="rc-contest-content">
           <section className="rc-contest-vote-card">
@@ -2686,7 +2693,6 @@ async function playVoiceNote(message: ChatMessage) {
       </div>
 
       {!configured && <div className="rc-notice"><ShieldCheck size={18}/><span>Supabase is not configured. Add your project URL and public key to your Render environment variables.</span></div>}
-      {page.name === tab && status && typeof document !== 'undefined' && createPortal(<div className={`rc-toast rc-toast-${statusType}`} role={statusType === 'error' ? 'alert' : 'status'}>{status}<button aria-label="Dismiss notice" onClick={() => setStatus('')}><X size={14}/></button></div>, document.body)}
 
       {page.name === 'Messages' && activeAds.filter(ad => ad.media_type === 'image' && ad.target_url).slice(0, 1).map(ad => <div key={ad.id} className="rc-message-ad-banner" style={{margin:'0 0 12px',width:'100%',aspectRatio:'16 / 9',maxHeight:260,overflow:'hidden',borderRadius:14,border:'1px solid #23365a',background:'#0b1222'}}><a href={ad.target_url || '#'} target="_blank" rel="noopener noreferrer" aria-label={`Open advert: ${ad.title}`} style={{display:'block',width:'100%',height:'100%'}}><img src={ad.media_path} alt={ad.title} style={{display:'block',width:'100%',height:'100%',objectFit:'cover'}}/></a></div>)}
 
