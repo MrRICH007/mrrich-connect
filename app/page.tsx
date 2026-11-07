@@ -374,7 +374,8 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [showContestAuth, setShowContestAuth] = useState(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('auth') === 'signin'
   );
-  const [forceContestAuth, setForceContestAuth] = useState(() =>
+  // This is the authoritative gate for a visitor who must authenticate to vote.
+  const [contestVoteAuthRequired, setContestVoteAuthRequired] = useState(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('auth') === 'signin'
   );
   const contestShareBusyRef = useRef<string | null>(null);
@@ -425,7 +426,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       // an asynchronous signOut can race getSession() and restore the contest view.
       setAuthMode('signin');
       setShowContestAuth(true);
-      setForceContestAuth(true);
+      setContestVoteAuthRequired(true);
       setStatus('Sign-in/up to vote');
       setStatusType('info');
     }
@@ -908,7 +909,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       setStatusType('error');
       return;
     }
-    setForceContestAuth(false);
+    setContestVoteAuthRequired(false);
     setShowContestAuth(false);
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('auth');
@@ -1022,6 +1023,9 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!supabase) return;
     const reopeningSameContest = activeContest?.id === contest.id;
     const selectedBeforeAuth = reopeningSameContest ? contestVotedOption : null;
+    let savedOption: string | null = null;
+    try { savedOption = sessionStorage.getItem(`rc_pending_contest_vote_${contest.id}`); } catch {}
+    const restoredOption = savedOption && contest.options.some(option => option.id === savedOption) ? savedOption : null;
     setActiveContest(contest);setContestResults(null);
     if (!reopeningSameContest) setContestVotedOption(null);
     if (!userId) {
@@ -1030,7 +1034,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       return;
     }
     const {data:mine}=await supabase.from('rc_contest_votes').select('option_id').eq('contest_id',contest.id).eq('user_id',userId).maybeSingle();
-    setContestVotedOption(mine?.option_id || selectedBeforeAuth || null);
+    setContestVotedOption(mine?.option_id || restoredOption || selectedBeforeAuth || null);
     if (mine?.option_id) {
       const {data: voteData}=await supabase.rpc('rc_get_contest_results',{p_contest_id:contest.id});
       if(Array.isArray(voteData)) setContestResults(voteData as ContestOption[]);
@@ -1048,7 +1052,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       setStatus('Sign-in/up to vote');
       setStatusType('info');
       setShowContestAuth(true);
-      setForceContestAuth(true);
+      setContestVoteAuthRequired(true);
       const nextUrl = new URL(window.location.href);
       nextUrl.searchParams.set('contest', activeContest.id);
       nextUrl.searchParams.set('auth', 'signin');
@@ -1076,7 +1080,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       if (savedOption && sharedContest.options.some(option => option.id === savedOption)) {
         setContestVotedOption(savedOption);
       }
-      void openContest(sharedContest);
+      if (!contestVoteAuthRequired) void openContest(sharedContest);
       setContestOpen(true);
       // Keep the ID while signed out so the same contest can be reopened after
       // authentication. The selected option remains in component state.
@@ -1096,7 +1100,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
       setStatusType('error');
       setPendingSharedContestId(null);
     }
-  }, [pendingSharedContestId, userId, contests]);
+  }, [pendingSharedContestId, userId, contests, contestVoteAuthRequired]);
 
 
   const isCurrentUserPremium = profiles.some(p => p.id === userId && p.premium_status === 'active');
@@ -2658,7 +2662,7 @@ async function playVoiceNote(message: ChatMessage) {
       </div>,
       document.body
     )}
-    {(!userId || forceContestAuth) ? (pendingSharedContestId && activeContest && !showContestAuth && !forceContestAuth ? <>
+    {(!authReady || !userId || contestVoteAuthRequired) ? (pendingSharedContestId && activeContest && !showContestAuth && !contestVoteAuthRequired ? <>
       <header className="rc-mobile-header">
         <div className="rc-brand"><div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div><div className="rc-brand-type"><strong>MR RICH</strong><span>CONNECT</span></div></div>
         <button className="rc-small-login" onClick={() => { setShowContestAuth(true); setAuthMode('signin'); }}>Sign in</button>
