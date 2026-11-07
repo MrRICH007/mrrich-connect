@@ -368,6 +368,8 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [contestVoteBusy, setContestVoteBusy] = useState(false);
   const [contestResults, setContestResults] = useState<ContestOption[] | null>(null);
   const [contestVotedOption, setContestVotedOption] = useState<string | null>(null);
+  const [pendingSharedContestId, setPendingSharedContestId] = useState<string | null>(null);
+  const contestShareBusyRef = useRef<string | null>(null);
   const contestCoverInputRef = useRef<HTMLInputElement | null>(null);
   const [announcementPosition, setAnnouncementPosition] = useState<{ x: number; y: number } | null>(null);
   const announcementDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -407,9 +409,16 @@ const voiceChunksRef = useRef<Blob[]>([]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('invite');
+    const sharedContestId = params.get('contest');
     if (token && /^[0-9a-f-]{36}$/i.test(token)) {
       inviteTokenFromUrl.current = token;
       setAuthMode('signup');
+    }
+    if (sharedContestId && /^[0-9a-f-]{8}-[0-9a-f-]{4}-[1-8][0-9a-f-]{3}-[89ab][0-9a-f-]{3}-[0-9a-f-]{12}$/i.test(sharedContestId)) {
+      setPendingSharedContestId(sharedContestId);
+      setContestOpen(true);
+      if (!token) setAuthMode('signin');
+      void loadContests();
     }
   }, []);
 
@@ -889,6 +898,34 @@ const voiceChunksRef = useRef<Blob[]>([]);
   }
 
   const contestImageUrl = (path?: string | null) => path && supabase ? supabase.storage.from('contest-images').getPublicUrl(path).data.publicUrl : '';
+  const shareContest = async (contest: CommunityContest) => {
+    if (!supabase || !userId || contestShareBusyRef.current === contest.id) return;
+    contestShareBusyRef.current = contest.id;
+    try {
+      const { data: tokenData, error: tokenError } = await supabase.rpc('get_my_invite_token');
+      if (tokenError || !tokenData) throw tokenError || new Error('No invite token was returned.');
+      const url = new URL('/', window.location.origin);
+      url.searchParams.set('contest', contest.id);
+      url.searchParams.set('invite', String(tokenData));
+      const shareUrl = url.toString();
+      const shareData = {
+        title: 'MR RICH CONNECT Contest',
+        text: `${contest.question}\nJoin MR RICH CONNECT to view and vote in this contest:`,
+        url: shareUrl,
+      };
+      if (navigator.share) await navigator.share(shareData);
+      else {
+        await navigator.clipboard.writeText(shareUrl);
+        setStatus('Contest link copied. Share it with your friends.');
+      }
+    } catch (error: any) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setStatus(`Could not create contest share link: ${error?.message || 'Please try again.'}`);
+      setStatusType('error');
+    } finally {
+      contestShareBusyRef.current = null;
+    }
+  };
   const contestExpiryBounds = () => { const now = new Date(); const max = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); const local = (d:Date) => new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); return { min: local(new Date(now.getTime()+5*60000)), max: local(max) }; };
   const loadContests = useCallback(async () => {
     if (!supabase) return;
@@ -961,6 +998,23 @@ const voiceChunksRef = useRef<Blob[]>([]);
     else if(Array.isArray(data)) setContestResults(data as ContestOption[]);
     setContestVoteBusy(false);
   };
+
+  useEffect(() => {
+    if (!pendingSharedContestId || !userId || !contests.length) return;
+    const sharedContest = contests.find(contest => contest.id === pendingSharedContestId);
+    if (sharedContest) {
+      void openContest(sharedContest);
+      setContestOpen(true);
+      setPendingSharedContestId(null);
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('contest');
+      cleanUrl.searchParams.delete('invite');
+      window.history.replaceState(window.history.state, '', cleanUrl.toString());
+    } else if (contests.length) {
+      setStatus('This contest may have expired or is no longer available.');
+      setPendingSharedContestId(null);
+    }
+  }, [pendingSharedContestId, userId, contests]);
 
   const isCurrentUserPremium = profiles.some(p => p.id === userId && p.premium_status === 'active');
 
@@ -1215,7 +1269,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (nicknameCheckError) { setStatus(`Could not verify nickname: ${nicknameCheckError.message}`); return; }
     if (nicknameAvailable === false) { setStatus('Nickname already taken. Choose another nickname.'); setStatusType('error'); return; }
     const { error } = await supabase.auth.signUp({ email, password, options: {
-      emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+      emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/${pendingSharedContestId ? `?contest=${encodeURIComponent(pendingSharedContestId)}&` : '?'}${inviteTokenFromUrl.current ? `invite=${encodeURIComponent(inviteTokenFromUrl.current)}` : ''}` : undefined,
       data: { nickname: requestedNickname, full_name: registration.full_name.trim(), phone: registration.phone.trim(), department: registration.department.trim(), level: registration.level.trim(), college: registration.college.trim(), school: registration.school.trim(), bio: registration.bio.trim(), rc_invite_token: inviteTokenFromUrl.current || null }
     }});
     if (error) {
@@ -3150,9 +3204,9 @@ async function playVoiceNote(message: ChatMessage) {
             {contestOptions.map((option,index)=><div className="rc-contest-option-editor" key={index}><label className="rc-contest-label">Option {index+1}<input value={option.caption} onChange={e=>setContestOptions(old=>{const next=old.map((o,i)=>i===index?{...o,caption:e.target.value}:o);if(index===old.length-1&&e.target.value.trim())next.push({caption:''});return next;})} placeholder="Type an answer…"/></label><label className="rc-contest-image-button"><ImagePlus size={16}/>{option.imageFile ? option.imageFile.name : 'Add option image'}<input type="file" accept="image/*" onChange={e=>setContestOptions(old=>old.map((o,i)=>i===index?{...o,imageFile:e.target.files?.[0]||null}:o))}/></label>{option.imageFile && <img className="rc-contest-option-preview" src={URL.createObjectURL(option.imageFile)} alt="Option preview"/>}</div>)}
             <button type="submit" className="rc-primary rc-full" disabled={contestBusy || !contestExpiresAt}>{contestBusy?'Publishing…':'Publish contest'}</button>
           </form></div>}
-          {!contestComposerOpen && <><section className="rc-contest-recent"><h2>Recent contests</h2><div className="rc-contest-strip">{contests.length?contests.map(contest=><button type="button" className="rc-contest-bubble" key={contest.id} onClick={()=>void openContest(contest)}>{contest.cover_image_path?<img src={contestImageUrl(contest.cover_image_path)} alt=""/>:<span className="rc-contest-no-cover"><Trophy size={22}/></span>}<strong>{contest.question}</strong><small>@{contest.author_nickname}</small></button>):<p className="rc-contest-empty">No contests have been published yet.</p>}</div></section><button type="button" className="rc-feature-fab" onClick={()=>setContestComposerOpen(true)}><Plus size={19}/> Add Contest</button></>}
+          {!contestComposerOpen && <><section className="rc-contest-recent"><h2>Recent contests</h2><div className="rc-contest-strip">{contests.length?contests.map(contest=><div className="rc-contest-share-row" key={contest.id}><button type="button" className="rc-contest-bubble" onClick={()=>void openContest(contest)}>{contest.cover_image_path?<img src={contestImageUrl(contest.cover_image_path)} alt=""/>:<span className="rc-contest-no-cover"><Trophy size={22}/></span>}<strong>{contest.question}</strong><small>@{contest.author_nickname}</small></button><button type="button" className="rc-contest-share-button" onClick={()=>void shareContest(contest)} aria-label="Share this contest"><Share2 size={17}/><span>Share</span></button></div>):<p className="rc-contest-empty">No contests have been published yet.</p>}</div></section><button type="button" className="rc-feature-fab" onClick={()=>setContestComposerOpen(true)}><Plus size={19}/> Add Contest</button></>}
         </>}
-        {activeContest && <section className="rc-contest-vote-card"><button type="button" className="rc-secondary" onClick={()=>{setActiveContest(null);setContestResults(null);}}> <ArrowLeft size={16}/> All contests</button>{activeContest.cover_image_path&&<img className="rc-contest-view-cover" src={contestImageUrl(activeContest.cover_image_path)} alt="Contest cover"/>}<h2>{activeContest.question}</h2><p className="rc-contest-author">Posted by @{activeContest.author_nickname}</p><div className="rc-contest-vote-options">{activeContest.options.map((option,index)=>{const result=contestResults?.find(r=>r.id===option.id);const pct=Number(result?.percentage)||0;const voted=!!contestResults;return <button type="button" key={option.id||index} className={`rc-contest-vote-option ${contestVotedOption===option.id?'selected':''} ${voted?'has-results':''}`} disabled={voted||!!contestVotedOption&&!!contestResults} onClick={()=>setContestVotedOption(option.id||null)}>{option.image_path&&<img src={contestImageUrl(option.image_path)} alt=""/>}<span className="rc-contest-vote-option-text">{option.caption}</span>{voted&&<><span className="rc-contest-result-track"><i style={{width:`${pct}%`}}/></span><small>{pct.toFixed(1)}% · {result?.votes||0} votes</small></>}</button>})}</div>{!contestResults&&<button type="button" className="rc-primary rc-full" disabled={!contestVotedOption||contestVoteBusy} onClick={()=>void voteContest()}>{contestVoteBusy?'Submitting vote…':'Vote'}</button>}{contestResults&&<p className="rc-contest-result-note">Current results · updated after your vote</p>}</section>}
+        {activeContest && <section className="rc-contest-vote-card"><button type="button" className="rc-secondary" onClick={()=>{setActiveContest(null);setContestResults(null);}}> <ArrowLeft size={16}/> All contests</button>{activeContest.cover_image_path&&<img className="rc-contest-view-cover" src={contestImageUrl(activeContest.cover_image_path)} alt="Contest cover"/>}<h2>{activeContest.question}</h2><p className="rc-contest-author">Posted by @{activeContest.author_nickname}</p><button type="button" className="rc-contest-share-button rc-contest-detail-share" onClick={()=>void shareContest(activeContest)}><Share2 size={17}/> Share this contest</button><div className="rc-contest-vote-options">{activeContest.options.map((option,index)=>{const result=contestResults?.find(r=>r.id===option.id);const pct=Number(result?.percentage)||0;const voted=!!contestResults;return <button type="button" key={option.id||index} className={`rc-contest-vote-option ${contestVotedOption===option.id?'selected':''} ${voted?'has-results':''}`} disabled={voted||!!contestVotedOption&&!!contestResults} onClick={()=>setContestVotedOption(option.id||null)}>{option.image_path&&<img src={contestImageUrl(option.image_path)} alt=""/>}<span className="rc-contest-vote-option-text">{option.caption}</span>{voted&&<><span className="rc-contest-result-track"><i style={{width:`${pct}%`}}/></span><small>{pct.toFixed(1)}% · {result?.votes||0} votes</small></>}</button>})}</div>{!contestResults&&<button type="button" className="rc-primary rc-full" disabled={!contestVotedOption||contestVoteBusy} onClick={()=>void voteContest()}>{contestVoteBusy?'Submitting vote…':'Vote'}</button>}{contestResults&&<p className="rc-contest-result-note">Current results · updated after your vote</p>}</section>}
       </div>
     </div>}
 
@@ -4658,6 +4712,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-contest-option-editor{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:11px;border:1px solid rgba(148,163,184,.16);border-radius:12px;background:rgba(3,10,20,.36)}
       .rc-contest-recent{margin:22px 0 8px;display:flex;flex-direction:column;gap:11px}.rc-contest-strip{display:flex;gap:10px;overflow-x:auto;padding:2px 1px 10px;scroll-snap-type:x mandatory}
       .rc-contest-bubble{flex:0 0 164px;display:flex;flex-direction:column;gap:7px;padding:8px;text-align:left;border:1px solid rgba(148,163,184,.2);border-radius:13px;background:#101d30;color:#f8fafc;scroll-snap-align:start}
+      .rc-contest-share-row{display:flex;align-items:stretch;gap:8px;width:100%}.rc-contest-share-row .rc-contest-bubble{flex:1;min-width:0}.rc-contest-share-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:76px;padding:10px 12px;border:1px solid rgba(96,165,250,.32);border-radius:12px;background:#10233b;color:#bfdbfe;font-size:11px;font-weight:800;cursor:pointer}.rc-contest-detail-share{align-self:flex-start;min-height:38px}
       .rc-contest-bubble>img,.rc-contest-no-cover{width:100%;aspect-ratio:16/5;object-fit:cover;border-radius:8px}.rc-contest-no-cover{display:grid;place-items:center;background:#152c4b;color:#93c5fd}
       .rc-contest-bubble strong{font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.rc-contest-bubble small{color:#93a4bd;font-size:10px}
       .rc-contest-empty{color:#94a3b8;font-size:12px}.rc-contest-view-cover{width:100%;aspect-ratio:16/5;object-fit:cover;border-radius:12px}.rc-contest-vote-card h2{margin:0;font-size:19px;line-height:1.35}.rc-contest-vote-options{display:flex;flex-direction:column;gap:9px}
@@ -4682,7 +4737,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-feature-compose-page .rc-contest-composer,.rc-feature-compose-page .rc-status-compose-page{width:min(100%,680px)!important;margin:0 auto!important}.rc-feature-compose-top{width:min(100%,680px)!important;margin:0 auto 14px!important;display:flex!important;align-items:center!important;gap:12px!important;color:#f8fafc!important;font-size:17px!important;font-weight:800!important}
       .rc-feature-fab{position:fixed!important;right:20px!important;bottom:calc(24px + env(safe-area-inset-bottom))!important;z-index:2147482600!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;min-height:50px!important;padding:0 18px!important;border:1px solid rgba(147,197,253,.38)!important;border-radius:999px!important;background:linear-gradient(135deg,#2563eb,#17428a)!important;color:#fff!important;font-size:13px!important;font-weight:800!important;box-shadow:0 10px 30px rgba(0,0,0,.38)!important}
       .rc-contest-recent{margin:4px 0 16px!important}.rc-contest-strip{display:flex!important;flex-direction:column!important;overflow:visible!important;gap:10px!important}
-      .rc-contest-bubble{width:100%!important;flex:0 0 auto!important;display:grid!important;grid-template-columns:116px minmax(0,1fr)!important;grid-template-rows:auto auto!important;align-items:center!important;column-gap:12px!important;text-align:left!important}
+      .rc-contest-share-row{display:flex!important;align-items:stretch!important;gap:8px!important}.rc-contest-share-row .rc-contest-bubble{width:auto!important;flex:1 1 0!important;min-width:0!important;display:grid!important;grid-template-columns:116px minmax(0,1fr)!important;grid-template-rows:auto auto!important;align-items:center!important;column-gap:12px!important;text-align:left!important}.rc-contest-share-button{flex:0 0 auto!important}
       .rc-contest-bubble>img,.rc-contest-no-cover{grid-row:1/3!important;grid-column:1!important;width:116px!important;aspect-ratio:16/5!important}
       .rc-contest-bubble strong{grid-column:2!important;grid-row:1!important}.rc-contest-bubble small{grid-column:2!important;grid-row:2!important}
       .rc-status-members-section{margin:0!important}.rc-status-member-row{min-height:64px!important}
