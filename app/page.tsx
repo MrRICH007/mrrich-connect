@@ -441,8 +441,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
       // Shared contest links carry the sender's unique invite token. Signed-out
       // visitors use the normal invitation registration/sign-in screen first.
       if (!authRedirect) {
+        // Load the shared contest first. The visitor chooses an answer and
+        // taps Vote before we send them to the normal invite signup screen.
         setAuthMode(token ? 'signup' : 'signin');
-        setShowContestAuth(true);
+        setShowContestAuth(false);
       }
       void loadContests();
     }
@@ -1027,15 +1029,18 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!supabase) return;
     const reopeningSameContest = activeContest?.id === contest.id;
     const selectedBeforeAuth = reopeningSameContest ? contestVotedOption : null;
+    let savedOption: string | null = null;
+    try { savedOption = sessionStorage.getItem(`rc_pending_contest_vote_${contest.id}`); } catch {}
     setActiveContest(contest);setContestResults(null);
-    if (!reopeningSameContest) setContestVotedOption(null);
+    if (!reopeningSameContest) setContestVotedOption(savedOption && contest.options.some(option => option.id === savedOption) ? savedOption : null);
     if (!userId) {
       // Public visitors can inspect the shared contest and choose an answer;
       // authentication is requested only when they attempt to submit the vote.
       return;
     }
     const {data:mine}=await supabase.from('rc_contest_votes').select('option_id').eq('contest_id',contest.id).eq('user_id',userId).maybeSingle();
-    setContestVotedOption(mine?.option_id || selectedBeforeAuth || null);
+    const restoredOption = savedOption && contest.options.some(option => option.id === savedOption) ? savedOption : null;
+    setContestVotedOption(mine?.option_id || restoredOption || selectedBeforeAuth || null);
     if (mine?.option_id) {
       const {data: voteData}=await supabase.rpc('rc_get_contest_results',{p_contest_id:contest.id});
       if(Array.isArray(voteData)) setContestResults(voteData as ContestOption[]);
@@ -1044,9 +1049,9 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const voteContest = async () => {
     if (!activeContest || !contestVotedOption) return;
     if (!userId) {
-      // If a session expires while voting, return to the same contest through
-      // its normal invite registration/sign-in flow rather than a forced URL
-      // redirect that can race Supabase session restoration.
+      // Preserve the selected answer and use the normal invitation signup
+      // screen. After authentication, the shared-contest loader restores it.
+      try { sessionStorage.setItem(`rc_pending_contest_vote_${activeContest.id}`, contestVotedOption); } catch {}
       setPendingSharedContestId(activeContest.id);
       setAuthMode(inviteTokenFromUrl.current ? 'signup' : 'signin');
       setShowContestAuth(true);
@@ -1064,7 +1069,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   };
 
   useEffect(() => {
-    if (!pendingSharedContestId || !contests.length) return;
+    if (!authReady || !pendingSharedContestId || !contests.length) return;
     const sharedContest = contests.find(contest => contest.id === pendingSharedContestId);
     if (sharedContest) {
       let savedOption: string | null = null;
@@ -1089,15 +1094,19 @@ const voiceChunksRef = useRef<Blob[]>([]);
         cleanUrl.searchParams.delete('auth');
         window.history.replaceState(window.history.state, '', cleanUrl.toString());
       } else {
+        // Signed-out visitors must see the contest, not the auth form yet.
+        // The Vote button is what opens the invite signup/sign-in screen.
+        setActiveContest(sharedContest);
+        setContestResults(null);
         setAuthMode(inviteTokenFromUrl.current ? 'signup' : 'signin');
-        setShowContestAuth(true);
+        setShowContestAuth(false);
       }
     } else {
       setStatus('This contest may have expired or is no longer available.');
       setStatusType('error');
       setPendingSharedContestId(null);
     }
-  }, [pendingSharedContestId, userId, contests]);
+  }, [authReady, pendingSharedContestId, userId, contests]);
 
 
   const isCurrentUserPremium = profiles.some(p => p.id === userId && p.premium_status === 'active');
