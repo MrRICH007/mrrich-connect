@@ -275,7 +275,9 @@ export default function Home() {
   const [supabase] = useState(() => { try { return createClient(); } catch { return null; } });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('auth') === 'signin' ? 'signin' : 'signin'
+  );
   const [registration, setRegistration] = useState({ nickname: '', full_name: '', phone: '', department: '', level: '', college: '', school: '', bio: '' });
   const [userId, setUserId] = useState<string | null>(null);
   const [nickname, setNickname] = useState('');
@@ -369,7 +371,12 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [contestResults, setContestResults] = useState<ContestOption[] | null>(null);
   const [contestVotedOption, setContestVotedOption] = useState<string | null>(null);
   const [pendingSharedContestId, setPendingSharedContestId] = useState<string | null>(null);
-  const [showContestAuth, setShowContestAuth] = useState(false);
+  const [showContestAuth, setShowContestAuth] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('auth') === 'signin'
+  );
+  const [forceContestAuth, setForceContestAuth] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('auth') === 'signin'
+  );
   const contestShareBusyRef = useRef<string | null>(null);
   const contestCoverInputRef = useRef<HTMLInputElement | null>(null);
   const [announcementPosition, setAnnouncementPosition] = useState<{ x: number; y: number } | null>(null);
@@ -414,13 +421,13 @@ const voiceChunksRef = useRef<Blob[]>([]);
     const authRedirect = params.get('auth') === 'signin';
     if (authRedirect) {
       // This URL is reached only after an unauthenticated visitor chooses Vote.
-      // Clear any stale cached Supabase session so the sign-in screen cannot
-      // be bypassed by a briefly restored user state.
+      // Keep the auth gate active from the first render. Do not sign out here:
+      // an asynchronous signOut can race getSession() and restore the contest view.
       setAuthMode('signin');
       setShowContestAuth(true);
+      setForceContestAuth(true);
       setStatus('Sign-in/up to vote');
       setStatusType('info');
-      void supabase?.auth.signOut();
     }
     if (token && /^[0-9a-f-]{36}$/i.test(token)) {
       inviteTokenFromUrl.current = token;
@@ -896,7 +903,17 @@ const voiceChunksRef = useRef<Blob[]>([]);
   async function signIn(e: FormEvent) {
     e.preventDefault(); if (!supabase) return;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setStatus(error ? error.message : 'Signed in successfully.');
+    if (error) {
+      setStatus(error.message);
+      setStatusType('error');
+      return;
+    }
+    setForceContestAuth(false);
+    setShowContestAuth(false);
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('auth');
+    window.history.replaceState(window.history.state, '', cleanUrl.toString());
+    setStatus('Signed in successfully.');
   }
   async function openInviteCard() {
     if (!supabase || !userId) return;
@@ -2635,7 +2652,7 @@ async function playVoiceNote(message: ChatMessage) {
       </div>,
       document.body
     )}
-    {!userId ? (pendingSharedContestId && activeContest && !showContestAuth ? <>
+    {(!userId || forceContestAuth) ? (pendingSharedContestId && activeContest && !showContestAuth && !forceContestAuth ? <>
       <header className="rc-mobile-header">
         <div className="rc-brand"><div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div><div className="rc-brand-type"><strong>MR RICH</strong><span>CONNECT</span></div></div>
         <button className="rc-small-login" onClick={() => { setShowContestAuth(true); setAuthMode('signin'); }}>Sign in</button>
