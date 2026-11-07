@@ -369,6 +369,7 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const [contestResults, setContestResults] = useState<ContestOption[] | null>(null);
   const [contestVotedOption, setContestVotedOption] = useState<string | null>(null);
   const [pendingSharedContestId, setPendingSharedContestId] = useState<string | null>(null);
+  const [showContestAuth, setShowContestAuth] = useState(false);
   const contestShareBusyRef = useRef<string | null>(null);
   const contestCoverInputRef = useRef<HTMLInputElement | null>(null);
   const [announcementPosition, setAnnouncementPosition] = useState<{ x: number; y: number } | null>(null);
@@ -931,7 +932,15 @@ const voiceChunksRef = useRef<Blob[]>([]);
     if (!supabase) return;
     const { data, error } = await supabase.from('rc_contests').select('id,author_id,question,cover_image_path,created_at,expires_at').eq('is_published', true).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(30);
     if (error) { setStatus(`Could not load contests: ${error.message}`); return; }
-    const rows = data || [];
+    const rows = [...(data || [])] as any[];
+    // A shared contest may be older than the 30-item recent list. Fetch that
+    // exact published contest as well so its unique link always opens it.
+    const sharedId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('contest') : null;
+    if (sharedId && !rows.some((row:any) => row.id === sharedId)) {
+      const { data: sharedRow, error: sharedError } = await supabase.from('rc_contests').select('id,author_id,question,cover_image_path,created_at,expires_at').eq('id', sharedId).eq('is_published', true).gt('expires_at', new Date().toISOString()).maybeSingle();
+      if (sharedError) { setStatus(`Could not load the shared contest: ${sharedError.message}`); return; }
+      if (sharedRow) rows.unshift(sharedRow);
+    }
     const ids = rows.map((r:any) => r.id);
     const { data: optionRows, error: optionError } = ids.length ? await supabase.from('rc_contest_options').select('id,contest_id,caption,image_path,position').in('contest_id', ids).order('position') : { data: [], error: null } as any;
     if (optionError) { setStatus(`Could not load contest options: ${optionError.message}`); return; }
@@ -981,16 +990,32 @@ const voiceChunksRef = useRef<Blob[]>([]);
   };
   const openContest = async (contest: CommunityContest) => {
     if (!supabase) return;
-    setActiveContest(contest);setContestResults(null);setContestVotedOption(null);
+    const reopeningSameContest = activeContest?.id === contest.id;
+    const selectedBeforeAuth = reopeningSameContest ? contestVotedOption : null;
+    setActiveContest(contest);setContestResults(null);
+    if (!reopeningSameContest) setContestVotedOption(null);
+    if (!userId) {
+      // Public visitors can inspect the shared contest and choose an answer;
+      // authentication is requested only when they attempt to submit the vote.
+      return;
+    }
     const {data:mine}=await supabase.from('rc_contest_votes').select('option_id').eq('contest_id',contest.id).eq('user_id',userId).maybeSingle();
-    setContestVotedOption(mine?.option_id || null);
+    setContestVotedOption(mine?.option_id || selectedBeforeAuth || null);
     if (mine?.option_id) {
       const {data: voteData}=await supabase.rpc('rc_get_contest_results',{p_contest_id:contest.id});
       if(Array.isArray(voteData)) setContestResults(voteData as ContestOption[]);
     }
   };
   const voteContest = async () => {
-    if(!supabase || !activeContest || !contestVotedOption) return;
+    if (!activeContest || !contestVotedOption) return;
+    if (!userId) {
+      setShowContestAuth(true);
+      setAuthMode('signin');
+      setStatus('Sign in or create an account to submit your vote. Your selected answer will be kept.');
+      setStatusType('info');
+      return;
+    }
+    if(!supabase) return;
     if (new Date(activeContest.expires_at).getTime() <= Date.now()) { setStatus('This contest has expired.'); setStatusType('error'); await loadContests(); setActiveContest(null); return; }
     setContestVoteBusy(true);
     const {data,error}=await supabase.rpc('rc_vote_contest',{p_contest_id:activeContest.id,p_option_id:contestVotedOption});
@@ -1000,21 +1025,28 @@ const voiceChunksRef = useRef<Blob[]>([]);
   };
 
   useEffect(() => {
-    if (!pendingSharedContestId || !userId || !contests.length) return;
+    if (!pendingSharedContestId || !contests.length) return;
     const sharedContest = contests.find(contest => contest.id === pendingSharedContestId);
     if (sharedContest) {
       void openContest(sharedContest);
       setContestOpen(true);
-      setPendingSharedContestId(null);
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete('contest');
-      cleanUrl.searchParams.delete('invite');
-      window.history.replaceState(window.history.state, '', cleanUrl.toString());
-    } else if (contests.length) {
+      // Keep the ID while signed out so the same contest can be reopened after
+      // authentication. The selected option remains in component state.
+      if (userId) {
+        setPendingSharedContestId(null);
+        setShowContestAuth(false);
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('contest');
+        cleanUrl.searchParams.delete('invite');
+        window.history.replaceState(window.history.state, '', cleanUrl.toString());
+      }
+    } else {
       setStatus('This contest may have expired or is no longer available.');
+      setStatusType('error');
       setPendingSharedContestId(null);
     }
   }, [pendingSharedContestId, userId, contests]);
+
 
   const isCurrentUserPremium = profiles.some(p => p.id === userId && p.premium_status === 'active');
 
@@ -2568,7 +2600,25 @@ async function playVoiceNote(message: ChatMessage) {
       onTouchMove={handlePageTouchMove}
       onTouchEnd={handlePageTouchEnd}
     >
-    {!userId ? <>
+    {!userId ? (pendingSharedContestId && activeContest && !showContestAuth ? <>
+      <header className="rc-mobile-header">
+        <div className="rc-brand"><div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div><div className="rc-brand-type"><strong>MR RICH</strong><span>CONNECT</span></div></div>
+        <button className="rc-small-login" onClick={() => { setShowContestAuth(true); setAuthMode('signin'); }}>Sign in</button>
+      </header>
+      <section className="rc-contest-screen rc-shared-public-contest">
+        <div className="rc-contest-content">
+          <section className="rc-contest-vote-card">
+            <span className="rc-eyebrow">SHARED CONTEST</span>
+            {activeContest.cover_image_path && <img className="rc-contest-view-cover" src={contestImageUrl(activeContest.cover_image_path)} alt="Contest cover"/>}
+            <h2>{activeContest.question}</h2>
+            <p className="rc-contest-author">Posted by @{activeContest.author_nickname}</p>
+            <div className="rc-contest-vote-options">{activeContest.options.map((option,index)=><button type="button" key={option.id||index} className={`rc-contest-vote-option ${contestVotedOption===option.id?'selected':''}`} onClick={()=>setContestVotedOption(option.id||null)}>{option.image_path&&<img src={contestImageUrl(option.image_path)} alt=""/>}<span className="rc-contest-vote-option-text">{option.caption}</span></button>)}</div>
+            <button type="button" className="rc-primary rc-full" disabled={!contestVotedOption || contestVoteBusy} onClick={()=>void voteContest()}>Sign in / Sign up to vote</button>
+            <p className="rc-muted">Choose an answer, then sign in or create an account to submit your vote. You'll return to this contest afterwards.</p>
+          </section>
+        </div>
+      </section>
+    </> : <>
     <header className="rc-mobile-header">
       <div className={`rc-brand ${isCurrentUserPremium ? 'rc-premium-brand' : ''}`}>
         <div className="rc-brand-mark"><MessageCircle size={31} strokeWidth={2.3}/><Wifi className="rc-logo-wifi" size={15} strokeWidth={3}/></div>
@@ -2610,7 +2660,7 @@ async function playVoiceNote(message: ChatMessage) {
         <small className="rc-privacy"><ShieldCheck size={14}/> Full name and phone are private. Email stays in your authentication account.</small>
       </form>
     </section>
-    </> : <div className="rc-swipe-viewport"><div className={`rc-swipe-stage ${pageSwipeAnimating ? 'is-swiping' : ''}`} style={{ transform: `translate3d(calc(-${(NAV_ITEMS.findIndex(item => item.name === tab) < 0 ? 0 : NAV_ITEMS.findIndex(item => item.name === tab)) * (100 / NAV_ITEMS.length)}% + ${pageSwipeOffset}px),0,0)` }}>
+    </>) : <div className="rc-swipe-viewport"><div className={`rc-swipe-stage ${pageSwipeAnimating ? 'is-swiping' : ''}`} style={{ transform: `translate3d(calc(-${(NAV_ITEMS.findIndex(item => item.name === tab) < 0 ? 0 : NAV_ITEMS.findIndex(item => item.name === tab)) * (100 / NAV_ITEMS.length)}% + ${pageSwipeOffset}px),0,0)` }}>
       {NAV_ITEMS.map((page, pageIndex) => {
         const activeIndex = NAV_ITEMS.findIndex(item => item.name === tab);
         const isActive = page.name === tab;
