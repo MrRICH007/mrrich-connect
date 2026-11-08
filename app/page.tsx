@@ -5058,11 +5058,6 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-chat-panel .rc-character-art{display:block!important;width:min(82vw,460px)!important;height:70%!important;max-height:70%!important;max-width:82vw!important;object-fit:contain!important;object-position:center bottom!important;overflow:visible!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.42))!important;flex:0 1 auto!important;}
       .rc-chat-panel .rc-chat-entrance-character{bottom:76px!important;}
       @media(prefers-reduced-motion:reduce){.rc-chat-panel .rc-chat-entrance-character{animation:none!important;display:none!important}}
-    `}
-
-
-
-
 
       /* Match conversation casing to the PERSONAL INVITATION card. Width/layout remain unchanged. */
       .rc-conversation-row {
@@ -5080,6 +5075,8 @@ async function playVoiceNote(message: ChatMessage) {
       }
       .rc-conversation-row::before,
       .rc-conversation-row::after { content: none !important; display: none !important; }
+    `}
+
 </style>
   </main>
 );
