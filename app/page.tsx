@@ -5064,6 +5064,22 @@ async function playVoiceNote(message: ChatMessage) {
 
 
 
+      /* Match conversation casing to the PERSONAL INVITATION card. Width/layout remain unchanged. */
+      .rc-conversation-row {
+        border: 1px solid rgba(148,163,184,.28) !important;
+        border-radius: 16px !important;
+        background: linear-gradient(120deg, rgba(45,48,55,.96), rgba(15,18,24,.96)) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 5px 16px rgba(0,0,0,.24) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      .rc-conversation-row.active {
+        border-color: rgba(148,163,184,.48) !important;
+        background: linear-gradient(120deg, rgba(58,62,70,.98), rgba(20,23,30,.98)) !important;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.045), 0 6px 18px rgba(0,0,0,.3) !important;
+      }
+      .rc-conversation-row::before,
+      .rc-conversation-row::after { content: none !important; display: none !important; }
 </style>
   </main>
 );
