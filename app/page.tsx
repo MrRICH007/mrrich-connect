@@ -2723,7 +2723,7 @@ async function playVoiceNote(message: ChatMessage) {
       </div>
     </header>
     <section className="rc-auth-layout">
-      <div className="rc-auth-intro"><span className="rc-eyebrow"><Sparkles size={14}/> YOUR CAMPUS. YOUR COMMUNITY.</span><h1>Find your people.<br/><em>Build your circle.</em></h1><p>Connect with people from your school and community.</p><div className="rc-auth-symbol"><MessageCircle size={58}/><Wifi size={25}/></div></div>
+      <div className="rc-auth-intro"><h1>Unlimited Campus Connection</h1><p>Connect with people from your school</p><div className="rc-auth-symbol"><MessageCircle size={58}/><Wifi size={25}/></div></div>
       {inviteTokenFromUrl.current && <section className="rc-incoming-invite-card" aria-label="Invitation preview">
         <span className="rc-eyebrow">PERSONAL INVITATION</span>
         <div className="rc-incoming-invite-person">
