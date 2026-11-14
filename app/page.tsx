@@ -386,6 +386,10 @@ const voiceChunksRef = useRef<Blob[]>([]);
   const announcementDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const announcementWasDragged = useRef(false);
   const [featuresMenuOpen, setFeaturesMenuOpen] = useState(false);
+  const [matchMakerOpen, setMatchMakerOpen] = useState(false);
+  const [matchFilters, setMatchFilters] = useState({ level: '', department: '', college: '', school: '' });
+  const [matchTraits, setMatchTraits] = useState<string[]>([]);
+  const [matchGenerated, setMatchGenerated] = useState(false);
   const [unreadAnnouncementCount, setUnreadAnnouncementCount] = useState(0);
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusComposerOpen, setStatusComposerOpen] = useState(false);
@@ -2677,6 +2681,20 @@ async function playVoiceNote(message: ChatMessage) {
   Math.max(0, Number(p.total_online_seconds || 0)) *
   (p.premium_status === 'active' ? 3 : 1);
 
+  const matchTraitOptions = ['Introvert','Extrovert','Quiet','Outspoken','Gentle','Active','Calm','Energetic','Funny','Serious','Creative','Analytical','Adventurous','Homebody','Friendly','Independent','Ambitious','Easy-going','Thoughtful','Confident','Empathetic','Talkative','Good listener','Sporty','Bookish'];
+  const generatedMatches = profiles.filter((person) => {
+    if (person.id === userId) return false;
+    if (matchFilters.level && person.level !== matchFilters.level) return false;
+    if (matchFilters.department && (person.department || '').toLocaleLowerCase() !== matchFilters.department.toLocaleLowerCase()) return false;
+    if (matchFilters.college && (person.college || '').toLocaleLowerCase() !== matchFilters.college.toLocaleLowerCase()) return false;
+    if (matchFilters.school && (person.school || '').toLocaleLowerCase() !== matchFilters.school.toLocaleLowerCase()) return false;
+    return true;
+  }).map(person => {
+    const about = `${person.bio || ''} ${person.department || ''}`.toLocaleLowerCase();
+    const traitScore = matchTraits.reduce((score, trait) => score + (about.includes(trait.toLocaleLowerCase()) ? 1 : 0), 0);
+    return { person, traitScore };
+  }).sort((a,b) => b.traitScore - a.traitScore || Number(b.person.premium_status === 'active') - Number(a.person.premium_status === 'active'));
+
   return (
     <main
       className="rc-shell"
@@ -3327,9 +3345,11 @@ async function playVoiceNote(message: ChatMessage) {
     {userId && tab === 'My Profile' && !selectedConversation && !showProfile && !showGroup && !marketplaceOpen && <button className="rc-floating-premium" onClick={() => setTab('Premium')}><Crown size={17}/> Premium</button>}
     {userId && !selectedConversation && !showProfile && !showGroup && !showEmojiPicker && !marketplaceOpen && !inviteOpen && <div className="rc-features-wrap" style={invitePosition ? { left: invitePosition.x, top: invitePosition.y, right: 'auto', bottom: 'auto' } : undefined}>
       <button type="button" className="rc-features-button" onPointerDown={e => { inviteWasDragged.current=false; const r=e.currentTarget.getBoundingClientRect(); inviteDrag.current={pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,originX:invitePosition?.x??r.left,originY:invitePosition?.y??r.top}; e.currentTarget.setPointerCapture(e.pointerId); }} onPointerMove={e=>{const d=inviteDrag.current;if(!d||d.pointerId!==e.pointerId)return;if(Math.abs(e.clientX-d.startX)>5||Math.abs(e.clientY-d.startY)>5)inviteWasDragged.current=true;const r=e.currentTarget.getBoundingClientRect();const minY=Math.min(220,Math.max(8,window.innerHeight-r.height-8));setInvitePosition({x:Math.max(8,Math.min(window.innerWidth-r.width-8,d.originX+e.clientX-d.startX)),y:Math.max(minY,Math.min(window.innerHeight-r.height-8,d.originY+e.clientY-d.startY))});}} onPointerUp={e=>{if(inviteDrag.current?.pointerId===e.pointerId)inviteDrag.current=null;}} onPointerCancel={()=>{inviteDrag.current=null;}} onClick={()=>{if(inviteWasDragged.current){inviteWasDragged.current=false;return;}setFeaturesMenuOpen(v=>!v);}} aria-label="Open Features menu" aria-expanded={featuresMenuOpen}><Sparkles size={22}/>{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount>99?'99+':unreadAnnouncementCount}</i>}</button>
-      {featuresMenuOpen&&<div className="rc-features-menu"><button onClick={()=>{setFeaturesMenuOpen(false);setContestOpen(true);setActiveContest(null);setContestResults(null);void loadContests();}}> <Trophy size={17}/> Contest</button><button onClick={()=>{setFeaturesMenuOpen(false);setStatusOpen(true);void loadStatuses();}}> <CircleDot size={17}/> Status</button><button onClick={()=>{setFeaturesMenuOpen(false);setMarketplaceOpen(true);}}><Store size={17}/> Marketplace</button><button onClick={()=>{setFeaturesMenuOpen(false);void openInviteCard();}}><UserPlus size={17}/> Invite</button><button onClick={()=>{setFeaturesMenuOpen(false);void loadAnnouncements();setAnnouncementOpen(true);setUnreadAnnouncementCount(0);}}><Megaphone size={17}/> Announcements{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount}</i>}</button></div>}
+      {featuresMenuOpen&&<div className="rc-features-menu"><button onClick={()=>{setFeaturesMenuOpen(false);setMatchMakerOpen(true);setMatchGenerated(false);}}> <Users size={17}/> Match Maker</button><button onClick={()=>{setFeaturesMenuOpen(false);setContestOpen(true);setActiveContest(null);setContestResults(null);void loadContests();}}> <Trophy size={17}/> Contest</button><button onClick={()=>{setFeaturesMenuOpen(false);setStatusOpen(true);void loadStatuses();}}> <CircleDot size={17}/> Status</button><button onClick={()=>{setFeaturesMenuOpen(false);setMarketplaceOpen(true);}}><Store size={17}/> Marketplace</button><button onClick={()=>{setFeaturesMenuOpen(false);void openInviteCard();}}><UserPlus size={17}/> Invite</button><button onClick={()=>{setFeaturesMenuOpen(false);void loadAnnouncements();setAnnouncementOpen(true);setUnreadAnnouncementCount(0);}}><Megaphone size={17}/> Announcements{unreadAnnouncementCount>0&&<i className="rc-features-badge">{unreadAnnouncementCount}</i>}</button></div>}
     </div>}
 
+
+    {userId && matchMakerOpen && <div className="rc-match-backdrop" onClick={()=>setMatchMakerOpen(false)}><section className="rc-match-panel" onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Match Maker"><header><div><span className="rc-match-kicker">MR RICH CONNECT</span><h2>Match Maker</h2><p>Discover people with a similar campus profile and personality.</p></div><button type="button" className="rc-match-close" onClick={()=>setMatchMakerOpen(false)} aria-label="Close"><X size={19}/></button></header><div className="rc-match-fields"><label>Level<select value={matchFilters.level} onChange={e=>setMatchFilters(v=>({...v,level:e.target.value}))}><option value="">Any level</option>{PROFILE_LEVELS.map(v=><option key={v} value={v}>{v}</option>)}</select></label><label>Department<select value={matchFilters.department} onChange={e=>setMatchFilters(v=>({...v,department:e.target.value}))}><option value="">Any department</option>{Array.from(new Set(profiles.map(p=>p.department).filter(Boolean) as string[])).sort().map(v=><option key={v} value={v}>{v}</option>)}</select></label><label>College / Faculty<select value={matchFilters.college} onChange={e=>setMatchFilters(v=>({...v,college:e.target.value}))}><option value="">Any college or faculty</option>{Array.from(new Set(profiles.map(p=>p.college).filter(Boolean) as string[])).sort().map(v=><option key={v} value={v}>{v}</option>)}</select></label><label>School<select value={matchFilters.school} onChange={e=>setMatchFilters(v=>({...v,school:e.target.value}))}><option value="">Any school</option>{Array.from(new Set(profiles.map(p=>p.school).filter(Boolean) as string[])).sort().map(v=><option key={v} value={v}>{v}</option>)}</select></label></div><div className="rc-match-traits"><strong>Personality preferences</strong><p>Select traits you would enjoy in a match. Matching checks profile bios for these self-described keywords.</p><div>{matchTraitOptions.map(trait=><label key={trait} className={matchTraits.includes(trait)?'selected':''}><input type="checkbox" checked={matchTraits.includes(trait)} onChange={e=>setMatchTraits(old=>e.target.checked?[...old,trait]:old.filter(t=>t!==trait))}/>{trait}</label>)}</div></div><button type="button" className="rc-match-generate" onClick={()=>setMatchGenerated(true)}><Sparkles size={17}/> Generate matches</button>{matchGenerated && <div className="rc-match-results"><strong>{generatedMatches.length} potential {generatedMatches.length===1?'match':'matches'} found</strong>{generatedMatches.length?generatedMatches.slice(0,30).map(({person,traitScore})=><div className="rc-match-person" key={person.id}>{person.avatar_url?<img src={person.avatar_url} alt=""/>:<span className="rc-match-avatar">{person.nickname.slice(0,1).toUpperCase()}</span>}<div><b>@{person.nickname}</b><small>{[person.level&&`${person.level} level`,person.department,person.college,person.school].filter(Boolean).join(' · ')}</small>{matchTraits.length>0&&<small>{traitScore?`${traitScore} personality keyword${traitScore===1?'':'s'} found in bio`:'No selected personality keywords found in bio'}</small>}</div><button type="button" onClick={()=>{setMatchMakerOpen(false);setTab('Discover');setDiscoverQuery(person.nickname);}}>View</button></div>):<p className="rc-match-empty">No profiles match those campus filters yet. Try widening your options.</p>}</div>}<p className="rc-match-note">Personality results are indicative only and depend on what members have written in their bios. They are not psychological assessments.</p></section></div>}
 
     {userId && contestOpen && <div className="rc-contest-screen">
       <header className="rc-contest-header"><button type="button" className="rc-icon-btn" onClick={()=>{if(contestComposerOpen){setContestComposerOpen(false);}else{setContestOpen(false);setActiveContest(null);}}} aria-label="Back"><ArrowLeft size={20}/></button><div><h1>Contests</h1><p>Share your choice. See the community result.</p></div></header>
@@ -5119,7 +5139,40 @@ async function playVoiceNote(message: ChatMessage) {
         background: rgba(147,197,253,.085) !important;
         box-shadow: inset 3px 0 0 rgba(147,197,253,.65) !important;
       }
+
+      /* App-wide neutral graphite grading; blue is reserved for brand, active states and emphasis. */
+      .rc-shell,.rc-shell main,.rc-shell section,.rc-shell .rc-page,.rc-shell .rc-panel,.rc-shell .rc-card,.rc-shell .rc-content,.rc-shell .rc-messages-layout,.rc-shell .rc-discover-panel,.rc-shell .rc-groups-panel,.rc-shell .rc-profile-panel,.rc-shell .rc-request-panel {
+        background-color:#090909 !important;
+      }
+      .rc-shell { background:linear-gradient(145deg,#000 0%,#101010 48%,#292929 100%) !important; color:#f5f5f5 !important; }
+      .rc-shell [class*="screen"],.rc-shell [class*="page"],.rc-shell [class*="panel"]:not(.rc-chat-panel),.rc-shell [class*="card"]:not(.rc-message-bubble) {
+        background-image:linear-gradient(145deg,rgba(255,255,255,.025),rgba(0,0,0,.12)) !important;
+      }
+      .rc-shell button:not(.rc-primary):not(.rc-bottom-item.active):not(.rc-features-button):not(.rc-match-generate):not(.rc-message-bubble):not(.rc-contest-vote-option.selected) {
+        background:#ededed !important;color:#101010 !important;border-color:rgba(255,255,255,.32) !important;
+      }
+      .rc-shell button:not(.rc-primary):not(.rc-bottom-item.active):not(.rc-features-button):not(.rc-match-generate) svg { color:inherit !important; }
+      .rc-shell .rc-primary,.rc-shell .rc-bottom-item.active,.rc-shell .rc-features-button,.rc-shell .rc-match-generate { background:linear-gradient(135deg,#2563eb,#17428a)!important;color:#fff!important; }
+      .rc-shell input:not([type=checkbox]):not([type=radio]),.rc-shell textarea,.rc-shell select { background:#111!important;color:#f5f5f5!important;border-color:#555!important; }
+      .rc-shell .rc-conversation-row { background:linear-gradient(100deg,#000 0%,#090909 50%,#292929 100%)!important;border-color:rgba(190,190,190,.24)!important; }
+      .rc-shell .rc-conversation-row.active { background:linear-gradient(100deg,#050505 0%,#171717 50%,#303030 100%)!important;border-color:rgba(96,165,250,.55)!important; }
+      /* A fixed grid header remains in view while the visual viewport shrinks for the keyboard. */
+      .rc-messages-layout.has-chat .rc-chat-panel { display:grid!important;grid-template-rows:64px minmax(0,1fr) auto!important;overflow:hidden!important;contain:none!important; }
+      .rc-messages-layout.has-chat .rc-chat-header { grid-row:1!important;position:sticky!important;top:0!important;align-self:start!important;z-index:2147481000!important;height:64px!important;min-height:64px!important;max-height:64px!important;background:linear-gradient(100deg,#080808,#242424)!important;border-bottom:1px solid rgba(255,255,255,.16)!important; }
+      .rc-messages-layout.has-chat .rc-chat-empty { grid-row:2!important;position:relative!important;isolation:isolate!important;background-color:#030407!important;background-image:radial-gradient(1px 1px at 8% 12%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 22% 38%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 41% 17%,#fff 98%,transparent),radial-gradient(2px 2px at 64% 31%,#bfdbfe 98%,transparent),radial-gradient(1px 1px at 79% 14%,#fff 98%,transparent),radial-gradient(1px 1px at 91% 58%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 14% 78%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 53% 72%,#fff 98%,transparent),radial-gradient(1px 1px at 88% 88%,#fff 98%,transparent),radial-gradient(ellipse at 50% 45%,rgba(30,45,75,.24),transparent 65%)!important;background-size:220px 190px,310px 270px,260px 230px,370px 300px,290px 250px,330px 280px,270px 240px,340px 290px,300px 260px,100% 100%!important; }
+      .rc-messages-layout.has-chat .rc-chat-empty:before { content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse at 18% 20%,rgba(45,70,110,.13),transparent 38%),radial-gradient(ellipse at 82% 72%,rgba(75,55,100,.10),transparent 40%); }
+      .rc-messages-layout.has-chat .rc-chat-empty>* { position:relative;z-index:1; }
+      .rc-match-backdrop { position:fixed;inset:0;z-index:2147483200;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.78);box-sizing:border-box; }
+      .rc-match-panel { width:min(100%,620px);max-height:88dvh;overflow:auto;padding:20px;border:1px solid #555;border-radius:22px;background:linear-gradient(145deg,#222,#090909)!important;color:#f7f7f7;box-shadow:0 24px 80px #000b; }
+      .rc-match-panel>header { display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px; }.rc-match-panel h2{margin:3px 0 5px;font-size:24px}.rc-match-panel header p,.rc-match-traits p,.rc-match-note{margin:0;color:#aaa;font-size:12px;line-height:1.5}.rc-match-kicker{font-size:10px;letter-spacing:.16em;color:#93c5fd;font-weight:900}.rc-match-close{width:38px;height:38px;border-radius:50%;display:grid;place-items:center}
+      .rc-match-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.rc-match-fields label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:800}.rc-match-fields select{min-height:43px;border:1px solid #555;border-radius:10px;padding:8px;color:#fff;background:#111}
+      .rc-match-traits{margin-top:20px}.rc-match-traits>strong{display:block;margin-bottom:4px}.rc-match-traits>div{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.rc-match-traits label{display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #555;border-radius:999px;background:#111;color:#ddd;font-size:11px}.rc-match-traits label.selected{border-color:#60a5fa;background:rgba(37,99,235,.2);color:#fff}.rc-match-traits input{accent-color:#2563eb}
+      .rc-match-generate{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:46px;margin:18px 0 12px;border:0;border-radius:12px;font-weight:900}.rc-match-results{padding-top:12px;border-top:1px solid #444}.rc-match-results>strong{display:block;margin-bottom:10px}.rc-match-person{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #333}.rc-match-person img,.rc-match-avatar{width:42px;height:42px;flex:0 0 42px;object-fit:cover;border-radius:50%;display:grid;place-items:center;background:#333;color:white;font-weight:900}.rc-match-person>div{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}.rc-match-person small{color:#aaa;font-size:10px;overflow-wrap:anywhere}.rc-match-person>button{padding:8px 12px;border-radius:9px;font-weight:800}.rc-match-empty{padding:16px 0;color:#aaa;font-size:12px}.rc-match-note{margin-top:12px}
+      @media(max-width:520px){.rc-match-fields{grid-template-columns:1fr}.rc-match-panel{padding:16px;max-height:90dvh}}
+
     `}
+
+
 
 </style>
   </main>
