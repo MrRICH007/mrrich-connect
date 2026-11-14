@@ -2790,8 +2790,8 @@ async function playVoiceNote(message: ChatMessage) {
     style={{
       display: 'flex',
       alignItems: 'stretch',
-      gap: 6,
-      marginBottom: 6,
+      gap: 0,
+      marginBottom: 0,
     }}
   >
     <button
@@ -5075,6 +5075,50 @@ async function playVoiceNote(message: ChatMessage) {
       }
       .rc-conversation-row::before,
       .rc-conversation-row::after { content: none !important; display: none !important; }
+
+      /* One shared liquid-glass casing for the entire scrollable inbox list. */
+      .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+        position: relative !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        border: 1px solid rgba(191,219,254,.22) !important;
+        border-radius: 20px !important;
+        background: linear-gradient(135deg, rgba(255,255,255,.105) 0%, rgba(148,163,184,.055) 38%, rgba(30,64,110,.12) 72%, rgba(255,255,255,.035) 100%) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.2), inset 0 -1px 0 rgba(96,165,250,.08), 0 10px 28px rgba(0,0,0,.2) !important;
+        backdrop-filter: blur(22px) saturate(155%) !important;
+        -webkit-backdrop-filter: blur(22px) saturate(155%) !important;
+        padding: 5px 0 calc(112px + env(safe-area-inset-bottom)) !important;
+        scrollbar-gutter: stable;
+        overscroll-behavior-y: contain !important;
+      }
+      .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {
+        margin: 0 !important;
+        gap: 0 !important;
+        border: 0 !important;
+        border-bottom: 1px solid rgba(203,213,225,.105) !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+      .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {
+        border-bottom: 0 !important;
+      }
+      .rc-messages-layout:not(.has-chat) .rc-conversation-row {
+        width: 100% !important;
+        min-height: 76px;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: rgba(147,197,253,.085) !important;
+        box-shadow: inset 3px 0 0 rgba(147,197,253,.65) !important;
+      }
     `}
 
 </style>
