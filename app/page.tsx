@@ -5282,6 +5282,48 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-shell .rc-group-participant-actions .rc-secondary{background:#101010!important;color:#fff!important;border:1px solid rgba(255,255,255,.25)!important}
       .rc-shell .rc-group-participant-actions .rc-icon-btn{width:34px;min-width:34px;padding:0!important}
 
+      /* Messages inbox: replace the old sparse star dots with a fixed Milky Way galaxy backdrop.
+         The list itself scrolls; its fixed-attachment background remains stationary. */
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+        position:relative!important;
+        isolation:isolate!important;
+        overflow-y:auto!important;
+        overflow-x:hidden!important;
+        background-color:#020207!important;
+        background-image:
+          radial-gradient(ellipse 78% 34% at 52% 49%,rgba(230,226,255,.23) 0%,rgba(160,166,220,.15) 18%,rgba(89,104,158,.12) 34%,rgba(42,48,86,.07) 51%,transparent 74%),
+          radial-gradient(ellipse 62% 23% at 47% 51%,rgba(207,211,255,.18) 0%,rgba(118,132,190,.12) 29%,transparent 72%),
+          radial-gradient(ellipse 35% 55% at 20% 18%,rgba(55,77,145,.16),transparent 72%),
+          radial-gradient(ellipse 39% 48% at 86% 82%,rgba(92,49,126,.14),transparent 73%),
+          linear-gradient(153deg,transparent 24%,rgba(80,91,151,.08) 36%,rgba(183,184,222,.13) 46%,rgba(226,222,255,.19) 50%,rgba(110,121,177,.12) 55%,rgba(38,47,91,.08) 64%,transparent 77%),
+          radial-gradient(1px 1px at 4% 8%,rgba(255,255,255,.95) 98%,transparent 100%),
+          radial-gradient(1px 1px at 11% 72%,rgba(222,231,255,.9) 98%,transparent 100%),
+          radial-gradient(1.5px 1.5px at 19% 29%,rgba(255,255,255,.95) 98%,transparent 100%),
+          radial-gradient(1px 1px at 27% 91%,rgba(205,218,255,.9) 98%,transparent 100%),
+          radial-gradient(1px 1px at 34% 13%,rgba(255,255,255,.85) 98%,transparent 100%),
+          radial-gradient(1.5px 1.5px at 42% 78%,rgba(255,255,255,.95) 98%,transparent 100%),
+          radial-gradient(1px 1px at 51% 22%,rgba(220,228,255,.95) 98%,transparent 100%),
+          radial-gradient(1px 1px at 59% 94%,rgba(255,255,255,.9) 98%,transparent 100%),
+          radial-gradient(1.5px 1.5px at 67% 38%,rgba(255,255,255,.95) 98%,transparent 100%),
+          radial-gradient(1px 1px at 74% 8%,rgba(215,225,255,.9) 98%,transparent 100%),
+          radial-gradient(1px 1px at 82% 68%,rgba(255,255,255,.95) 98%,transparent 100%),
+          radial-gradient(1.5px 1.5px at 91% 31%,rgba(226,231,255,.95) 98%,transparent 100%),
+          radial-gradient(1px 1px at 97% 88%,rgba(255,255,255,.9) 98%,transparent 100%),
+          radial-gradient(ellipse at 50% 50%,rgba(3,4,12,.06),rgba(0,0,0,.52) 100%)!important;
+        background-size:100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,
+          173px 157px,211px 193px,257px 229px,293px 263px,337px 307px,
+          379px 347px,421px 383px,467px 421px,509px 463px,557px 503px,
+          601px 547px,647px 587px,691px 631px,100% 100%!important;
+        background-position:center top!important;
+        background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,no-repeat!important;
+        background-attachment:fixed!important;
+        box-shadow:inset 0 0 55px rgba(0,0,0,.48)!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > * {position:relative!important;z-index:1!important}
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {background:rgba(2,3,9,.13)!important}
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row {background:rgba(3,4,12,.24)!important}
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {background:rgba(37,99,235,.17)!important}
+
     `}
 
 
