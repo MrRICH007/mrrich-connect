@@ -4647,20 +4647,22 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-messages-layout.has-chat .rc-chat-panel{display:flex!important;flex-direction:column!important;overflow:hidden!important;min-height:0!important}
       .rc-messages-layout.has-chat .rc-chat-header{position:relative!important;flex:0 0 auto!important;top:auto!important;z-index:40!important;transform:none!important;min-height:62px!important;max-height:92px!important}
       .rc-messages-layout.has-chat .rc-chat-empty{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important}
-       /* Conversation cards: opaque surfaces with an individual broken blue neon outline. */
+       /* Conversation entries stay transparent; the list itself provides the glass casing. */
        .rc-conversation-row {
-         background:#0b1424!important;
-         border:1px dashed rgba(96,165,250,.58)!important;
-         border-radius:14px!important;
-         box-shadow:0 0 9px rgba(37,99,235,.12)!important;
+         background:transparent!important;
+         background-color:transparent!important;
+         border:0!important;
+         border-radius:0!important;
+         box-shadow:none!important;
          backdrop-filter:none!important;
          -webkit-backdrop-filter:none!important;
        }
        .rc-conversation-row::before,.rc-conversation-row::after { content:none!important;display:none!important; }
        .rc-conversation-row.active {
-         background:#10203a!important;
-         border-color:rgba(96,165,250,.9)!important;
-         box-shadow:0 0 13px rgba(37,99,235,.24)!important;
+         background:rgba(255,255,255,.045)!important;
+         background-color:rgba(255,255,255,.045)!important;
+         border:0!important;
+         box-shadow:none!important;
        }
        .rc-conversation-row-wrap { background:transparent!important; }
 
@@ -5197,8 +5199,6 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-shell button:not(.rc-primary):not(.rc-bottom-item.active):not(.rc-features-button):not(.rc-match-generate) svg { color:inherit !important; }
       .rc-shell .rc-primary,.rc-shell .rc-bottom-item.active,.rc-shell .rc-features-button,.rc-shell .rc-match-generate { background:linear-gradient(135deg,#2563eb,#17428a)!important;color:#fff!important; }
       .rc-shell input:not([type=checkbox]):not([type=radio]),.rc-shell textarea,.rc-shell select { background:#111!important;color:#f5f5f5!important;border-color:#555!important; }
-      .rc-shell .rc-conversation-row { background:linear-gradient(100deg,#000 0%,#090909 50%,#292929 100%)!important;border-color:rgba(190,190,190,.24)!important; }
-      .rc-shell .rc-conversation-row.active { background:linear-gradient(100deg,#050505 0%,#171717 50%,#303030 100%)!important;border-color:rgba(96,165,250,.55)!important; }
       /* A fixed grid header remains in view while the visual viewport shrinks for the keyboard. */
       .rc-messages-layout.has-chat .rc-chat-panel { display:grid!important;grid-template-rows:64px minmax(0,1fr) auto!important;overflow:hidden!important;contain:none!important; }
       .rc-messages-layout.has-chat .rc-chat-header { grid-row:1!important;position:sticky!important;top:0!important;align-self:start!important;z-index:2147481000!important;height:64px!important;min-height:64px!important;max-height:64px!important;background:linear-gradient(100deg,#080808,#242424)!important;border-bottom:1px solid rgba(255,255,255,.16)!important; }
@@ -5230,7 +5230,7 @@ async function playVoiceNote(message: ChatMessage) {
         radial-gradient(1px 1px at 3% 7%,#fff 98%,transparent),radial-gradient(1px 1px at 9% 24%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 16% 11%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 23% 42%,#e0e7ff 98%,transparent),radial-gradient(1px 1px at 31% 18%,#fff 98%,transparent),radial-gradient(1px 1px at 38% 66%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 46% 9%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 53% 34%,#fff 98%,transparent),radial-gradient(1px 1px at 61% 78%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 69% 15%,#fff 98%,transparent),radial-gradient(1px 1px at 76% 51%,#e0e7ff 98%,transparent),radial-gradient(1.5px 1.5px at 84% 27%,#fff 98%,transparent),radial-gradient(1px 1px at 92% 8%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 97% 72%,#fff 98%,transparent),radial-gradient(1px 1px at 12% 88%,#fff 98%,transparent),radial-gradient(1px 1px at 34% 91%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 58% 94%,#fff 98%,transparent),radial-gradient(1px 1px at 88% 91%,#dbeafe 98%,transparent),radial-gradient(2px 2px at 27% 73%,#bfdbfe 98%,transparent),radial-gradient(2px 2px at 73% 39%,#fff 98%,transparent),radial-gradient(ellipse at 50% 45%,rgba(30,45,75,.2),transparent 68%) !important; background-size:173px 151px,211px 197px,239px 223px,281px 247px,307px 269px,337px 293px,367px 317px,397px 347px,427px 373px,457px 397px,487px 421px,517px 449px,547px 477px,577px 503px,607px 529px,637px 557px,667px 583px,697px 607px,100% 100%,100% 100%,100% 100% !important; }
 
       .rc-mobile-header{background:#000!important;background-image:none!important}
-      .rc-conversation-list{position:relative;isolation:isolate;background-color:#030406!important;background-image:radial-gradient(1px 1px at 8% 12%,rgba(255,255,255,.8) 98%,transparent),radial-gradient(1px 1px at 19% 73%,rgba(219,234,254,.75) 98%,transparent),radial-gradient(1.5px 1.5px at 31% 29%,rgba(255,255,255,.9) 98%,transparent),radial-gradient(1px 1px at 44% 86%,rgba(255,255,255,.65) 98%,transparent),radial-gradient(1px 1px at 57% 17%,rgba(219,234,254,.8) 98%,transparent),radial-gradient(1.5px 1.5px at 69% 62%,rgba(255,255,255,.9) 98%,transparent),radial-gradient(1px 1px at 82% 38%,rgba(255,255,255,.75) 98%,transparent),radial-gradient(1px 1px at 94% 91%,rgba(219,234,254,.7) 98%,transparent);background-size:193px 177px,227px 211px,263px 239px,307px 281px,349px 317px,397px 359px,443px 401px,487px 443px!important;background-attachment:fixed!important}
+      /* The inbox glass casing is defined in the canonical rule-set below. */
       .rc-conversation-list>*{position:relative;z-index:1}
       .rc-group-row-wrap{align-items:center!important}
       .rc-group-row-actions{display:flex;flex:0 0 78px;flex-direction:column;align-items:stretch;justify-content:center;gap:5px;padding:7px 6px;border:1px solid rgba(255,255,255,.12);border-radius:0 13px 13px 0;background:rgba(0,0,0,.42);height:100%;min-height:68px}
@@ -5406,6 +5406,21 @@ async function playVoiceNote(message: ChatMessage) {
         }
       }
 
+
+      /* Final guard: transparent conversation contents, with the glass casing preserved on the list. */
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap,
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child,
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row {
+        background:transparent!important;
+        background-color:transparent!important;
+        background-image:none!important;
+        border:0!important;
+        box-shadow:none!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
+        background:rgba(255,255,255,.045)!important;
+        background-color:rgba(255,255,255,.045)!important;
+      }
 
       /* Remove the opaque page-panel layer behind the inbox glass.
          The list keeps its own translucent glass surface; its ancestors must
