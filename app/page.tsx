@@ -2862,6 +2862,7 @@ async function playVoiceNote(message: ChatMessage) {
       {page.name === 'Messages' && activeAds.filter(ad => ad.media_type === 'image' && ad.target_url).slice(0, 1).map(ad => <div key={ad.id} className="rc-message-ad-banner" style={{margin:'0 0 12px',width:'100%',aspectRatio:'16 / 9',maxHeight:260,overflow:'hidden',borderRadius:14,border:'1px solid #23365a',background:'#0b1222'}}><a href={ad.target_url || '#'} target="_blank" rel="noopener noreferrer" aria-label={`Open advert: ${ad.title}`} style={{display:'block',width:'100%',height:'100%'}}><img src={ad.media_path} alt={ad.title} style={{display:'block',width:'100%',height:'100%',objectFit:'cover'}}/></a></div>)}
 
       {page.name === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''} ${chatExiting ? 'chat-exiting' : ''}`}>
+        <div className="rc-inbox-glass-frame">
         <aside className="rc-conversation-list">
           {conversationList.map(convo => (
   <div
@@ -2987,6 +2988,7 @@ async function playVoiceNote(message: ChatMessage) {
 ))}
           {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
         </aside>
+        </div>
         <section className="rc-chat-panel">
           {selectedConversation ? <>{chatEntranceCharacter && <div className={`rc-chat-entrance-character rc-chat-entrance-${chatEntranceCharacter}`} aria-hidden="true"><ChatEntranceArt character={chatEntranceCharacter}/></div>}<header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={closeConversationWithMotion} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} style={{cursor:selectedConversation.kind === 'person' ? 'pointer' : 'default'}}>{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><button type="button" className="rc-chat-header-copy rc-chat-profile-trigger" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); else { const group = groups.find(g => g.conversation_id === selectedConversation.id); if (group) void openGroupInfo(group); } }}><strong>{selectedConversation.title}{selectedConversation.kind === 'person' && profiles.find(p => p.id === selectedConversation.otherUserId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={16} />}</strong><small>{selectedConversation.kind === 'group' ? 'View group description & participants' : 'View public profile'}</small></button>
 {selectedConversation.kind === 'person' && selectedConversation.otherUserId && (
@@ -5408,84 +5410,76 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::-webkit-scrollbar-thumb {background:rgba(255,255,255,.22)!important;border-radius:99px!important}
 
 
-      /* FINAL OVERRIDE — shared colourless water-glass casing for the inbox.
-         Keep this after every mobile layout rule so no later reset can flatten it. */
-      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) > .rc-conversation-list {
+      /* Stationary, borderless liquid-glass shell. Only the conversation contents scroll. */
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) {
+        display:block!important;
+        overflow:visible!important;
+        min-height:0!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame {
         position:relative!important;
         isolation:isolate!important;
         box-sizing:border-box!important;
-        width:calc(100% - 14px)!important;
-        max-width:calc(100% - 14px)!important;
-        margin:8px 7px 14px!important;
-        padding:0 0 calc(104px + env(safe-area-inset-bottom))!important;
-        border:1px solid rgba(255,255,255,.38)!important;
-        border-radius:24px!important;
-        background:rgba(255,255,255,.035)!important;
-        background-image:none!important;
-        box-shadow:
-          inset 0 1.5px 1px rgba(255,255,255,.52),
-          inset 1px 0 1px rgba(255,255,255,.19),
-          inset -1px 0 1px rgba(255,255,255,.16),
-          inset 0 -1px 2px rgba(255,255,255,.22),
-          0 12px 34px rgba(0,0,0,.24)!important;
-        -webkit-backdrop-filter:blur(24px) saturate(100%)!important;
-        backdrop-filter:blur(24px) saturate(100%)!important;
-        overflow:visible!important;
-        scrollbar-gutter:stable;
-      }
-      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) > .rc-conversation-list::before {
-        content:""!important;
-        display:block!important;
-        position:absolute!important;
-        inset:0!important;
-        z-index:0!important;
-        border-radius:inherit!important;
-        pointer-events:none!important;
-        background:
-          radial-gradient(ellipse 88% 16% at 50% 0%,rgba(255,255,255,.19),transparent 78%),
-          radial-gradient(ellipse 54% 13% at 13% 42%,rgba(255,255,255,.075),transparent 82%),
-          radial-gradient(ellipse 58% 15% at 91% 76%,rgba(255,255,255,.065),transparent 84%),
-          linear-gradient(108deg,transparent 0%,rgba(255,255,255,.035) 23%,transparent 40%,rgba(255,255,255,.045) 68%,transparent 100%)!important;
-      }
-      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) > .rc-conversation-list::after {
-        content:""!important;
-        position:absolute!important;
-        inset:0!important;
-        z-index:3!important;
-        border:1px solid rgba(255,255,255,.13)!important;
-        border-radius:inherit!important;
-        pointer-events:none!important;
-        box-shadow:inset 0 0 0 1px rgba(255,255,255,.035),0 0 16px rgba(255,255,255,.045)!important;
-      }
-      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) > .rc-conversation-list > * {
-        position:relative!important;
-        z-index:1!important;
-      }
-      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {
-        margin:0!important;
-        border:0!important;
-        border-bottom:1px solid rgba(255,255,255,.115)!important;
-        border-radius:0!important;
-        background:transparent!important;
-        box-shadow:none!important;
-      }
-      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {
-        border-bottom:0!important;
-      }
-      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row,
-      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
         width:100%!important;
-        min-height:76px!important;
+        height:calc(var(--rc-visual-height,100dvh) - 330px)!important;
+        min-height:220px!important;
+        max-height:calc(var(--rc-visual-height,100dvh) - 250px)!important;
+        margin:10px 0 calc(104px + env(safe-area-inset-bottom))!important;
+        padding:0!important;
         border:0!important;
-        border-radius:0!important;
-        background:transparent!important;
-        box-shadow:none!important;
-        -webkit-backdrop-filter:none!important;
-        backdrop-filter:none!important;
+        border-radius:28px!important;
+        background:rgba(255,255,255,.018)!important;
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(255,255,255,.10),0 18px 44px rgba(0,0,0,.20)!important;
+        overflow:hidden!important;
+        -webkit-backdrop-filter:blur(26px) saturate(100%)!important;
+        backdrop-filter:blur(26px) saturate(100%)!important;
       }
-      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
-        background:rgba(255,255,255,.055)!important;
-        box-shadow:inset 2px 0 0 rgba(255,255,255,.48)!important;
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame::before {
+        content:""!important;position:absolute!important;inset:0!important;z-index:0!important;pointer-events:none!important;border-radius:inherit!important;
+        background:
+          radial-gradient(ellipse 78% 20% at 18% 0%,rgba(255,255,255,.22),transparent 76%),
+          radial-gradient(ellipse 55% 17% at 82% 8%,rgba(255,255,255,.13),transparent 78%),
+          radial-gradient(ellipse 45% 30% at 0% 52%,rgba(255,255,255,.09),transparent 78%),
+          radial-gradient(ellipse 42% 28% at 100% 76%,rgba(255,255,255,.085),transparent 80%),
+          linear-gradient(118deg,transparent 8%,rgba(255,255,255,.075) 21%,rgba(255,255,255,.012) 32%,transparent 43%,rgba(255,255,255,.055) 69%,transparent 82%),
+          linear-gradient(180deg,rgba(255,255,255,.055),transparent 22%,transparent 78%,rgba(255,255,255,.035));
+        filter:blur(.25px);
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame::after {
+        content:""!important;position:absolute!important;inset:0!important;z-index:3!important;pointer-events:none!important;border-radius:inherit!important;
+        background:
+          radial-gradient(ellipse 32% 8% at 26% 1%,rgba(255,255,255,.30),transparent 85%),
+          radial-gradient(ellipse 24% 7% at 78% 99%,rgba(255,255,255,.19),transparent 86%),
+          linear-gradient(104deg,transparent 0 16%,rgba(255,255,255,.10) 18%,transparent 20% 58%,rgba(255,255,255,.07) 61%,transparent 64%);
+        box-shadow:inset 0 0 24px rgba(255,255,255,.055),inset 0 1px 2px rgba(255,255,255,.22);
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame > .rc-conversation-list {
+        position:relative!important;z-index:1!important;display:flex!important;flex-direction:column!important;gap:0!important;
+        box-sizing:border-box!important;width:100%!important;height:100%!important;min-height:0!important;max-height:100%!important;
+        margin:0!important;padding:4px 0 calc(12px + env(safe-area-inset-bottom))!important;
+        border:0!important;border-radius:inherit!important;background:transparent!important;background-image:none!important;box-shadow:none!important;
+        overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;
+        overscroll-behavior-y:contain!important;touch-action:pan-y!important;scrollbar-gutter:stable!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame .rc-conversation-list::before,
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame .rc-conversation-list::after {content:none!important;display:none!important}
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame .rc-conversation-row-wrap {
+        position:relative!important;z-index:1!important;flex:0 0 auto!important;margin:0!important;border:0!important;
+        border-bottom:1px solid rgba(255,255,255,.105)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame .rc-conversation-row-wrap:last-child {border-bottom:0!important}
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame .rc-conversation-row,
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame .rc-conversation-row.active {
+        width:100%!important;min-height:76px!important;border:0!important;border-radius:0!important;background:transparent!important;
+        box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame .rc-conversation-row.active {
+        background:rgba(255,255,255,.045)!important;box-shadow:inset 2px 0 0 rgba(255,255,255,.38)!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame .rc-conversation-list::-webkit-scrollbar {width:3px!important}
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame .rc-conversation-list::-webkit-scrollbar-thumb {background:rgba(255,255,255,.18)!important;border-radius:99px!important}
+      @media(max-width:800px){
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-inbox-glass-frame {height:calc(var(--rc-visual-height,100dvh) - 330px)!important;max-height:calc(var(--rc-visual-height,100dvh) - 260px)!important;margin-top:8px!important}
       }
 
     `}
