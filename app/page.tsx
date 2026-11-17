@@ -5406,6 +5406,88 @@ async function playVoiceNote(message: ChatMessage) {
         box-shadow:inset 2px 0 0 rgba(255,255,255,.62)!important;
       }
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::-webkit-scrollbar-thumb {background:rgba(255,255,255,.22)!important;border-radius:99px!important}
+
+
+      /* FINAL OVERRIDE — shared colourless water-glass casing for the inbox.
+         Keep this after every mobile layout rule so no later reset can flatten it. */
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) > .rc-conversation-list {
+        position:relative!important;
+        isolation:isolate!important;
+        box-sizing:border-box!important;
+        width:calc(100% - 14px)!important;
+        max-width:calc(100% - 14px)!important;
+        margin:8px 7px 14px!important;
+        padding:0 0 calc(104px + env(safe-area-inset-bottom))!important;
+        border:1px solid rgba(255,255,255,.38)!important;
+        border-radius:24px!important;
+        background:rgba(255,255,255,.035)!important;
+        background-image:none!important;
+        box-shadow:
+          inset 0 1.5px 1px rgba(255,255,255,.52),
+          inset 1px 0 1px rgba(255,255,255,.19),
+          inset -1px 0 1px rgba(255,255,255,.16),
+          inset 0 -1px 2px rgba(255,255,255,.22),
+          0 12px 34px rgba(0,0,0,.24)!important;
+        -webkit-backdrop-filter:blur(24px) saturate(100%)!important;
+        backdrop-filter:blur(24px) saturate(100%)!important;
+        overflow:visible!important;
+        scrollbar-gutter:stable;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) > .rc-conversation-list::before {
+        content:""!important;
+        display:block!important;
+        position:absolute!important;
+        inset:0!important;
+        z-index:0!important;
+        border-radius:inherit!important;
+        pointer-events:none!important;
+        background:
+          radial-gradient(ellipse 88% 16% at 50% 0%,rgba(255,255,255,.19),transparent 78%),
+          radial-gradient(ellipse 54% 13% at 13% 42%,rgba(255,255,255,.075),transparent 82%),
+          radial-gradient(ellipse 58% 15% at 91% 76%,rgba(255,255,255,.065),transparent 84%),
+          linear-gradient(108deg,transparent 0%,rgba(255,255,255,.035) 23%,transparent 40%,rgba(255,255,255,.045) 68%,transparent 100%)!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) > .rc-conversation-list::after {
+        content:""!important;
+        position:absolute!important;
+        inset:0!important;
+        z-index:3!important;
+        border:1px solid rgba(255,255,255,.13)!important;
+        border-radius:inherit!important;
+        pointer-events:none!important;
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.035),0 0 16px rgba(255,255,255,.045)!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) > .rc-conversation-list > * {
+        position:relative!important;
+        z-index:1!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {
+        margin:0!important;
+        border:0!important;
+        border-bottom:1px solid rgba(255,255,255,.115)!important;
+        border-radius:0!important;
+        background:transparent!important;
+        box-shadow:none!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {
+        border-bottom:0!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row,
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
+        width:100%!important;
+        min-height:76px!important;
+        border:0!important;
+        border-radius:0!important;
+        background:transparent!important;
+        box-shadow:none!important;
+        -webkit-backdrop-filter:none!important;
+        backdrop-filter:none!important;
+      }
+      .rc-shell .rc-tab-panel:has(.rc-messages-layout:not(.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
+        background:rgba(255,255,255,.055)!important;
+        box-shadow:inset 2px 0 0 rgba(255,255,255,.48)!important;
+      }
+
     `}
 
 
