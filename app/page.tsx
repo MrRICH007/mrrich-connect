@@ -5405,6 +5405,33 @@ async function playVoiceNote(message: ChatMessage) {
           z-index:1!important;
         }
       }
+
+
+      /* Remove the opaque page-panel layer behind the inbox glass.
+         The list keeps its own translucent glass surface; its ancestors must
+         remain transparent so they cannot paint a black rectangle over it. */
+      @media (max-width:800px) {
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) {
+          background:transparent!important;
+          background-color:transparent!important;
+          background-image:none!important;
+          box-shadow:none!important;
+        }
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) > .rc-messages-layout:not(.has-chat) {
+          background:transparent!important;
+          background-color:transparent!important;
+          background-image:none!important;
+          box-shadow:none!important;
+        }
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) .rc-conversation-row-wrap,
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) .rc-empty-conversations {
+          background:transparent!important;
+          background-color:transparent!important;
+          background-image:none!important;
+          box-shadow:none!important;
+        }
+      }
+
     `}
 
 
