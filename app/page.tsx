@@ -5407,7 +5407,19 @@ async function playVoiceNote(message: ChatMessage) {
       }
 
 
-      /* Final guard: transparent conversation contents, with the glass casing preserved on the list. */
+      /* Final inbox transparency fix:
+         Keep the list's glass casing (border, blur and glass edge shadows),
+         but do not paint any dark/tinted panel behind the conversation rows. */
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+        background:transparent!important;
+        background-color:transparent!important;
+        background-image:none!important;
+        -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
+        backdrop-filter:blur(24px) saturate(150%)!important;
+        border:1px solid rgba(220,235,255,.25)!important;
+        border-radius:25px!important;
+        box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.10),inset -1px 0 1px rgba(190,215,255,.09),inset 0 -1px 2px rgba(255,255,255,.12),0 12px 30px rgba(0,0,0,.22)!important;
+      }
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap,
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child,
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row {
@@ -5420,6 +5432,18 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
         background:rgba(255,255,255,.045)!important;
         background-color:rgba(255,255,255,.045)!important;
+      }
+      @media (max-width:800px) {
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+          background:transparent!important;
+          background-color:transparent!important;
+          background-image:none!important;
+          -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
+          backdrop-filter:blur(24px) saturate(150%)!important;
+          border:1px solid rgba(220,235,255,.25)!important;
+          border-radius:25px!important;
+          box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.10),inset -1px 0 1px rgba(190,215,255,.09),inset 0 -1px 2px rgba(255,255,255,.12),0 12px 30px rgba(0,0,0,.22)!important;
+        }
       }
 
       /* Remove the opaque page-panel layer behind the inbox glass.
@@ -5445,6 +5469,32 @@ async function playVoiceNote(message: ChatMessage) {
           background-image:none!important;
           box-shadow:none!important;
         }
+      }
+
+      /* Final inbox transparency override: retain the glass casing, remove the black fill. */
+      .rc-shell aside.rc-conversation-list,
+      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list {
+        background:transparent!important;
+        background-color:transparent!important;
+        background-image:none!important;
+        background-blend-mode:normal!important;
+      }
+      .rc-shell aside.rc-conversation-list::before,
+      .rc-shell aside.rc-conversation-list::after,
+      .rc-shell aside.rc-conversation-list .rc-conversation-row-wrap,
+      .rc-shell aside.rc-conversation-list .rc-conversation-row {
+        background:transparent!important;
+        background-color:transparent!important;
+        background-image:none!important;
+      }
+      .rc-shell aside.rc-conversation-list .rc-conversation-row {
+        box-shadow:none!important;
+        backdrop-filter:none!important;
+        -webkit-backdrop-filter:none!important;
+      }
+      .rc-shell aside.rc-conversation-list .rc-conversation-row.active {
+        background:rgba(255,255,255,.045)!important;
+        background-color:rgba(255,255,255,.045)!important;
       }
 
     `}
