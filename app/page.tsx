@@ -5250,229 +5250,160 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-hold-hint{font-size:9px!important;white-space:nowrap}
 
 
-      /* Requested corrections: fixed starfield behind the independently scrolling inbox. */
+      /* Canonical Messages inbox styling.
+         Keep this as the final inbox rule-set so older mobile resets cannot
+         turn off the shared glass surface or reintroduce row separators. */
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-        position:relative!important; isolation:isolate!important;
-        background-color:#030406!important;
-        background-image:
-          radial-gradient(1px 1px at 4% 8%,rgba(255,255,255,.85) 98%,transparent),
-          radial-gradient(1px 1px at 13% 32%,rgba(219,234,254,.8) 98%,transparent),
-          radial-gradient(1.5px 1.5px at 24% 76%,rgba(255,255,255,.9) 98%,transparent),
-          radial-gradient(1px 1px at 37% 17%,rgba(255,255,255,.7) 98%,transparent),
-          radial-gradient(1px 1px at 49% 54%,rgba(219,234,254,.8) 98%,transparent),
-          radial-gradient(1.5px 1.5px at 62% 89%,rgba(255,255,255,.9) 98%,transparent),
-          radial-gradient(1px 1px at 73% 25%,rgba(255,255,255,.8) 98%,transparent),
-          radial-gradient(1px 1px at 86% 66%,rgba(219,234,254,.8) 98%,transparent),
-          radial-gradient(1.5px 1.5px at 96% 12%,rgba(255,255,255,.9) 98%,transparent)!important;
-        background-size:181px 167px,223px 211px,269px 241px,313px 283px,359px 331px,409px 373px,461px 419px,521px 467px,587px 523px!important;
-        background-attachment:fixed!important;
-      }
-      .rc-shell .rc-conversation-row-wrap,.rc-shell .rc-conversation-row {position:relative;z-index:1}
-      /* Every page header is solid black, including desktop and mobile page panels. */
-      .rc-shell .rc-mobile-header,.rc-shell .rc-tab-panel > header.rc-mobile-header {background:#000!important;background-color:#000!important;background-image:none!important;border-bottom-color:rgba(255,255,255,.12)!important}
-      /* Group list action casing: leave button plus icon-only settings control. */
-      .rc-shell .rc-group-row-actions{flex-basis:54px!important;width:54px!important;min-width:54px!important;padding:6px 5px!important;align-items:center!important}
-      .rc-shell .rc-group-row-actions .rc-group-settings-action{width:34px!important;height:31px!important;min-height:31px!important;padding:0!important;gap:0!important;font-size:0!important}
-      .rc-shell .rc-group-row-actions .rc-group-settings-action svg{width:17px!important;height:17px!important}
-      .rc-shell .rc-group-participant-wrap{border-bottom:1px solid rgba(255,255,255,.07)}
-      .rc-shell .rc-group-participant-wrap .rc-group-participant{border-bottom:0!important}
-      .rc-shell .rc-group-participant-actions{display:flex;align-items:center;gap:7px;padding:0 4px 10px 51px;flex-wrap:wrap}
-      .rc-shell .rc-group-participant-actions button{min-height:34px;padding:7px 10px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer}
-      .rc-shell .rc-group-participant-actions .rc-danger{background:#26090d!important;color:#fecaca!important;border:1px solid rgba(248,113,113,.42)!important}
-      .rc-shell .rc-group-participant-actions .rc-secondary{background:#101010!important;color:#fff!important;border:1px solid rgba(255,255,255,.25)!important}
-      .rc-shell .rc-group-participant-actions .rc-icon-btn{width:34px;min-width:34px;padding:0!important}
-
-      /* Messages inbox: replace the old sparse star dots with a fixed Milky Way galaxy backdrop.
-         The list itself scrolls; its fixed-attachment background remains stationary. */
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+        display:flex!important;
+        flex-direction:column!important;
+        gap:0!important;
         position:relative!important;
         isolation:isolate!important;
-        overflow-y:auto!important;
-        overflow-x:hidden!important;
-        background-color:#020207!important;
-        background-image:
-          radial-gradient(ellipse 78% 34% at 52% 49%,rgba(230,226,255,.23) 0%,rgba(160,166,220,.15) 18%,rgba(89,104,158,.12) 34%,rgba(42,48,86,.07) 51%,transparent 74%),
-          radial-gradient(ellipse 62% 23% at 47% 51%,rgba(207,211,255,.18) 0%,rgba(118,132,190,.12) 29%,transparent 72%),
-          radial-gradient(ellipse 35% 55% at 20% 18%,rgba(55,77,145,.16),transparent 72%),
-          radial-gradient(ellipse 39% 48% at 86% 82%,rgba(92,49,126,.14),transparent 73%),
-          linear-gradient(153deg,transparent 24%,rgba(80,91,151,.08) 36%,rgba(183,184,222,.13) 46%,rgba(226,222,255,.19) 50%,rgba(110,121,177,.12) 55%,rgba(38,47,91,.08) 64%,transparent 77%),
-          radial-gradient(1px 1px at 4% 8%,rgba(255,255,255,.95) 98%,transparent 100%),
-          radial-gradient(1px 1px at 11% 72%,rgba(222,231,255,.9) 98%,transparent 100%),
-          radial-gradient(1.5px 1.5px at 19% 29%,rgba(255,255,255,.95) 98%,transparent 100%),
-          radial-gradient(1px 1px at 27% 91%,rgba(205,218,255,.9) 98%,transparent 100%),
-          radial-gradient(1px 1px at 34% 13%,rgba(255,255,255,.85) 98%,transparent 100%),
-          radial-gradient(1.5px 1.5px at 42% 78%,rgba(255,255,255,.95) 98%,transparent 100%),
-          radial-gradient(1px 1px at 51% 22%,rgba(220,228,255,.95) 98%,transparent 100%),
-          radial-gradient(1px 1px at 59% 94%,rgba(255,255,255,.9) 98%,transparent 100%),
-          radial-gradient(1.5px 1.5px at 67% 38%,rgba(255,255,255,.95) 98%,transparent 100%),
-          radial-gradient(1px 1px at 74% 8%,rgba(215,225,255,.9) 98%,transparent 100%),
-          radial-gradient(1px 1px at 82% 68%,rgba(255,255,255,.95) 98%,transparent 100%),
-          radial-gradient(1.5px 1.5px at 91% 31%,rgba(226,231,255,.95) 98%,transparent 100%),
-          radial-gradient(1px 1px at 97% 88%,rgba(255,255,255,.9) 98%,transparent 100%),
-          radial-gradient(ellipse at 50% 50%,rgba(3,4,12,.06),rgba(0,0,0,.52) 100%)!important;
-        background-size:100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,
-          173px 157px,211px 193px,257px 229px,293px 263px,337px 307px,
-          379px 347px,421px 383px,467px 421px,509px 463px,557px 503px,
-          601px 547px,647px 587px,691px 631px,100% 100%!important;
-        background-position:center top!important;
-        background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,repeat,no-repeat!important;
-        background-attachment:fixed!important;
-        box-shadow:inset 0 0 55px rgba(0,0,0,.48)!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > * {position:relative!important;z-index:1!important}
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {background:rgba(2,3,9,.13)!important}
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row {background:rgba(3,4,12,.24)!important}
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {background:rgba(37,99,235,.17)!important}
-
-      /* Mobile-safe fixed star layer: stays pinned while conversation rows scroll. */
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-        position:relative!important;isolation:isolate!important;
-        background-color:#02030a!important;
-        background-image:radial-gradient(ellipse at 48% 44%,rgba(68,78,132,.19),transparent 57%),radial-gradient(ellipse at 80% 82%,rgba(65,39,103,.12),transparent 58%)!important;
-        overflow-y:auto!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::before {
-        content:""!important;display:block!important;position:sticky!important;top:0!important;
-        width:100%!important;height:100%!important;min-height:100%!important;margin-bottom:-100%!important;
-        z-index:0!important;pointer-events:none!important;
-        background-image:
-          radial-gradient(1px 1px at 3% 8%,rgba(255,255,255,.96) 98%,transparent 100%),
-          radial-gradient(2px 2px at 12% 36%,rgba(226,235,255,.95) 98%,transparent 100%),
-          radial-gradient(1px 1px at 22% 79%,rgba(255,255,255,.88) 98%,transparent 100%),
-          radial-gradient(3px 3px at 31% 18%,rgba(255,255,255,.96) 98%,transparent 100%),
-          radial-gradient(1px 1px at 42% 61%,rgba(219,231,255,.92) 98%,transparent 100%),
-          radial-gradient(2px 2px at 53% 11%,rgba(255,255,255,.94) 98%,transparent 100%),
-          radial-gradient(1px 1px at 63% 86%,rgba(255,255,255,.9) 98%,transparent 100%),
-          radial-gradient(3px 3px at 72% 43%,rgba(226,235,255,.96) 98%,transparent 100%),
-          radial-gradient(1px 1px at 84% 17%,rgba(255,255,255,.9) 98%,transparent 100%),
-          radial-gradient(2px 2px at 94% 72%,rgba(219,231,255,.95) 98%,transparent 100%),
-          radial-gradient(1px 1px at 8% 92%,rgba(255,255,255,.82) 98%,transparent 100%),
-          radial-gradient(1.5px 1.5px at 27% 49%,rgba(255,255,255,.9) 98%,transparent 100%),
-          radial-gradient(1.5px 1.5px at 48% 93%,rgba(219,231,255,.9) 98%,transparent 100%),
-          radial-gradient(1px 1px at 68% 25%,rgba(255,255,255,.85) 98%,transparent 100%),
-          radial-gradient(1.5px 1.5px at 89% 51%,rgba(255,255,255,.9) 98%,transparent 100%);
-        background-size:137px 131px,181px 167px,223px 197px,269px 239px,313px 283px,
-          359px 317px,409px 367px,461px 413px,521px 467px,587px 523px,
-          647px 577px,709px 631px,773px 691px,839px 743px,907px 809px!important;
-        background-repeat:repeat!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > * {position:relative!important;z-index:1!important}
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > :first-child {z-index:1!important}
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {background:rgba(2,3,9,.10)!important}
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row {background:rgba(3,4,12,.16)!important}
-
-
-      /* Final Messages inbox treatment: one colourless, water-clear liquid casing. */
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-        position:relative!important; isolation:isolate!important;
-        overflow-x:hidden!important; overflow-y:auto!important;
-        border:1px solid rgba(255,255,255,.32)!important;
-        border-radius:25px!important;
-        background:rgba(255,255,255,.025)!important;
-        background-image:none!important;
-        box-shadow:inset 0 1.5px 1px rgba(255,255,255,.42),inset 1px 0 1px rgba(255,255,255,.12),inset -1px 0 1px rgba(255,255,255,.10),inset 0 -1px 2px rgba(255,255,255,.16),0 14px 36px rgba(0,0,0,.22)!important;
-        -webkit-backdrop-filter:blur(26px) saturate(100%)!important;
-        backdrop-filter:blur(26px) saturate(100%)!important;
-        padding:7px 0 calc(112px + env(safe-area-inset-bottom))!important;
-        scrollbar-gutter:stable; overscroll-behavior-y:contain!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::before {
-        content:""!important; display:block!important; position:sticky!important; top:0!important;
-        width:100%!important; height:100%!important; min-height:100%!important;
-        margin-bottom:-100%!important; z-index:0!important; pointer-events:none!important;
-        background:radial-gradient(ellipse 85% 20% at 50% 0%,rgba(255,255,255,.19),transparent 78%),radial-gradient(ellipse 55% 16% at 18% 42%,rgba(255,255,255,.055),transparent 80%),radial-gradient(ellipse 62% 20% at 88% 76%,rgba(255,255,255,.045),transparent 82%),linear-gradient(112deg,transparent 0%,rgba(255,255,255,.025) 26%,transparent 43%,rgba(255,255,255,.035) 68%,transparent 100%)!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::after {
-        content:""!important; display:block!important; position:sticky!important; top:0!important;
-        width:calc(100% - 18px)!important; height:1px!important; margin:0 9px -1px!important;
-        z-index:2!important; pointer-events:none!important;
-        background:linear-gradient(90deg,transparent,rgba(255,255,255,.5) 18%,rgba(255,255,255,.18) 50%,rgba(255,255,255,.42) 82%,transparent)!important;
-        box-shadow:0 0 10px rgba(255,255,255,.12)!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > * {position:relative!important;z-index:1!important}
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {
-        margin:0!important; border:0!important; border-bottom:1px solid rgba(255,255,255,.105)!important;
-        border-radius:0!important; background:transparent!important; box-shadow:none!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {border-bottom:0!important}
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row,
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
-        width:100%!important; min-height:76px!important; border:0!important; border-radius:0!important;
-        background:transparent!important; box-shadow:none!important;
-        -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
-        background:rgba(255,255,255,.075)!important;
-        box-shadow:inset 2px 0 0 rgba(255,255,255,.62)!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::-webkit-scrollbar-thumb {background:rgba(255,255,255,.22)!important;border-radius:99px!important}
-
-      /* Extend the stationary shared casing down behind the fixed bottom navigation.
-         The list remains the only scrolling surface. */
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-        height:calc(var(--rc-visual-height, 100dvh) - 130px)!important;
-        max-height:calc(var(--rc-visual-height, 100dvh) - 130px)!important;
-        min-height:calc(var(--rc-visual-height, 100dvh) - 130px)!important;
-        padding-bottom:calc(112px + env(safe-area-inset-bottom))!important;
         box-sizing:border-box!important;
+        width:100%!important;
+        height:calc(var(--rc-visual-height, 100dvh) - 130px)!important;
+        min-height:140px!important;
+        max-height:calc(var(--rc-visual-height, 100dvh) - 130px)!important;
+        overflow-x:hidden!important;
+        overflow-y:auto!important;
+        -webkit-overflow-scrolling:touch!important;
+        overscroll-behavior-y:contain!important;
+        touch-action:pan-y!important;
+        scrollbar-gutter:stable;
+        border:1px solid rgba(220,235,255,.25)!important;
+        border-radius:25px!important;
+        background-color:rgba(210,225,250,.045)!important;
+        background-image:
+          linear-gradient(118deg,rgba(255,255,255,.085) 0%,rgba(255,255,255,.025) 19%,transparent 39%,rgba(155,190,245,.045) 68%,rgba(255,255,255,.055) 100%),
+          radial-gradient(ellipse 72% 24% at 14% 5%,rgba(255,255,255,.105),transparent 74%),
+          radial-gradient(ellipse 62% 22% at 88% 82%,rgba(125,170,245,.075),transparent 78%),
+          linear-gradient(180deg,rgba(255,255,255,.035),transparent 22%,transparent 78%,rgba(155,190,255,.025))!important;
+        background-attachment:fixed!important;
+        background-repeat:no-repeat!important;
+        box-shadow:
+          inset 0 1px 1px rgba(255,255,255,.30),
+          inset 1px 0 1px rgba(255,255,255,.10),
+          inset -1px 0 1px rgba(190,215,255,.09),
+          inset 0 -1px 2px rgba(255,255,255,.12),
+          0 12px 30px rgba(0,0,0,.22)!important;
+        -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
+        backdrop-filter:blur(24px) saturate(150%)!important;
+        padding:7px 0 calc(112px + env(safe-area-inset-bottom))!important;
       }
-      /* No hairline separators between conversation entries. */
+
+      /* Entries sit directly on the single shared glass surface. */
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap,
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {
+        flex:0 0 auto!important;
+        margin:0!important;
         border:0!important;
         border-bottom:0!important;
+        border-radius:0!important;
+        background:transparent!important;
+        background-color:transparent!important;
+        box-shadow:none!important;
       }
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row,
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
+        width:100%!important;
+        min-height:76px!important;
         border:0!important;
+        border-radius:0!important;
+        background:transparent!important;
+        background-color:transparent!important;
         box-shadow:none!important;
+        -webkit-backdrop-filter:none!important;
+        backdrop-filter:none!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row::before,
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row::after {
+        content:none!important;
+        display:none!important;
       }
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
         background:rgba(255,255,255,.045)!important;
       }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::-webkit-scrollbar-thumb {
+        background:rgba(220,235,255,.20)!important;
+        border-radius:99px!important;
+      }
 
-      /* Restore the shared liquid-glass casing without bringing back row separators.
-         The casing surface and its refraction stay stationary while the entries scroll. */
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-        position:relative!important; isolation:isolate!important;
-        border:1px solid rgba(226,238,255,.22)!important;
-        border-radius:25px!important;
-        background-color:rgba(175,205,245,.055)!important;
-        background-image:
-          linear-gradient(112deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.018) 18%,transparent 34%,rgba(150,190,255,.055) 61%,rgba(255,255,255,.075) 100%),
-          radial-gradient(ellipse 78% 24% at 12% 8%,rgba(255,255,255,.13),transparent 72%),
-          radial-gradient(ellipse 70% 28% at 91% 72%,rgba(112,166,255,.10),transparent 76%)!important;
-        background-attachment:fixed!important;
-        box-shadow:inset 0 1.5px 1px rgba(255,255,255,.38),inset 1px 0 1px rgba(255,255,255,.13),inset -1px 0 1px rgba(190,215,255,.12),inset 0 -1px 2px rgba(255,255,255,.18),0 14px 36px rgba(0,0,0,.24)!important;
-        -webkit-backdrop-filter:blur(28px) saturate(165%)!important;
-        backdrop-filter:blur(28px) saturate(165%)!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::before {
-        content:""!important;display:block!important;position:sticky!important;top:0!important;
-        width:100%!important;height:100%!important;min-height:100%!important;
-        margin-bottom:-100%!important;z-index:0!important;pointer-events:none!important;
-        background:
-          linear-gradient(118deg,transparent 5%,rgba(255,255,255,.11) 22%,transparent 36%,rgba(255,255,255,.045) 57%,transparent 72%),
-          radial-gradient(ellipse 48% 13% at 18% 27%,rgba(255,255,255,.10),transparent 80%),
-          radial-gradient(ellipse 55% 16% at 83% 67%,rgba(105,165,255,.09),transparent 82%),
-          linear-gradient(90deg,rgba(255,255,255,.035),transparent 12%,transparent 88%,rgba(255,255,255,.025))!important;
-        filter:blur(.25px)!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::after {
-        content:""!important;display:block!important;position:sticky!important;top:0!important;
-        width:calc(100% - 22px)!important;height:1px!important;margin:0 11px -1px!important;
-        z-index:2!important;pointer-events:none!important;
-        background:linear-gradient(90deg,transparent,rgba(255,255,255,.52) 20%,rgba(210,230,255,.22) 52%,rgba(255,255,255,.42) 82%,transparent)!important;
-        box-shadow:0 0 12px rgba(205,225,255,.16)!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > * {position:relative!important;z-index:1!important}
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap,
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {
-        border:0!important;border-bottom:0!important;background:transparent!important;box-shadow:none!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row,
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
-        border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+
+      /* Mobile cascade repair: older page-scroll rules use a more specific
+         :has() selector and were stripping the casing and disabling list scroll.
+         Reassert the layout and glass appearance at that same DOM depth. */
+      @media (max-width:800px) {
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) {
+          display:flex!important;
+          flex-direction:column!important;
+          height:100dvh!important;
+          max-height:100dvh!important;
+          min-height:0!important;
+          overflow:hidden!important;
+          padding:0!important;
+          box-sizing:border-box!important;
+        }
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) > .rc-mobile-header {
+          position:relative!important;
+          top:auto!important;
+          flex:0 0 64px!important;
+          height:64px!important;
+          min-height:64px!important;
+        }
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) > .rc-page-heading {
+          position:relative!important;
+          top:auto!important;
+          flex:0 0 auto!important;
+          margin:0!important;
+          padding:8px 14px!important;
+        }
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) > .rc-messages-layout:not(.has-chat) {
+          display:flex!important;
+          flex:1 1 0!important;
+          flex-direction:column!important;
+          width:100%!important;
+          height:auto!important;
+          max-height:none!important;
+          min-height:0!important;
+          overflow:hidden!important;
+          margin:0!important;
+          padding:0!important;
+          box-sizing:border-box!important;
+        }
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+          display:flex!important;
+          flex:1 1 0!important;
+          flex-direction:column!important;
+          position:relative!important;
+          inset:auto!important;
+          width:100%!important;
+          max-width:100%!important;
+          height:auto!important;
+          max-height:none!important;
+          min-height:0!important;
+          margin:0!important;
+          padding:7px 0 calc(112px + env(safe-area-inset-bottom))!important;
+          box-sizing:border-box!important;
+          overflow-x:hidden!important;
+          overflow-y:auto!important;
+          -webkit-overflow-scrolling:touch!important;
+          overscroll-behavior-y:contain!important;
+          touch-action:pan-y!important;
+          border:1px solid rgba(220,235,255,.25)!important;
+          border-radius:25px!important;
+          background-color:rgba(210,225,250,.045)!important;
+          background-image:
+            linear-gradient(118deg,rgba(255,255,255,.085) 0%,rgba(255,255,255,.025) 19%,transparent 39%,rgba(155,190,245,.045) 68%,rgba(255,255,255,.055) 100%),
+            radial-gradient(ellipse 72% 24% at 14% 5%,rgba(255,255,255,.105),transparent 74%),
+            radial-gradient(ellipse 62% 22% at 88% 82%,rgba(125,170,245,.075),transparent 78%),
+            linear-gradient(180deg,rgba(255,255,255,.035),transparent 22%,transparent 78%,rgba(155,190,255,.025))!important;
+          background-attachment:fixed!important;
+          background-repeat:no-repeat!important;
+          box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.10),inset -1px 0 1px rgba(190,215,255,.09),inset 0 -1px 2px rgba(255,255,255,.12),0 12px 30px rgba(0,0,0,.22)!important;
+          -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
+          backdrop-filter:blur(24px) saturate(150%)!important;
+          z-index:1!important;
+        }
       }
     `}
 
