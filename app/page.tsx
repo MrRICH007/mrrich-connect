@@ -5430,6 +5430,50 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
         background:rgba(255,255,255,.045)!important;
       }
+
+      /* Restore the shared liquid-glass casing without bringing back row separators.
+         The casing surface and its refraction stay stationary while the entries scroll. */
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+        position:relative!important; isolation:isolate!important;
+        border:1px solid rgba(226,238,255,.22)!important;
+        border-radius:25px!important;
+        background-color:rgba(175,205,245,.055)!important;
+        background-image:
+          linear-gradient(112deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.018) 18%,transparent 34%,rgba(150,190,255,.055) 61%,rgba(255,255,255,.075) 100%),
+          radial-gradient(ellipse 78% 24% at 12% 8%,rgba(255,255,255,.13),transparent 72%),
+          radial-gradient(ellipse 70% 28% at 91% 72%,rgba(112,166,255,.10),transparent 76%)!important;
+        background-attachment:fixed!important;
+        box-shadow:inset 0 1.5px 1px rgba(255,255,255,.38),inset 1px 0 1px rgba(255,255,255,.13),inset -1px 0 1px rgba(190,215,255,.12),inset 0 -1px 2px rgba(255,255,255,.18),0 14px 36px rgba(0,0,0,.24)!important;
+        -webkit-backdrop-filter:blur(28px) saturate(165%)!important;
+        backdrop-filter:blur(28px) saturate(165%)!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::before {
+        content:""!important;display:block!important;position:sticky!important;top:0!important;
+        width:100%!important;height:100%!important;min-height:100%!important;
+        margin-bottom:-100%!important;z-index:0!important;pointer-events:none!important;
+        background:
+          linear-gradient(118deg,transparent 5%,rgba(255,255,255,.11) 22%,transparent 36%,rgba(255,255,255,.045) 57%,transparent 72%),
+          radial-gradient(ellipse 48% 13% at 18% 27%,rgba(255,255,255,.10),transparent 80%),
+          radial-gradient(ellipse 55% 16% at 83% 67%,rgba(105,165,255,.09),transparent 82%),
+          linear-gradient(90deg,rgba(255,255,255,.035),transparent 12%,transparent 88%,rgba(255,255,255,.025))!important;
+        filter:blur(.25px)!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::after {
+        content:""!important;display:block!important;position:sticky!important;top:0!important;
+        width:calc(100% - 22px)!important;height:1px!important;margin:0 11px -1px!important;
+        z-index:2!important;pointer-events:none!important;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.52) 20%,rgba(210,230,255,.22) 52%,rgba(255,255,255,.42) 82%,transparent)!important;
+        box-shadow:0 0 12px rgba(205,225,255,.16)!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > * {position:relative!important;z-index:1!important}
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap,
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {
+        border:0!important;border-bottom:0!important;background:transparent!important;box-shadow:none!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row,
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
+        border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+      }
     `}
 
 
