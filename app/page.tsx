@@ -5324,6 +5324,43 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row {background:rgba(3,4,12,.24)!important}
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {background:rgba(37,99,235,.17)!important}
 
+      /* Mobile-safe fixed star layer: stays pinned while conversation rows scroll. */
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+        position:relative!important;isolation:isolate!important;
+        background-color:#02030a!important;
+        background-image:radial-gradient(ellipse at 48% 44%,rgba(68,78,132,.19),transparent 57%),radial-gradient(ellipse at 80% 82%,rgba(65,39,103,.12),transparent 58%)!important;
+        overflow-y:auto!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::before {
+        content:""!important;display:block!important;position:sticky!important;top:0!important;
+        width:100%!important;height:100%!important;min-height:100%!important;margin-bottom:-100%!important;
+        z-index:0!important;pointer-events:none!important;
+        background-image:
+          radial-gradient(1px 1px at 3% 8%,rgba(255,255,255,.96) 98%,transparent 100%),
+          radial-gradient(2px 2px at 12% 36%,rgba(226,235,255,.95) 98%,transparent 100%),
+          radial-gradient(1px 1px at 22% 79%,rgba(255,255,255,.88) 98%,transparent 100%),
+          radial-gradient(3px 3px at 31% 18%,rgba(255,255,255,.96) 98%,transparent 100%),
+          radial-gradient(1px 1px at 42% 61%,rgba(219,231,255,.92) 98%,transparent 100%),
+          radial-gradient(2px 2px at 53% 11%,rgba(255,255,255,.94) 98%,transparent 100%),
+          radial-gradient(1px 1px at 63% 86%,rgba(255,255,255,.9) 98%,transparent 100%),
+          radial-gradient(3px 3px at 72% 43%,rgba(226,235,255,.96) 98%,transparent 100%),
+          radial-gradient(1px 1px at 84% 17%,rgba(255,255,255,.9) 98%,transparent 100%),
+          radial-gradient(2px 2px at 94% 72%,rgba(219,231,255,.95) 98%,transparent 100%),
+          radial-gradient(1px 1px at 8% 92%,rgba(255,255,255,.82) 98%,transparent 100%),
+          radial-gradient(1.5px 1.5px at 27% 49%,rgba(255,255,255,.9) 98%,transparent 100%),
+          radial-gradient(1.5px 1.5px at 48% 93%,rgba(219,231,255,.9) 98%,transparent 100%),
+          radial-gradient(1px 1px at 68% 25%,rgba(255,255,255,.85) 98%,transparent 100%),
+          radial-gradient(1.5px 1.5px at 89% 51%,rgba(255,255,255,.9) 98%,transparent 100%);
+        background-size:137px 131px,181px 167px,223px 197px,269px 239px,313px 283px,
+          359px 317px,409px 367px,461px 413px,521px 467px,587px 523px,
+          647px 577px,709px 631px,773px 691px,839px 743px,907px 809px!important;
+        background-repeat:repeat!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > * {position:relative!important;z-index:1!important}
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > :first-child {z-index:1!important}
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {background:rgba(2,3,9,.10)!important}
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row {background:rgba(3,4,12,.16)!important}
+
     `}
 
 
