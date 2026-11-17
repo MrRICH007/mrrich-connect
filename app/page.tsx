@@ -5497,6 +5497,60 @@ async function playVoiceNote(message: ChatMessage) {
         background-color:rgba(255,255,255,.045)!important;
       }
 
+      /* Final inbox architecture: stationary glass casing, transparent scrolling list. */
+      .rc-shell .rc-messages-layout:not(.has-chat) {
+        position:relative!important; isolation:isolate!important;
+        background:transparent!important; background-color:transparent!important;
+        background-image:none!important; border:0!important; box-shadow:none!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat)::before {
+        content:""!important; display:block!important; position:absolute!important;
+        inset:0!important; z-index:0!important; pointer-events:none!important;
+        border:1px solid rgba(220,235,255,.25)!important; border-radius:25px!important;
+        background:
+          linear-gradient(118deg,rgba(255,255,255,.085) 0%,rgba(255,255,255,.025) 19%,transparent 39%,rgba(155,190,245,.045) 68%,rgba(255,255,255,.055) 100%),
+          radial-gradient(ellipse 72% 24% at 14% 5%,rgba(255,255,255,.105),transparent 74%),
+          radial-gradient(ellipse 62% 22% at 88% 82%,rgba(125,170,245,.075),transparent 78%),
+          linear-gradient(180deg,rgba(255,255,255,.035),transparent 22%,transparent 78%,rgba(155,190,255,.025))!important;
+        box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.10),inset -1px 0 1px rgba(190,215,255,.09),inset 0 -1px 2px rgba(255,255,255,.12),0 12px 30px rgba(0,0,0,.22)!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list {
+        position:relative!important; z-index:1!important;
+        background:transparent!important; background-color:transparent!important;
+        background-image:none!important; background-blend-mode:normal!important;
+        border:0!important; border-radius:0!important; box-shadow:none!important;
+        -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
+        overflow-x:hidden!important; overflow-y:auto!important;
+        -webkit-overflow-scrolling:touch!important; overscroll-behavior-y:contain!important;
+        touch-action:pan-y!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list::before,
+      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list::after,
+      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list .rc-conversation-row-wrap,
+      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list .rc-conversation-row,
+      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list .rc-conversation-row.active {
+        background:transparent!important; background-color:transparent!important;
+        background-image:none!important; box-shadow:none!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list .rc-conversation-row {
+        border:0!important; -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list .rc-conversation-row.active {
+        background:rgba(255,255,255,.045)!important;
+        box-shadow:inset 3px 0 0 rgba(147,197,253,.55)!important;
+      }
+      @media (max-width:800px) {
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) > .rc-messages-layout:not(.has-chat) {
+          position:relative!important; background:transparent!important;
+          background-color:transparent!important; background-image:none!important;
+        }
+        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list {
+          background:transparent!important; background-color:transparent!important;
+          background-image:none!important; border:0!important; border-radius:0!important;
+          box-shadow:none!important; -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
+        }
+      }
+
     `}
 
 
