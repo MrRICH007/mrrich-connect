@@ -5361,6 +5361,51 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {background:rgba(2,3,9,.10)!important}
       .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row {background:rgba(3,4,12,.16)!important}
 
+
+      /* Final Messages inbox treatment: one colourless, water-clear liquid casing. */
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
+        position:relative!important; isolation:isolate!important;
+        overflow-x:hidden!important; overflow-y:auto!important;
+        border:1px solid rgba(255,255,255,.32)!important;
+        border-radius:25px!important;
+        background:rgba(255,255,255,.025)!important;
+        background-image:none!important;
+        box-shadow:inset 0 1.5px 1px rgba(255,255,255,.42),inset 1px 0 1px rgba(255,255,255,.12),inset -1px 0 1px rgba(255,255,255,.10),inset 0 -1px 2px rgba(255,255,255,.16),0 14px 36px rgba(0,0,0,.22)!important;
+        -webkit-backdrop-filter:blur(26px) saturate(100%)!important;
+        backdrop-filter:blur(26px) saturate(100%)!important;
+        padding:7px 0 calc(112px + env(safe-area-inset-bottom))!important;
+        scrollbar-gutter:stable; overscroll-behavior-y:contain!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::before {
+        content:""!important; display:block!important; position:sticky!important; top:0!important;
+        width:100%!important; height:100%!important; min-height:100%!important;
+        margin-bottom:-100%!important; z-index:0!important; pointer-events:none!important;
+        background:radial-gradient(ellipse 85% 20% at 50% 0%,rgba(255,255,255,.19),transparent 78%),radial-gradient(ellipse 55% 16% at 18% 42%,rgba(255,255,255,.055),transparent 80%),radial-gradient(ellipse 62% 20% at 88% 76%,rgba(255,255,255,.045),transparent 82%),linear-gradient(112deg,transparent 0%,rgba(255,255,255,.025) 26%,transparent 43%,rgba(255,255,255,.035) 68%,transparent 100%)!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::after {
+        content:""!important; display:block!important; position:sticky!important; top:0!important;
+        width:calc(100% - 18px)!important; height:1px!important; margin:0 9px -1px!important;
+        z-index:2!important; pointer-events:none!important;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.5) 18%,rgba(255,255,255,.18) 50%,rgba(255,255,255,.42) 82%,transparent)!important;
+        box-shadow:0 0 10px rgba(255,255,255,.12)!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list > * {position:relative!important;z-index:1!important}
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {
+        margin:0!important; border:0!important; border-bottom:1px solid rgba(255,255,255,.105)!important;
+        border-radius:0!important; background:transparent!important; box-shadow:none!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {border-bottom:0!important}
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row,
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
+        width:100%!important; min-height:76px!important; border:0!important; border-radius:0!important;
+        background:transparent!important; box-shadow:none!important;
+        -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
+        background:rgba(255,255,255,.075)!important;
+        box-shadow:inset 2px 0 0 rgba(255,255,255,.62)!important;
+      }
+      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::-webkit-scrollbar-thumb {background:rgba(255,255,255,.22)!important;border-radius:99px!important}
     `}
 
 
