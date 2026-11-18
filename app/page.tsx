@@ -2614,7 +2614,7 @@ async function playVoiceNote(message: ChatMessage) {
 
   function handlePageTouchStart(e: TouchEvent<HTMLElement>) {
     const target = e.target as HTMLElement;
-    const inConversationList = Boolean(target.closest('.rc-conversation-list'));
+    const inConversationList = Boolean(target.closest('.rc-inbox-scroll, .rc-inbox-glass'));
     // Allow swipes to begin anywhere over the conversation list, including on a row;
     // normal taps still open that conversation because navigation only happens after a clear horizontal drag.
     if (target.closest('input, textarea, select, [contenteditable="true"], .rc-message-row, .rc-bottom-nav, .rc-modal, .rc-modal-backdrop') ||
@@ -2862,130 +2862,85 @@ async function playVoiceNote(message: ChatMessage) {
       {page.name === 'Messages' && activeAds.filter(ad => ad.media_type === 'image' && ad.target_url).slice(0, 1).map(ad => <div key={ad.id} className="rc-message-ad-banner" style={{margin:'0 0 12px',width:'100%',aspectRatio:'16 / 9',maxHeight:260,overflow:'hidden',borderRadius:14,border:'1px solid #23365a',background:'#0b1222'}}><a href={ad.target_url || '#'} target="_blank" rel="noopener noreferrer" aria-label={`Open advert: ${ad.title}`} style={{display:'block',width:'100%',height:'100%'}}><img src={ad.media_path} alt={ad.title} style={{display:'block',width:'100%',height:'100%',objectFit:'cover'}}/></a></div>)}
 
       {page.name === 'Messages' && <section className={`rc-messages-layout ${selectedConversation ? 'has-chat' : ''} ${chatExiting ? 'chat-exiting' : ''}`}>
-        <aside className="rc-conversation-list">
-          {conversationList.map(convo => (
-  <div
-    key={convo.id}
-    className="rc-conversation-row-wrap"
-    style={{
-      display: 'flex',
-      alignItems: 'stretch',
-      gap: 0,
-      marginBottom: 0,
-    }}
-  >
-    <button
-      type="button"
-      className={`rc-conversation-row ${
-        selectedConversation?.id === convo.id ? 'active' : ''
-      }`}
-            style={{ flex: 1, minWidth: 0, touchAction: 'pan-y' }}
-      onPointerDown={() => {
-        suppressConversationClick.current = false;
-        if (conversationHoldTimer.current !== null) {
-          window.clearTimeout(conversationHoldTimer.current);
-        }
-        conversationHoldTimer.current = window.setTimeout(() => {
-          setHideActionsConversationId(current => current === convo.id ? null : convo.id);
-          suppressConversationClick.current = true;
-        }, 550);
-      }}
-      onPointerUp={() => {
-        if (conversationHoldTimer.current !== null) {
-          window.clearTimeout(conversationHoldTimer.current);
-        }
-        conversationHoldTimer.current = null;
-      }}
-      onPointerLeave={() => {
-        if (conversationHoldTimer.current !== null) {
-          window.clearTimeout(conversationHoldTimer.current);
-        }
-        conversationHoldTimer.current = null;
-      }}
-      onPointerCancel={() => {
-        if (conversationHoldTimer.current !== null) {
-          window.clearTimeout(conversationHoldTimer.current);
-        }
-        conversationHoldTimer.current = null;
-      }}
-      onClick={() => {
-        if (suppressConversationClick.current) {
-          suppressConversationClick.current = false;
-          return;
-        }
-        setHideActionsConversationId(null);
-        setSelectedConversation(convo);
-        void markConversationRead(convo.id);
-        setReplyTo(null);
-      }}
-    >
-      <span className="rc-conversation-avatar">
-        {convo.avatarUrl ? (
-          <img src={convo.avatarUrl} alt="" />
-        ) : convo.kind === 'group' ? (
-          <Users size={20} />
-        ) : (
-          <MessageCircle size={20} />
-        )}
-      </span>
-
-      <span className="rc-conversation-copy">
-        <strong>{convo.title}{convo.kind === 'person' && profiles.find(p => p.id === convo.otherUserId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={15} aria-label="Premium member" />}</strong>
-        <span className="rc-conversation-kind">{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</span>
-        <small>
-          {convo.lastMessagePreview ? (
-            <>
-              {convo.lastMessagePreview.length >= 42
-                ? `${convo.lastMessagePreview.slice(0, 39)}...`
-                : convo.lastMessagePreview}
-              {convo.lastMessageSenderId === userId && (
-                <span
-                  className={`rc-preview-ticks ${
-                    convo.lastMessageRead ? 'is-read' : ''
-                  }`}
+        <aside className="rc-inbox-glass" aria-label="Conversations">
+          <div className="rc-inbox-scroll">
+            {conversationList.map(convo => (
+              <div className="rc-inbox-entry" key={convo.id}>
+                <button
+                  type="button"
+                  className={`rc-inbox-item ${selectedConversation?.id === convo.id ? 'is-selected' : ''}`}
+                  onPointerDown={() => {
+                    suppressConversationClick.current = false;
+                    if (conversationHoldTimer.current !== null) window.clearTimeout(conversationHoldTimer.current);
+                    conversationHoldTimer.current = window.setTimeout(() => {
+                      setHideActionsConversationId(current => current === convo.id ? null : convo.id);
+                      suppressConversationClick.current = true;
+                    }, 550);
+                  }}
+                  onPointerUp={() => {
+                    if (conversationHoldTimer.current !== null) window.clearTimeout(conversationHoldTimer.current);
+                    conversationHoldTimer.current = null;
+                  }}
+                  onPointerLeave={() => {
+                    if (conversationHoldTimer.current !== null) window.clearTimeout(conversationHoldTimer.current);
+                    conversationHoldTimer.current = null;
+                  }}
+                  onPointerCancel={() => {
+                    if (conversationHoldTimer.current !== null) window.clearTimeout(conversationHoldTimer.current);
+                    conversationHoldTimer.current = null;
+                  }}
+                  onClick={() => {
+                    if (suppressConversationClick.current) {
+                      suppressConversationClick.current = false;
+                      return;
+                    }
+                    setHideActionsConversationId(null);
+                    setSelectedConversation(convo);
+                    void markConversationRead(convo.id);
+                    setReplyTo(null);
+                  }}
                 >
-                  {convo.lastMessageRead
-                    ? '✓✓'
-                    : convo.lastMessageDelivered
-                      ? '✓✓'
-                      : '✓'}
-                </span>
-              )}
-            </>
-          ) : (
-            'No messages yet'
-          )}
-        </small>
-      </span>
-
-      <span className="rc-conversation-meta">
-        {(unreadCounts[convo.id] || 0) > 0 && (
-          <span className="rc-unread-badge">
-            {unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}
-          </span>
-        )}
-        {convo.lastMessageAt && <small className="rc-conversation-timestamp">{formatConversationTimestamp(convo.lastMessageAt)}</small>}
-      </span>
-    </button>
-
-        {hideActionsConversationId === convo.id && (
-      <button
-        type="button"
-        className="rc-icon-btn"
-        aria-label={`Hide conversation with ${convo.title}`}
-        title="Hide conversation"
-        onClick={() => {
-          setHideActionsConversationId(null);
-          void hideConversation(convo.id);
-        }}
-        style={{ flexShrink: 0 }}
-      >
-        <X size={17} />
-      </button>
-    )}
-  </div>
-))}
-          {conversationList.length === 0 && <div className="rc-empty-conversations"><div className="rc-empty-icon"><MessageCircle size={27}/></div><strong>Your Conversations Will Appear Here.</strong><p>Accept a message request to start a private conversation.</p><button className="rc-text-btn" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button></div>}
+                  <span className="rc-inbox-avatar">
+                    {convo.avatarUrl ? <img src={convo.avatarUrl} alt="" /> : convo.kind === 'group' ? <Users size={21}/> : <MessageCircle size={21}/>}
+                  </span>
+                  <span className="rc-inbox-copy">
+                    <strong className="rc-inbox-name">
+                      {convo.title}
+                      {convo.kind === 'person' && profiles.find(p => p.id === convo.otherUserId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={15} aria-label="Premium member" />}
+                    </strong>
+                    <span className="rc-inbox-kind">{convo.kind === 'group' ? 'Group conversation' : 'Private conversation'}</span>
+                    <span className="rc-inbox-preview">
+                      {convo.lastMessagePreview
+                        ? (convo.lastMessagePreview.length >= 42 ? `${convo.lastMessagePreview.slice(0, 39)}...` : convo.lastMessagePreview)
+                        : 'No messages yet'}
+                      {convo.lastMessageSenderId === userId && convo.lastMessagePreview && (
+                        <span className={`rc-inbox-ticks ${convo.lastMessageRead ? 'is-read' : ''}`} aria-label={convo.lastMessageRead ? 'Read' : convo.lastMessageDelivered ? 'Delivered' : 'Sent'}>
+                          {convo.lastMessageRead || convo.lastMessageDelivered ? '✓✓' : '✓'}
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                  <span className="rc-inbox-meta">
+                    {(unreadCounts[convo.id] || 0) > 0 && <span className="rc-inbox-unread">{unreadCounts[convo.id] > 99 ? '99+' : unreadCounts[convo.id]}</span>}
+                    {convo.lastMessageAt && <time className="rc-inbox-time">{formatConversationTimestamp(convo.lastMessageAt)}</time>}
+                  </span>
+                </button>
+                {hideActionsConversationId === convo.id && (
+                  <button type="button" className="rc-inbox-hide" aria-label={`Hide conversation with ${convo.title}`} title="Hide conversation" onClick={() => { setHideActionsConversationId(null); void hideConversation(convo.id); }}>
+                    <X size={17}/>
+                  </button>
+                )}
+              </div>
+            ))}
+            {conversationList.length === 0 && (
+              <div className="rc-inbox-empty">
+                <span className="rc-inbox-empty-icon"><MessageCircle size={27}/></span>
+                <strong>Your Conversations Will Appear Here.</strong>
+                <p>Accept a message request to start a private conversation.</p>
+                <button type="button" onClick={() => { setTab('Requests'); void loadIncomingRequests(); }}>View requests <Bell size={14}/></button>
+              </div>
+            )}
+          </div>
         </aside>
         <section className="rc-chat-panel">
           {selectedConversation ? <>{chatEntranceCharacter && <div className={`rc-chat-entrance-character rc-chat-entrance-${chatEntranceCharacter}`} aria-hidden="true"><ChatEntranceArt character={chatEntranceCharacter}/></div>}<header className="rc-chat-header"><button className="rc-icon-btn rc-back-chat" onClick={closeConversationWithMotion} aria-label="Back to conversations"><ArrowLeft size={19}/></button><div className="rc-conversation-avatar rc-chat-header-avatar" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); }} style={{cursor:selectedConversation.kind === 'person' ? 'pointer' : 'default'}}>{selectedConversation.avatarUrl ? <img src={selectedConversation.avatarUrl} alt=""/> : selectedConversation.kind === 'group' ? <Users size={20}/> : <MessageCircle size={20}/>}</div><button type="button" className="rc-chat-header-copy rc-chat-profile-trigger" onClick={() => { if (selectedConversation.kind === 'person') setPublicProfile(profiles.find(p => p.id === selectedConversation.otherUserId) || null); else { const group = groups.find(g => g.conversation_id === selectedConversation.id); if (group) void openGroupInfo(group); } }}><strong>{selectedConversation.title}{selectedConversation.kind === 'person' && profiles.find(p => p.id === selectedConversation.otherUserId)?.premium_status === 'active' && <BadgeCheck className="rc-premium-tick" size={16} />}</strong><small>{selectedConversation.kind === 'group' ? 'View group description & participants' : 'View public profile'}</small></button>
@@ -3563,8 +3518,6 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-content-section, .rc-profile-page, .rc-messages-layout { animation: rc-page-swipe-in 190ms cubic-bezier(.2,.75,.25,1) both; }
       .rc-messages-layout.has-chat .rc-chat-panel { animation: rc-chat-swipe-in 190ms cubic-bezier(.2,.75,.25,1) both; }
       .rc-messages-layout.chat-exiting .rc-chat-panel { animation: rc-chat-swipe-out 160ms ease-in both; pointer-events: none; }
-      .rc-person-card, .rc-group-row-wrap, .rc-request-card, .rc-conversation-row, .rc-primary, .rc-secondary, .rc-icon-btn, .rc-bottom-item { transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease; }
-      .rc-person-card:active, .rc-group-row-wrap:active, .rc-request-card:active, .rc-conversation-row:active, .rc-primary:active, .rc-secondary:active, .rc-icon-btn:active, .rc-bottom-item:active { transform: scale(.985); }
       .rc-shell { touch-action: pan-y; overflow-x: clip; padding-bottom: 0 !important; min-height: 100dvh; }
       .rc-referral-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0;padding:12px 14px;border:1px solid rgba(96,165,250,.24);border-radius:13px;background:rgba(37,99,235,.09);color:#dbeafe}.rc-referral-summary span{font-size:13px;font-weight:700}.rc-referral-summary strong{font-size:22px;color:#60a5fa;font-variant-numeric:tabular-nums}
       /* Keep chat identity header pinned inside the visible keyboard-adjusted viewport. */
@@ -3626,7 +3579,6 @@ async function playVoiceNote(message: ChatMessage) {
           height: var(--rc-visual-height, 100dvh) !important;
           max-height: var(--rc-visual-height, 100dvh) !important;
         }
-        .rc-messages-layout.has-chat .rc-conversation-list { display: none !important; }
         .rc-messages-layout.has-chat .rc-chat-panel { height: 100% !important; min-height: 0 !important; }
         .rc-messages-layout.has-chat .rc-chat-panel,
         .rc-messages-layout.has-chat .rc-composer-wrap,
@@ -3655,14 +3607,11 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-lifetime-hours span { color:#fff; font-weight:500; }
       .rc-premium-back { margin-bottom:14px; }
       .rc-unread-badge, .rc-nav-badge { background:#facc15 !important; color:#172033 !important; font-weight:800; }
-      .rc-conversation-copy small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
-      .rc-preview-ticks { color:#94a3b8; font-weight:800; white-space:nowrap; margin-left:3px; } .rc-preview-ticks.is-read { color:#facc15; }
       .rc-current-rank { border:1px solid rgba(96,165,250,.5); border-radius:12px; }
       .rc-admin-only-notice { width:100%; box-sizing:border-box; text-align:center; padding:18px 12px calc(18px + env(safe-area-inset-bottom)); color:#facc15; font-weight:800; background:rgba(16,43,88,.55); border-top:1px solid rgba(96,165,250,.25); } .rc-hour-unit { display:inline-block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.82em; font-weight:900; letter-spacing:-.04em; margin-left:2px; }
 
       .rc-group-row-wrap { display:flex; align-items:stretch; gap:0; border:1px solid rgba(96,165,250,.25); border-radius:14px; overflow:hidden; background:rgba(16,43,88,.42); } .rc-group-row-wrap .rc-group-row { flex:1; min-width:0; border:0; border-radius:0; background:transparent; } .rc-edit-group-avatar { flex:0 0 48px; display:inline-flex; align-items:center; justify-content:center; margin:0; padding:8px; border:0; border-left:1px solid rgba(96,165,250,.25); border-radius:0; background:#102b58; color:#fff; cursor:pointer; } .rc-school-options { max-height:220px; overflow:auto; margin-top:8px; } .rc-modal fieldset input[type="search"] { width:100%; padding:10px; border-radius:10px; background:#0b1730; color:#fff; border:1px solid rgba(148,163,184,.3); }
       .rc-modal fieldset { border:1px solid rgba(148,163,184,.25); border-radius:12px; padding:12px; margin:8px 0 14px; } .rc-modal legend { padding:0 6px; font-weight:700; } .rc-setting-check { display:flex !important; flex-direction:column !important; align-items:flex-start !important; gap:7px !important; margin:12px 0 !important; } .rc-setting-check input { width:auto !important; margin:0 0 0 2px; } .rc-modal select { width:100%; padding:12px; border-radius:10px; background:#0b1730; color:#fff; border:1px solid rgba(148,163,184,.3); }
-      .rc-preview-ticks { color:#94a3b8; font-weight:800; white-space:nowrap; } .rc-preview-ticks.is-read { color:#facc15; }
       .rc-current-rank { border:1px solid rgba(96,165,250,.5); border-radius:12px; }
       .rc-admin-only-notice { width:100%; box-sizing:border-box; text-align:center; padding:18px 12px calc(18px + env(safe-area-inset-bottom)); color:#facc15; font-weight:800; background:rgba(16,43,88,.55); border-top:1px solid rgba(96,165,250,.25); } .rc-hour-unit { display:inline-block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.82em; font-weight:900; letter-spacing:-.04em; margin-left:2px; }
       .rc-floating-premium, .rc-floating-invite { position:fixed; z-index:55; display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid rgba(96,165,250,.55); border-radius:999px; background:#102b58; color:#fff; padding:11px 15px; font-weight:700; box-shadow:0 8px 28px rgba(0,0,0,.3); touch-action:none; }
@@ -3694,6 +3643,7 @@ async function playVoiceNote(message: ChatMessage) {
       @media (max-width:800px) { .rc-floating-premium { bottom:calc(82px + env(safe-area-inset-bottom)); } .rc-floating-invite { bottom:calc(192px + env(safe-area-inset-bottom)); } }
       @media (max-height:620px) { .rc-invite-card { max-height:calc(100dvh - 20px); padding:22px 16px 16px; gap:9px; } .rc-invite-avatar { width:82px; height:82px; } .rc-invite-qr { width:138px; height:138px; } }
 
+      /* Slim glass panels for each conversation in the Messages list. */
 
       /* Compact, left-aligned quoted/replied-to message previews. */
       .rc-replied-message {
@@ -3790,25 +3740,6 @@ async function playVoiceNote(message: ChatMessage) {
       }
       /* Reflective glass conversation cards, with no shared enclosing panel. */
       .rc-messages-layout:not(.has-chat) { padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important; background: transparent !important; border: 0 !important; box-shadow: none !important; }
-      .rc-conversation-list {
-        background: transparent !important;
-        border: 0 !important;
-        box-shadow: none !important;
-        border-radius: 0 !important;
-        padding: 4px 2px calc(112px + env(safe-area-inset-bottom)) !important;
-        overflow-y: auto !important;
-        overscroll-behavior-y: contain;
-        scrollbar-gutter: stable;
-      }
-      .rc-conversation-row-wrap { background: transparent !important; border: 0 !important; box-shadow: none !important; }
-      .rc-conversation-row::before {
-        content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(112deg, transparent 8%, rgba(255,255,255,.11) 24%, rgba(255,255,255,.025) 37%, transparent 52%);
-        opacity: .9;
-      }
-      .rc-conversation-row > * { position: relative; z-index: 1; }
-      .rc-conversation-kind { display:block; color:#93c5fd; font-size:10px; line-height:1.2; margin:1px 0 3px; }
-      .rc-conversation-copy small { line-height:1.3; }
       .rc-page-heading.rc-simple-page-heading { margin-top: 0 !important; padding-top: 2px !important; }
       .rc-page-heading.rc-simple-page-heading h1 { margin-top: 0 !important; }
       .rc-toast { z-index: 200;
@@ -3829,38 +3760,11 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-tab-panel.rc-panel-visible { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
       /* Keep the inbox independently scrollable while leaving room for the fixed bottom navigation. */
       .rc-messages-layout:not(.has-chat) { display: block !important; min-height: 0 !important; overflow: visible !important; }
-      .rc-conversation-list {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 0 !important;
-        box-sizing: border-box !important;
-        height: calc(var(--rc-visual-height, 100dvh) - 220px) !important;
-        max-height: calc(var(--rc-visual-height, 100dvh) - 220px) !important;
-        min-height: 140px !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        -webkit-overflow-scrolling: touch !important;
-        touch-action: pan-y !important;
-        overscroll-behavior-y: contain !important;
-        scrollbar-gutter: stable;
-        padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
-      }
-      .rc-conversation-row-wrap, .rc-empty-conversations { flex: 0 0 auto !important; }
-      .rc-conversation-row { touch-action: pan-y !important; }
-      .rc-conversation-copy { display:flex !important; flex:1 1 auto !important; min-width:0 !important; flex-direction:column !important; align-items:flex-start !important; text-align:left !important; }
-      .rc-conversation-copy strong { display:block !important; width:100%; text-align:left !important; }
-      .rc-conversation-kind { display:block !important; width:100%; text-align:left !important; margin-top:2px !important; }
-      .rc-conversation-meta { flex:0 0 auto; align-self:stretch; display:flex; flex-direction:column; align-items:flex-end; justify-content:flex-start; gap:5px; min-width:34px; padding-top:1px; margin-left:4px; }
-      .rc-conversation-timestamp { display:block; color:rgba(219,234,254,.72); font-size:9.5px !important; line-height:1.15; white-space:nowrap; font-variant-numeric:tabular-nums; }
       .rc-leave-chat-button { flex:0 0 auto; margin-left:auto; padding:7px 10px; border:1px solid rgba(248,113,113,.42); border-radius:9px; background:rgba(127,29,29,.13); color:#fca5a5; font-size:12px; font-weight:700; cursor:pointer; }
-
-      @media (max-width:800px) { .rc-conversation-list { height:calc(var(--rc-visual-height, 100dvh) - 230px) !important; max-height:calc(var(--rc-visual-height, 100dvh) - 230px) !important; } .rc-leave-chat-button { padding:6px 8px; } }
-      .rc-conversation-list::-webkit-scrollbar { width: 3px; }
-      .rc-conversation-list::-webkit-scrollbar-thumb { background: rgba(147,197,253,.24); border-radius: 99px; }
+      /* iOS-style liquid glass: soft frosted translucency, glossy edge and a light sweep. */
+      @media (max-width:800px) { .rc-leave-chat-button { padding:6px 8px; } }
 
       /* Final mobile layout fixes: full-screen chat overlay, no dark list mask. */
-      .rc-conversation-list::before, .rc-conversation-list::after { content: none !important; display: none !important; }
-      .rc-conversation-list { background: transparent !important; background-image: none !important; box-shadow: none !important; }
       .rc-messages-layout:not(.has-chat)::before, .rc-messages-layout:not(.has-chat)::after { content: none !important; display: none !important; }
       @media (max-width:800px) {
         .rc-messages-layout.has-chat { transform: none !important; }
@@ -3876,51 +3780,8 @@ async function playVoiceNote(message: ChatMessage) {
           overflow: visible !important;
           background: transparent !important;
         }
-        .rc-conversation-list {
-          height: auto !important;
-          max-height: calc(100svh - 275px) !important;
-          min-height: 120px !important;
-          overflow-y: auto !important;
-          overscroll-behavior: contain !important;
-          padding-bottom: 20px !important;
-          margin-bottom: 0 !important;
-          background: transparent !important;
-          border: 0 !important;
-          box-shadow: none !important;
-        }
-        .rc-messages-layout:not(.has-chat),
-        .rc-messages-layout:not(.has-chat) .rc-conversation-list,
-        .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {
-          background-color: transparent !important;
-        }
       }
       /* Keep the private-conversation label on its own line even for long nicknames. */
-      .rc-conversation-copy {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        justify-content: center !important;
-        min-width: 0 !important;
-        overflow: hidden !important;
-      }
-      .rc-conversation-copy > strong {
-        display: block !important;
-        flex: 0 0 auto !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-      }
-      .rc-conversation-copy > .rc-conversation-kind {
-        display: block !important;
-        flex: 0 0 auto !important;
-        align-self: stretch !important;
-        width: 100% !important;
-        margin: 2px 0 3px !important;
-        white-space: normal !important;
-        line-height: 1.2 !important;
-      }
       .rc-chat-panel {
         position: relative !important;
         isolation: isolate !important;
@@ -3963,17 +3824,6 @@ async function playVoiceNote(message: ChatMessage) {
 
       /* Final correction: extend the inbox viewport downwards to shrink the dark gap. */
       @media (max-width: 800px) {
-        .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          height: calc(100dvh - 205px) !important;
-          max-height: calc(100dvh - 205px) !important;
-          min-height: 180px !important;
-          padding-bottom: 8px !important;
-          margin-bottom: 0 !important;
-          overflow-y: auto !important;
-          background: transparent !important;
-          background-color: transparent !important;
-          box-shadow: none !important;
-        }
       }
 
       /* Match private and group conversation title stacks; reserve room for Block/Leave. */
@@ -4096,42 +3946,12 @@ async function playVoiceNote(message: ChatMessage) {
         padding-top: 0 !important;
         padding-bottom: 0 !important;
       }
-      .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-        margin-top: 0 !important;
-        margin-bottom: 0 !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        height: calc(var(--rc-visual-height, 100dvh) - 145px) !important;
-        max-height: calc(var(--rc-visual-height, 100dvh) - 145px) !important;
-        min-height: 0 !important;
-      }
       @media (max-width: 800px) {
         .rc-tab-panel:has(.rc-messages-layout) > .rc-page-heading {
           margin-bottom: 0 !important;
         }
         /* Fill the entire usable space between the pinned Messages heading and bottom nav.
            This removes the leftover black strip instead of merely increasing list height. */
-        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          position: fixed !important;
-          top: 145px !important;
-          bottom: calc(76px + env(safe-area-inset-bottom)) !important;
-          left: 0 !important;
-          right: 0 !important;
-          width: auto !important;
-          height: auto !important;
-          max-height: none !important;
-          min-height: 0 !important;
-          margin: 0 !important;
-          padding: 0 2px 8px !important;
-          box-sizing: border-box !important;
-          overflow-x: hidden !important;
-          overflow-y: auto !important;
-          background: transparent !important;
-          background-color: transparent !important;
-          border: 0 !important;
-          box-shadow: none !important;
-          z-index: 20 !important;
-        }
       }
       /* Final layout correction: the Messages page uses a vertical flex layout.
          The inbox itself takes every pixel between the fixed headings and nav;
@@ -4173,28 +3993,6 @@ async function playVoiceNote(message: ChatMessage) {
           margin: 0 !important;
           padding: 0 !important;
           box-sizing: border-box !important;
-        }
-        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          position: relative !important;
-          inset: auto !important;
-          display: flex !important;
-          flex: 1 1 0 !important;
-          flex-direction: column !important;
-          width: 100% !important;
-          height: auto !important;
-          max-height: none !important;
-          min-height: 0 !important;
-          margin: 0 !important;
-          padding: 0 2px 8px !important;
-          box-sizing: border-box !important;
-          overflow-x: hidden !important;
-          overflow-y: auto !important;
-          -webkit-overflow-scrolling: touch !important;
-          overscroll-behavior-y: contain !important;
-          background: transparent !important;
-          border: 0 !important;
-          box-shadow: none !important;
-          z-index: auto !important;
         }
       }
 
@@ -4307,25 +4105,6 @@ async function playVoiceNote(message: ChatMessage) {
           margin: 0 !important;
           padding: 0 !important;
         }
-        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          position: relative !important;
-          inset: auto !important;
-          flex: 1 1 0 !important;
-          display: block !important;
-          width: 100% !important;
-          max-width: 100% !important;
-          height: auto !important;
-          max-height: none !important;
-          min-height: 0 !important;
-          margin: 0 !important;
-          padding: 0 2px 0 !important;
-          box-sizing: border-box !important;
-          overflow-x: hidden !important;
-          overflow-y: auto !important;
-          -webkit-overflow-scrolling: touch !important;
-          background: transparent !important;
-          z-index: 1 !important;
-        }
       }
       /* Group and private chat content must never exceed the visible viewport width. */
       .rc-messages-layout.has-chat {
@@ -4405,29 +4184,6 @@ async function playVoiceNote(message: ChatMessage) {
           padding: 0 !important;
           box-sizing: border-box !important;
         }
-        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          position: relative !important;
-          inset: auto !important;
-          display: flex !important;
-          flex: 1 1 0 !important;
-          flex-direction: column !important;
-          width: 100% !important;
-          max-width: 100% !important;
-          height: auto !important;
-          max-height: none !important;
-          min-height: 0 !important;
-          margin: 0 !important;
-          padding: 0 2px !important;
-          box-sizing: border-box !important;
-          overflow-x: hidden !important;
-          overflow-y: auto !important;
-          -webkit-overflow-scrolling: touch !important;
-          overscroll-behavior-y: contain !important;
-          background: transparent !important;
-          border: 0 !important;
-          box-shadow: none !important;
-          z-index: 1 !important;
-        }
         /* The chat overlays only the current viewport-sized page panel, never
            the 600%-wide swipe stage. */
         .rc-tab-panel:has(.rc-messages-layout.has-chat) { position: relative !important; }
@@ -4474,10 +4230,6 @@ async function playVoiceNote(message: ChatMessage) {
       /* Give the Messages conversation list enough transparent scroll space
          to move its final conversation fully above the fixed bottom navigation. */
       @media (max-width: 800px) {
-        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          padding: 0 2px calc(104px + env(safe-area-inset-bottom)) !important;
-          scroll-padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
-        }
       }
 
       /* Final mobile scroll-end correction for the non-Messages tabs.
@@ -4528,18 +4280,6 @@ async function playVoiceNote(message: ChatMessage) {
           max-height: none !important;
           min-height: 0 !important;
           overflow: visible !important;
-        }
-        .rc-tab-panel:has(.rc-messages-layout) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          display: block !important;
-          flex: none !important;
-          height: auto !important;
-          max-height: none !important;
-          min-height: 0 !important;
-          overflow: visible !important;
-          -webkit-overflow-scrolling: auto !important;
-          overscroll-behavior: auto !important;
-          padding: 0 2px calc(104px + env(safe-area-inset-bottom)) !important;
-          scroll-padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
         }
         /* Selecting a conversation retains the existing full-screen chat rules. */
         .rc-tab-panel:has(.rc-messages-layout.has-chat) {
@@ -4610,23 +4350,6 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-messages-layout.has-chat .rc-chat-header{position:relative!important;flex:0 0 auto!important;top:auto!important;z-index:40!important;transform:none!important;min-height:62px!important;max-height:92px!important}
       .rc-messages-layout.has-chat .rc-chat-empty{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important}
        /* Conversation entries stay transparent; the list itself provides the glass casing. */
-       .rc-conversation-row {
-         background:transparent!important;
-         background-color:transparent!important;
-         border:0!important;
-         border-radius:0!important;
-         box-shadow:none!important;
-         backdrop-filter:none!important;
-         -webkit-backdrop-filter:none!important;
-       }
-       .rc-conversation-row::before,.rc-conversation-row::after { content:none!important;display:none!important; }
-       .rc-conversation-row.active {
-         background:rgba(255,255,255,.045)!important;
-         background-color:rgba(255,255,255,.045)!important;
-         border:0!important;
-         box-shadow:none!important;
-       }
-       .rc-conversation-row-wrap { background:transparent!important; }
 
        /* Keep only the message history scrollable; identity and composer remain pinned. */
        .rc-messages-layout.has-chat .rc-chat-panel {
@@ -4744,7 +4467,6 @@ async function playVoiceNote(message: ChatMessage) {
        .rc-messages-layout.has-chat .rc-chat-header { position:sticky!important;top:0!important;left:0!important;right:0!important;z-index:2147483000!important;flex:0 0 auto!important;display:flex!important;min-height:64px!important;transform:translateZ(0)!important;align-self:stretch!important;background:#101b2d!important;border-bottom:1px solid rgba(148,163,184,.22)!important; }
        .rc-messages-layout.has-chat .rc-chat-empty { flex:1 1 0!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important; }
        .rc-messages-layout.has-chat .rc-composer-wrap { flex:0 0 auto!important;position:relative!important;z-index:20!important; }
-       .rc-conversation-row::before,.rc-conversation-row::after { content:none!important;display:none!important; }
        .rc-incoming-invite-card { width:min(calc(100% - 32px),520px);margin:0 auto 16px;padding:16px;border:1px solid rgba(148,163,184,.28);border-radius:16px;background:linear-gradient(120deg,rgba(45,48,55,.96),rgba(15,18,24,.96));color:#f8fafc; }
        .rc-incoming-invite-person { display:flex;align-items:center;gap:12px;margin-top:10px; }
        .rc-incoming-invite-avatar { width:56px;height:56px;flex:0 0 56px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#263244;color:#cbd5e1;border:1px solid rgba(203,213,225,.4); }
@@ -4915,7 +4637,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-contest-bubble>img,.rc-contest-no-cover{grid-row:1/3!important;grid-column:1!important;width:116px!important;aspect-ratio:16/5!important}
       .rc-contest-bubble strong{grid-column:2!important;grid-row:1!important}.rc-contest-bubble small{grid-column:2!important;grid-row:2!important}
       .rc-status-members-section{margin:0!important}.rc-status-member-row{min-height:64px!important}
-
+      /* Conversation cards: deepest navy at left, fading to a softer navy at right. */
       /* The message scroller is a sibling of the header and composer, never their parent. */
       .rc-messages-layout.has-chat .rc-chat-panel {
         display: grid !important;
@@ -4993,7 +4715,8 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-announcement-content { position:relative!important; padding-bottom:100px!important; }
       .rc-announcement-fab { position:fixed!important; right:20px!important; bottom:calc(92px + env(safe-area-inset-bottom))!important; z-index:2147482600!important; display:inline-flex!important; align-items:center!important; justify-content:center!important; gap:8px!important; min-height:50px!important; padding:0 18px!important; border:1px solid rgba(147,197,253,.4)!important; border-radius:999px!important; background:linear-gradient(135deg,#2563eb,#17428a)!important; color:#fff!important; font-size:13px!important; font-weight:800!important; box-shadow:0 10px 30px #0008!important; }
       .rc-announcement-compose-page { width:min(100%,680px)!important; margin:0 auto!important; }
- { bottom:calc(104px + env(safe-area-inset-bottom))!important; }
+      /* Final requested polish: navy-black-navy cards, elevated announcement action, pinned chat chrome. */
+      .rc-announcement-fab { bottom:calc(104px + env(safe-area-inset-bottom))!important; }
       @media (max-width:800px) {
         .rc-messages-layout.has-chat { display:block!important; position:fixed!important; inset:var(--rc-visual-offset,0px) 0 auto 0!important; height:var(--rc-visual-height,100dvh)!important; max-height:var(--rc-visual-height,100dvh)!important; overflow:hidden!important; }
         .rc-messages-layout.has-chat .rc-chat-panel { display:grid!important; grid-template-rows:64px minmax(0,1fr) auto!important; height:100%!important; max-height:100%!important; min-height:0!important; overflow:hidden!important; }
@@ -5061,52 +4784,8 @@ async function playVoiceNote(message: ChatMessage) {
       @media(prefers-reduced-motion:reduce){.rc-chat-panel .rc-chat-entrance-character{animation:none!important;display:none!important}}
 
       /* Match conversation casing to the PERSONAL INVITATION card. Width/layout remain unchanged. */
-      .rc-conversation-row::before,
-      .rc-conversation-row::after { content: none !important; display: none !important; }
 
       /* One shared liquid-glass casing for the entire scrollable inbox list. */
-      .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-        position: relative !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        border: 1px solid rgba(191,219,254,.22) !important;
-        border-radius: 20px !important;
-        background: linear-gradient(135deg, rgba(255,255,255,.105) 0%, rgba(148,163,184,.055) 38%, rgba(30,64,110,.12) 72%, rgba(255,255,255,.035) 100%) !important;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.2), inset 0 -1px 0 rgba(96,165,250,.08), 0 10px 28px rgba(0,0,0,.2) !important;
-        backdrop-filter: blur(22px) saturate(155%) !important;
-        -webkit-backdrop-filter: blur(22px) saturate(155%) !important;
-        padding: 5px 0 calc(112px + env(safe-area-inset-bottom)) !important;
-        scrollbar-gutter: stable;
-        overscroll-behavior-y: contain !important;
-      }
-      .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap {
-        margin: 0 !important;
-        gap: 0 !important;
-        border: 0 !important;
-        border-bottom: 1px solid rgba(203,213,225,.105) !important;
-        border-radius: 0 !important;
-        background: transparent !important;
-        box-shadow: none !important;
-      }
-      .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {
-        border-bottom: 0 !important;
-      }
-      .rc-messages-layout:not(.has-chat) .rc-conversation-row {
-        width: 100% !important;
-        min-height: 76px;
-        border: 0 !important;
-        border-radius: 0 !important;
-        background: transparent !important;
-        box-shadow: none !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-      }
-      .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
-        border: 0 !important;
-        border-radius: 0 !important;
-        background: rgba(147,197,253,.085) !important;
-        box-shadow: inset 3px 0 0 rgba(147,197,253,.65) !important;
-      }
 
       /* App-wide neutral graphite grading; blue is reserved for brand, active states and emphasis. */
       .rc-shell,.rc-shell main,.rc-shell section,.rc-shell .rc-page,.rc-shell .rc-panel,.rc-shell .rc-card,.rc-shell .rc-content,.rc-shell .rc-messages-layout,.rc-shell .rc-discover-panel,.rc-shell .rc-groups-panel,.rc-shell .rc-profile-panel,.rc-shell .rc-request-panel {
@@ -5145,16 +4824,12 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-shell .rc-bottom-nav { background:#000 !important; background-image:none !important; border-top:1px solid rgba(255,255,255,.12) !important; box-shadow:0 -8px 24px rgba(0,0,0,.42) !important; }
       .rc-shell .rc-bottom-item:not(.active),.rc-shell .rc-bottom-item:not(.active) .rc-bottom-icon,.rc-shell .rc-bottom-item:not(.active) .rc-bottom-label { color:#fff !important; }
       .rc-shell .rc-bottom-item.active,.rc-shell .rc-bottom-item.active .rc-bottom-icon,.rc-shell .rc-bottom-item.active .rc-bottom-label { color:#60a5fa !important; }
-      .rc-shell .rc-conversation-list,.rc-shell .rc-conversation-row-wrap { background:transparent !important; background-color:transparent !important; box-shadow:none !important; }
-      .rc-shell .rc-conversation-row { background:rgba(255,255,255,.025) !important; border-color:rgba(190,190,190,.16) !important; box-shadow:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
-      .rc-shell .rc-conversation-row.active { background:rgba(37,99,235,.12) !important; border-color:rgba(96,165,250,.48) !important; }
       /* Denser layered starfield: many fine stars plus occasional brighter distant stars. */
       .rc-messages-layout.has-chat .rc-chat-empty { background-color:#020307 !important; background-image:
         radial-gradient(1px 1px at 3% 7%,#fff 98%,transparent),radial-gradient(1px 1px at 9% 24%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 16% 11%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 23% 42%,#e0e7ff 98%,transparent),radial-gradient(1px 1px at 31% 18%,#fff 98%,transparent),radial-gradient(1px 1px at 38% 66%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 46% 9%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 53% 34%,#fff 98%,transparent),radial-gradient(1px 1px at 61% 78%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 69% 15%,#fff 98%,transparent),radial-gradient(1px 1px at 76% 51%,#e0e7ff 98%,transparent),radial-gradient(1.5px 1.5px at 84% 27%,#fff 98%,transparent),radial-gradient(1px 1px at 92% 8%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 97% 72%,#fff 98%,transparent),radial-gradient(1px 1px at 12% 88%,#fff 98%,transparent),radial-gradient(1px 1px at 34% 91%,#dbeafe 98%,transparent),radial-gradient(1px 1px at 58% 94%,#fff 98%,transparent),radial-gradient(1px 1px at 88% 91%,#dbeafe 98%,transparent),radial-gradient(2px 2px at 27% 73%,#bfdbfe 98%,transparent),radial-gradient(2px 2px at 73% 39%,#fff 98%,transparent),radial-gradient(ellipse at 50% 45%,rgba(30,45,75,.2),transparent 68%) !important; background-size:173px 151px,211px 197px,239px 223px,281px 247px,307px 269px,337px 293px,367px 317px,397px 347px,427px 373px,457px 397px,487px 421px,517px 449px,547px 477px,577px 503px,607px 529px,637px 557px,667px 583px,697px 607px,100% 100%,100% 100%,100% 100% !important; }
 
       .rc-mobile-header{background:#000!important;background-image:none!important}
       /* The inbox glass casing is defined in the canonical rule-set below. */
-      .rc-conversation-list>*{position:relative;z-index:1}
       .rc-group-row-wrap{align-items:center!important}
       .rc-group-row-actions{display:flex;flex:0 0 78px;flex-direction:column;align-items:stretch;justify-content:center;gap:5px;padding:7px 6px;border:1px solid rgba(255,255,255,.12);border-radius:0 13px 13px 0;background:rgba(0,0,0,.42);height:100%;min-height:68px}
       .rc-group-row-actions button{display:flex;align-items:center;justify-content:center;gap:5px;min-height:27px;padding:5px 4px;border:1px solid rgba(255,255,255,.16);border-radius:7px;background:#050505;color:#fff;font-size:11px;font-weight:700}
@@ -5176,80 +4851,8 @@ async function playVoiceNote(message: ChatMessage) {
       /* Canonical Messages inbox styling.
          Keep this as the final inbox rule-set so older mobile resets cannot
          turn off the shared glass surface or reintroduce row separators. */
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-        display:flex!important;
-        flex-direction:column!important;
-        gap:0!important;
-        position:relative!important;
-        isolation:isolate!important;
-        box-sizing:border-box!important;
-        width:100%!important;
-        height:calc(var(--rc-visual-height, 100dvh) - 130px)!important;
-        min-height:140px!important;
-        max-height:calc(var(--rc-visual-height, 100dvh) - 130px)!important;
-        overflow-x:hidden!important;
-        overflow-y:auto!important;
-        -webkit-overflow-scrolling:touch!important;
-        overscroll-behavior-y:contain!important;
-        touch-action:pan-y!important;
-        scrollbar-gutter:stable;
-        border:1px solid rgba(220,235,255,.25)!important;
-        border-radius:25px!important;
-        background-color:rgba(210,225,250,.045)!important;
-        background-image:
-          linear-gradient(118deg,rgba(255,255,255,.085) 0%,rgba(255,255,255,.025) 19%,transparent 39%,rgba(155,190,245,.045) 68%,rgba(255,255,255,.055) 100%),
-          radial-gradient(ellipse 72% 24% at 14% 5%,rgba(255,255,255,.105),transparent 74%),
-          radial-gradient(ellipse 62% 22% at 88% 82%,rgba(125,170,245,.075),transparent 78%),
-          linear-gradient(180deg,rgba(255,255,255,.035),transparent 22%,transparent 78%,rgba(155,190,255,.025))!important;
-        background-attachment:fixed!important;
-        background-repeat:no-repeat!important;
-        box-shadow:
-          inset 0 1px 1px rgba(255,255,255,.30),
-          inset 1px 0 1px rgba(255,255,255,.10),
-          inset -1px 0 1px rgba(190,215,255,.09),
-          inset 0 -1px 2px rgba(255,255,255,.12),
-          0 12px 30px rgba(0,0,0,.22)!important;
-        -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
-        backdrop-filter:blur(24px) saturate(150%)!important;
-        padding:7px 0 calc(112px + env(safe-area-inset-bottom))!important;
-      }
 
       /* Entries sit directly on the single shared glass surface. */
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap,
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child {
-        flex:0 0 auto!important;
-        margin:0!important;
-        border:0!important;
-        border-bottom:0!important;
-        border-radius:0!important;
-        background:transparent!important;
-        background-color:transparent!important;
-        box-shadow:none!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row,
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
-        width:100%!important;
-        min-height:76px!important;
-        border:0!important;
-        border-radius:0!important;
-        background:transparent!important;
-        background-color:transparent!important;
-        box-shadow:none!important;
-        -webkit-backdrop-filter:none!important;
-        backdrop-filter:none!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row::before,
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row::after {
-        content:none!important;
-        display:none!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
-        background:rgba(255,255,255,.045)!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list::-webkit-scrollbar-thumb {
-        background:rgba(220,235,255,.20)!important;
-        border-radius:99px!important;
-      }
 
 
       /* Mobile cascade repair: older page-scroll rules use a more specific
@@ -5293,80 +4896,13 @@ async function playVoiceNote(message: ChatMessage) {
           padding:0!important;
           box-sizing:border-box!important;
         }
-        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          display:flex!important;
-          flex:1 1 0!important;
-          flex-direction:column!important;
-          position:relative!important;
-          inset:auto!important;
-          width:100%!important;
-          max-width:100%!important;
-          height:auto!important;
-          max-height:none!important;
-          min-height:0!important;
-          margin:0!important;
-          padding:7px 0 calc(112px + env(safe-area-inset-bottom))!important;
-          box-sizing:border-box!important;
-          overflow-x:hidden!important;
-          overflow-y:auto!important;
-          -webkit-overflow-scrolling:touch!important;
-          overscroll-behavior-y:contain!important;
-          touch-action:pan-y!important;
-          border:1px solid rgba(220,235,255,.25)!important;
-          border-radius:25px!important;
-          background-color:rgba(210,225,250,.045)!important;
-          background-image:
-            linear-gradient(118deg,rgba(255,255,255,.085) 0%,rgba(255,255,255,.025) 19%,transparent 39%,rgba(155,190,245,.045) 68%,rgba(255,255,255,.055) 100%),
-            radial-gradient(ellipse 72% 24% at 14% 5%,rgba(255,255,255,.105),transparent 74%),
-            radial-gradient(ellipse 62% 22% at 88% 82%,rgba(125,170,245,.075),transparent 78%),
-            linear-gradient(180deg,rgba(255,255,255,.035),transparent 22%,transparent 78%,rgba(155,190,255,.025))!important;
-          background-attachment:fixed!important;
-          background-repeat:no-repeat!important;
-          box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.10),inset -1px 0 1px rgba(190,215,255,.09),inset 0 -1px 2px rgba(255,255,255,.12),0 12px 30px rgba(0,0,0,.22)!important;
-          -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
-          backdrop-filter:blur(24px) saturate(150%)!important;
-          z-index:1!important;
-        }
       }
 
 
       /* Final inbox transparency fix:
          Keep the list's glass casing (border, blur and glass edge shadows),
          but do not paint any dark/tinted panel behind the conversation rows. */
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-        background:transparent!important;
-        background-color:transparent!important;
-        background-image:none!important;
-        -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
-        backdrop-filter:blur(24px) saturate(150%)!important;
-        border:1px solid rgba(220,235,255,.25)!important;
-        border-radius:25px!important;
-        box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.10),inset -1px 0 1px rgba(190,215,255,.09),inset 0 -1px 2px rgba(255,255,255,.12),0 12px 30px rgba(0,0,0,.22)!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap,
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row-wrap:last-child,
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row {
-        background:transparent!important;
-        background-color:transparent!important;
-        background-image:none!important;
-        border:0!important;
-        box-shadow:none!important;
-      }
-      .rc-shell .rc-messages-layout:not(.has-chat) .rc-conversation-row.active {
-        background:rgba(255,255,255,.045)!important;
-        background-color:rgba(255,255,255,.045)!important;
-      }
       @media (max-width:800px) {
-        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) .rc-messages-layout:not(.has-chat) .rc-conversation-list {
-          background:transparent!important;
-          background-color:transparent!important;
-          background-image:none!important;
-          -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
-          backdrop-filter:blur(24px) saturate(150%)!important;
-          border:1px solid rgba(220,235,255,.25)!important;
-          border-radius:25px!important;
-          box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.10),inset -1px 0 1px rgba(190,215,255,.09),inset 0 -1px 2px rgba(255,255,255,.12),0 12px 30px rgba(0,0,0,.22)!important;
-        }
       }
 
       /* Remove the opaque page-panel layer behind the inbox glass.
@@ -5385,70 +4921,99 @@ async function playVoiceNote(message: ChatMessage) {
           background-image:none!important;
           box-shadow:none!important;
         }
-        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) .rc-conversation-row-wrap,
-        .rc-shell .rc-tab-panel:has(.rc-messages-layout):not(:has(.rc-messages-layout.has-chat)) .rc-empty-conversations {
-          background:transparent!important;
-          background-color:transparent!important;
-          background-image:none!important;
-          box-shadow:none!important;
-        }
       }
 
       /* Final inbox transparency override: retain the glass casing, remove the black fill. */
-      .rc-shell aside.rc-conversation-list,
-      .rc-shell .rc-messages-layout:not(.has-chat) > aside.rc-conversation-list {
-        background:transparent!important;
-        background-color:transparent!important;
-        background-image:none!important;
-        background-blend-mode:normal!important;
-      }
-      .rc-shell aside.rc-conversation-list::before,
-      .rc-shell aside.rc-conversation-list::after,
-      .rc-shell aside.rc-conversation-list .rc-conversation-row-wrap,
-      .rc-shell aside.rc-conversation-list .rc-conversation-row {
-        background:transparent!important;
-        background-color:transparent!important;
-        background-image:none!important;
-      }
-      .rc-shell aside.rc-conversation-list .rc-conversation-row {
-        box-shadow:none!important;
-        backdrop-filter:none!important;
-        -webkit-backdrop-filter:none!important;
-      }
-      .rc-shell aside.rc-conversation-list .rc-conversation-row.active {
-        background:rgba(255,255,255,.045)!important;
-        background-color:rgba(255,255,255,.045)!important;
-      }
 
 
-      /* Loaded inbox rows must not receive the global dark-card/text treatment.
-         The list's parent/casing keeps the liquid-glass appearance; rows float on it. */
-      .rc-shell aside.rc-conversation-list .rc-conversation-row,
-      .rc-shell aside.rc-conversation-list .rc-conversation-row.active,
-      .rc-shell aside.rc-conversation-list .rc-conversation-row-wrap,
-      .rc-shell aside.rc-conversation-list .rc-conversation-row * {
+      /* Fresh Messages inbox renderer — isolated from all legacy conversation styles. */
+      .rc-shell .rc-messages-layout:not(.has-chat){display:flex!important;flex-direction:column!important;width:100%!important;min-width:0!important;min-height:420px!important;}
+      .rc-shell .rc-messages-layout.has-chat .rc-inbox-glass{display:none!important;}
+      .rc-shell .rc-inbox-glass {
+        position:relative!important;
+        display:block!important;
+        isolation:isolate!important;
+        flex:1 1 0!important;
+        width:100%!important;
+        min-width:0!important;
+        min-height:0!important;
+        height:100%!important;
+        overflow:hidden!important;
+        box-sizing:border-box!important;
+        border:1px solid rgba(224,238,255,.27)!important;
+        border-radius:26px!important;
+        background:rgba(196,220,255,.035)!important;
+        -webkit-backdrop-filter:blur(26px) saturate(165%)!important;
+        backdrop-filter:blur(26px) saturate(165%)!important;
+        box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.11),inset -1px 0 1px rgba(190,215,255,.10),inset 0 -1px 2px rgba(255,255,255,.13),0 12px 30px rgba(0,0,0,.20)!important;
+      }
+      .rc-shell .rc-inbox-glass::before {
+        content:""!important;
+        position:absolute!important;
+        inset:0!important;
+        z-index:0!important;
+        pointer-events:none!important;
+        border-radius:inherit!important;
+        background:linear-gradient(118deg,rgba(255,255,255,.105),rgba(255,255,255,.025) 22%,transparent 43%,rgba(154,190,255,.045) 72%,rgba(255,255,255,.055)),radial-gradient(ellipse at 13% 0%,rgba(255,255,255,.10),transparent 55%),radial-gradient(ellipse at 88% 100%,rgba(130,175,255,.07),transparent 58%)!important;
+      }
+      .rc-shell .rc-inbox-scroll {
+        position:absolute!important;
+        z-index:1!important;
+        inset:0!important;
+        display:flex!important;
+        flex-direction:column!important;
+        gap:0!important;
+        min-height:0!important;
+        overflow-x:hidden!important;
+        overflow-y:auto!important;
+        padding:7px 0 calc(112px + env(safe-area-inset-bottom))!important;
+        box-sizing:border-box!important;
         background:transparent!important;
         background-color:transparent!important;
         background-image:none!important;
         box-shadow:none!important;
-        text-shadow:none!important;
-        filter:none!important;
+        -webkit-overflow-scrolling:touch!important;
+        overscroll-behavior-y:contain!important;
+        touch-action:pan-y!important;
+        scrollbar-width:thin!important;
+        scrollbar-color:rgba(220,235,255,.23) transparent!important;
       }
-      .rc-shell aside.rc-conversation-list .rc-conversation-row,
-      .rc-shell aside.rc-conversation-list .rc-conversation-row.active {
-        border-color:transparent!important;
-        border-radius:0!important;
-        -webkit-backdrop-filter:none!important;
-        backdrop-filter:none!important;
+      .rc-shell .rc-inbox-scroll::-webkit-scrollbar{width:3px!important}
+      .rc-shell .rc-inbox-scroll::-webkit-scrollbar-thumb{background:rgba(220,235,255,.23)!important;border-radius:99px!important}
+      .rc-shell .rc-inbox-entry{position:relative!important;display:flex!important;flex:0 0 auto!important;align-items:stretch!important;gap:4px!important;margin:0!important;padding:0 9px!important;background:transparent!important;border:0!important;box-shadow:none!important}
+      .rc-shell .rc-inbox-item{
+        appearance:none!important;-webkit-appearance:none!important;
+        display:flex!important;align-items:center!important;gap:12px!important;
+        flex:1 1 auto!important;width:100%!important;min-width:0!important;min-height:82px!important;
+        margin:0!important;padding:11px 10px!important;box-sizing:border-box!important;
+        border:0!important;border-bottom:1px solid rgba(225,238,255,.075)!important;border-radius:0!important;
+        background:transparent!important;background-color:transparent!important;background-image:none!important;
+        color:#f8fbff!important;text-align:left!important;box-shadow:none!important;
+        -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+        touch-action:pan-y!important;cursor:pointer!important;
       }
-      .rc-shell aside.rc-conversation-list .rc-conversation-row::before,
-      .rc-shell aside.rc-conversation-list .rc-conversation-row::after {
-        content:none!important;
-        display:none!important;
-      }
-      .rc-shell aside.rc-conversation-list .rc-conversation-row.active {
-        background:rgba(255,255,255,.045)!important;
-        box-shadow:inset 3px 0 0 rgba(147,197,253,.55)!important;
+      .rc-shell .rc-inbox-item:focus-visible{outline:2px solid rgba(147,197,253,.8)!important;outline-offset:-3px!important}
+      .rc-shell .rc-inbox-item.is-selected{background:rgba(220,235,255,.055)!important;box-shadow:inset 3px 0 0 rgba(147,197,253,.62)!important}
+      .rc-shell .rc-inbox-avatar{display:grid!important;place-items:center!important;flex:0 0 54px!important;width:54px!important;height:54px!important;overflow:hidden!important;border-radius:50%!important;background:rgba(31,62,112,.72)!important;color:#eff6ff!important;border:1px solid rgba(170,205,255,.13)!important;box-shadow:none!important}
+      .rc-shell .rc-inbox-avatar img{display:block!important;width:100%!important;height:100%!important;object-fit:cover!important}
+      .rc-shell .rc-inbox-copy{display:flex!important;flex:1 1 auto!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center!important;gap:4px!important;min-width:0!important;padding:0!important;background:transparent!important;box-shadow:none!important}
+      .rc-shell .rc-inbox-name{display:flex!important;align-items:center!important;gap:5px!important;width:100%!important;min-width:0!important;margin:0!important;padding:0!important;color:#fff!important;font-size:15px!important;font-weight:800!important;line-height:1.25!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;background:transparent!important;text-shadow:none!important;box-shadow:none!important}
+      .rc-shell .rc-inbox-kind{display:block!important;margin:0!important;padding:0!important;color:rgba(169,204,255,.92)!important;font-size:12px!important;font-weight:500!important;line-height:1.25!important;background:transparent!important;text-shadow:none!important;box-shadow:none!important}
+      .rc-shell .rc-inbox-preview{display:block!important;max-width:100%!important;overflow:hidden!important;margin:0!important;padding:0!important;color:rgba(222,230,243,.68)!important;font-size:12px!important;font-weight:400!important;line-height:1.35!important;white-space:nowrap!important;text-overflow:ellipsis!important;background:transparent!important;text-shadow:none!important;box-shadow:none!important}
+      .rc-shell .rc-inbox-ticks{display:inline!important;margin-left:5px!important;color:#aab8ca!important;font-size:11px!important;font-weight:800!important;letter-spacing:-2px!important;background:transparent!important;text-shadow:none!important}
+      .rc-shell .rc-inbox-ticks.is-read{color:#facc15!important}
+      .rc-shell .rc-inbox-meta{display:flex!important;flex:0 0 auto!important;flex-direction:column!important;align-items:flex-end!important;justify-content:flex-start!important;gap:7px!important;align-self:stretch!important;min-width:34px!important;padding-top:3px!important;background:transparent!important;box-shadow:none!important}
+      .rc-shell .rc-inbox-time{display:block!important;color:rgba(220,232,250,.62)!important;font-size:10px!important;line-height:1.2!important;white-space:nowrap!important;font-variant-numeric:tabular-nums!important;background:transparent!important;text-shadow:none!important}
+      .rc-shell .rc-inbox-unread{display:grid!important;place-items:center!important;min-width:19px!important;height:19px!important;padding:0 5px!important;box-sizing:border-box!important;border-radius:99px!important;background:#facc15!important;color:#172033!important;font-size:10px!important;font-weight:900!important}
+      .rc-shell .rc-inbox-hide{display:grid!important;place-items:center!important;align-self:center!important;flex:0 0 38px!important;width:38px!important;height:38px!important;border:1px solid rgba(255,255,255,.18)!important;border-radius:12px!important;background:rgba(255,255,255,.07)!important;color:#fff!important}
+      .rc-shell .rc-inbox-empty{display:flex!important;flex-direction:column!important;align-items:center!important;gap:9px!important;margin:auto!important;padding:35px 22px!important;text-align:center!important;color:#f8fbff!important;background:transparent!important;box-shadow:none!important}
+      .rc-shell .rc-inbox-empty-icon{display:grid!important;place-items:center!important;width:54px!important;height:54px!important;border-radius:50%!important;background:rgba(31,62,112,.65)!important;color:#dbeafe!important}
+      .rc-shell .rc-inbox-empty p{margin:0!important;color:rgba(222,230,243,.68)!important;font-size:12px!important;line-height:1.5!important;background:transparent!important;text-shadow:none!important}
+      .rc-shell .rc-inbox-empty button{display:inline-flex!important;align-items:center!important;gap:7px!important;padding:8px 12px!important;border:1px solid rgba(147,197,253,.28)!important;border-radius:10px!important;background:rgba(255,255,255,.06)!important;color:#dbeafe!important}
+      @media(max-width:800px){
+        .rc-shell .rc-messages-layout:not(.has-chat){display:flex!important;flex-direction:column!important;min-height:0!important;overflow:hidden!important}
+        .rc-shell .rc-inbox-glass{flex:1 1 0!important;min-height:0!important;height:100%!important;margin:0!important}
+        .rc-shell .rc-inbox-scroll{padding-bottom:calc(112px + env(safe-area-inset-bottom))!important}
       }
     `}
 
