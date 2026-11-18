@@ -4795,7 +4795,7 @@ async function playVoiceNote(message: ChatMessage) {
       .rc-shell [class*="screen"],.rc-shell [class*="page"],.rc-shell [class*="panel"]:not(.rc-chat-panel),.rc-shell [class*="card"]:not(.rc-message-bubble) {
         background-image:linear-gradient(145deg,rgba(255,255,255,.025),rgba(0,0,0,.12)) !important;
       }
-      .rc-shell button:not(.rc-primary):not(.rc-bottom-item.active):not(.rc-features-button):not(.rc-match-generate):not(.rc-message-bubble):not(.rc-contest-vote-option.selected) {
+      .rc-shell button:not(.rc-primary):not(.rc-bottom-item.active):not(.rc-features-button):not(.rc-match-generate):not(.rc-message-bubble):not(.rc-contest-vote-option.selected):not(.rc-inbox-item) {
         background:#ededed !important;color:#101010 !important;border-color:rgba(255,255,255,.32) !important;
       }
       .rc-shell button:not(.rc-primary):not(.rc-bottom-item.active):not(.rc-features-button):not(.rc-match-generate) svg { color:inherit !important; }
@@ -4818,7 +4818,7 @@ async function playVoiceNote(message: ChatMessage) {
       /* Final requested palette and navigation/button contrast corrections. */
       .rc-shell { background:linear-gradient(145deg,#000 0%,#080808 48%,#181818 100%) !important; background-color:#080808 !important; }
       .rc-shell main,.rc-shell .rc-page,.rc-shell .rc-content-section,.rc-shell .rc-messages-layout:not(.has-chat) { background-color:transparent !important; }
-      .rc-shell button:not(.rc-primary):not(.rc-bottom-item.active):not(.rc-features-button):not(.rc-match-generate):not(.rc-message-bubble):not(.rc-contest-vote-option.selected) { background:#080808 !important; color:#f5f5f5 !important; border-color:rgba(255,255,255,.24) !important; }
+      .rc-shell button:not(.rc-primary):not(.rc-bottom-item.active):not(.rc-features-button):not(.rc-match-generate):not(.rc-message-bubble):not(.rc-contest-vote-option.selected):not(.rc-inbox-item) { background:#080808 !important; color:#f5f5f5 !important; border-color:rgba(255,255,255,.24) !important; }
       .rc-shell button:not(.rc-primary):not(.rc-bottom-item.active):not(.rc-features-button):not(.rc-match-generate) svg { color:#fff !important; }
       .rc-shell .rc-primary,.rc-shell .rc-bottom-item.active,.rc-shell .rc-features-button,.rc-shell .rc-match-generate { background:linear-gradient(135deg,#2563eb,#17428a) !important; color:#fff !important; }
       .rc-shell .rc-bottom-nav { background:#000 !important; background-image:none !important; border-top:1px solid rgba(255,255,255,.12) !important; box-shadow:0 -8px 24px rgba(0,0,0,.42) !important; }
