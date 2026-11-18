@@ -4942,9 +4942,7 @@ async function playVoiceNote(message: ChatMessage) {
         box-sizing:border-box!important;
         border:1px solid rgba(224,238,255,.27)!important;
         border-radius:26px!important;
-        background:transparent!important;
-        background-color:transparent!important;
-        background-image:none!important;
+        background:rgba(196,220,255,.035)!important;
         -webkit-backdrop-filter:blur(26px) saturate(165%)!important;
         backdrop-filter:blur(26px) saturate(165%)!important;
         box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.11),inset -1px 0 1px rgba(190,215,255,.10),inset 0 -1px 2px rgba(255,255,255,.13),0 12px 30px rgba(0,0,0,.20)!important;
@@ -4956,8 +4954,7 @@ async function playVoiceNote(message: ChatMessage) {
         z-index:0!important;
         pointer-events:none!important;
         border-radius:inherit!important;
-        background:transparent!important;
-        background-image:none!important;
+        background:linear-gradient(118deg,rgba(255,255,255,.105),rgba(255,255,255,.025) 22%,transparent 43%,rgba(154,190,255,.045) 72%,rgba(255,255,255,.055)),radial-gradient(ellipse at 13% 0%,rgba(255,255,255,.10),transparent 55%),radial-gradient(ellipse at 88% 100%,rgba(130,175,255,.07),transparent 58%)!important;
       }
       .rc-shell .rc-inbox-scroll {
         position:absolute!important;
@@ -4989,14 +4986,14 @@ async function playVoiceNote(message: ChatMessage) {
         display:flex!important;align-items:center!important;gap:12px!important;
         flex:1 1 auto!important;width:100%!important;min-width:0!important;min-height:82px!important;
         margin:0!important;padding:11px 10px!important;box-sizing:border-box!important;
-        border:0!important;border-bottom:1px solid rgba(225,238,255,.075)!important;border-radius:0!important;
+        border:0!important;border-bottom:0!important;border-radius:0!important;
         background:transparent!important;background-color:transparent!important;background-image:none!important;
         color:#f8fbff!important;text-align:left!important;box-shadow:none!important;
         -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
         touch-action:pan-y!important;cursor:pointer!important;
       }
       .rc-shell .rc-inbox-item:focus-visible{outline:2px solid rgba(147,197,253,.8)!important;outline-offset:-3px!important}
-      .rc-shell .rc-inbox-item.is-selected{background:rgba(220,235,255,.055)!important;box-shadow:inset 3px 0 0 rgba(147,197,253,.62)!important}
+      .rc-shell .rc-inbox-item.is-selected{background:transparent!important;background-color:transparent!important;background-image:none!important;box-shadow:none!important}
       .rc-shell .rc-inbox-avatar{display:grid!important;place-items:center!important;flex:0 0 54px!important;width:54px!important;height:54px!important;overflow:hidden!important;border-radius:50%!important;background:rgba(31,62,112,.72)!important;color:#eff6ff!important;border:1px solid rgba(170,205,255,.13)!important;box-shadow:none!important}
       .rc-shell .rc-inbox-avatar img{display:block!important;width:100%!important;height:100%!important;object-fit:cover!important}
       .rc-shell .rc-inbox-copy{display:flex!important;flex:1 1 auto!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center!important;gap:4px!important;min-width:0!important;padding:0!important;background:transparent!important;box-shadow:none!important}
