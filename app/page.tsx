@@ -5086,6 +5086,48 @@ async function playVoiceNote(message: ChatMessage) {
           border-radius:27px!important;
         }
       }
+
+      /* Keep conversation content optically in front of the liquid surface.
+         Remove the vertical side rails so the casing reads as a floating
+         rectangular liquid sheet with only soft top/bottom reflections. */
+      .rc-shell .rc-inbox-glass {
+        border-left-color:transparent!important;
+        border-right-color:transparent!important;
+        box-shadow:
+          inset 0 1.5px 1px rgba(255,255,255,.42),
+          inset 0 -1px 1px rgba(255,255,255,.18),
+          0 14px 34px rgba(0,0,0,.15)!important;
+      }
+      .rc-shell .rc-inbox-glass::before {
+        z-index:0!important;
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.10),
+          inset 0 -1px 0 rgba(255,255,255,.08)!important;
+      }
+      .rc-shell .rc-inbox-scroll {
+        z-index:2!important;
+        position:absolute!important;
+      }
+      .rc-shell .rc-inbox-glass::after {
+        z-index:1!important;
+        background:
+          linear-gradient(164deg,transparent 0%,rgba(255,255,255,.12) 8%,rgba(255,255,255,.025) 14%,transparent 24%),
+          linear-gradient(342deg,transparent 0%,rgba(188,220,255,.10) 7%,rgba(255,255,255,.025) 13%,transparent 25%),
+          radial-gradient(75% 15% at 50% 0%,rgba(255,255,255,.12),transparent 100%)!important;
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.30),
+          inset 0 -1px 0 rgba(255,255,255,.12)!important;
+      }
+      .rc-shell .rc-inbox-item,
+      .rc-shell .rc-inbox-avatar,
+      .rc-shell .rc-inbox-copy,
+      .rc-shell .rc-inbox-meta {
+        position:relative!important;
+        z-index:3!important;
+      }
+      @media(max-width:800px) {
+        .rc-shell .rc-inbox-glass { border-left-color:transparent!important;border-right-color:transparent!important; }
+      }
     `}
 
 
