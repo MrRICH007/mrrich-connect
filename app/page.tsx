@@ -4942,7 +4942,9 @@ async function playVoiceNote(message: ChatMessage) {
         box-sizing:border-box!important;
         border:1px solid rgba(224,238,255,.27)!important;
         border-radius:26px!important;
-        background:rgba(196,220,255,.035)!important;
+        background:transparent!important;
+        background-color:transparent!important;
+        background-image:none!important;
         -webkit-backdrop-filter:blur(26px) saturate(165%)!important;
         backdrop-filter:blur(26px) saturate(165%)!important;
         box-shadow:inset 0 1px 1px rgba(255,255,255,.30),inset 1px 0 1px rgba(255,255,255,.11),inset -1px 0 1px rgba(190,215,255,.10),inset 0 -1px 2px rgba(255,255,255,.13),0 12px 30px rgba(0,0,0,.20)!important;
@@ -4954,7 +4956,9 @@ async function playVoiceNote(message: ChatMessage) {
         z-index:0!important;
         pointer-events:none!important;
         border-radius:inherit!important;
-        background:linear-gradient(118deg,rgba(255,255,255,.105),rgba(255,255,255,.025) 22%,transparent 43%,rgba(154,190,255,.045) 72%,rgba(255,255,255,.055)),radial-gradient(ellipse at 13% 0%,rgba(255,255,255,.10),transparent 55%),radial-gradient(ellipse at 88% 100%,rgba(130,175,255,.07),transparent 58%)!important;
+        background:transparent!important;
+        background-color:transparent!important;
+        background-image:none!important;
       }
       .rc-shell .rc-inbox-scroll {
         position:absolute!important;
@@ -4972,6 +4976,7 @@ async function playVoiceNote(message: ChatMessage) {
         background-color:transparent!important;
         background-image:none!important;
         box-shadow:none!important;
+        isolation:isolate!important;
         -webkit-overflow-scrolling:touch!important;
         overscroll-behavior-y:contain!important;
         touch-action:pan-y!important;
