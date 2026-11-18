@@ -5020,6 +5020,72 @@ async function playVoiceNote(message: ChatMessage) {
         .rc-shell .rc-inbox-glass{flex:1 1 0!important;min-height:0!important;height:100%!important;margin:0!important}
         .rc-shell .rc-inbox-scroll{padding-bottom:calc(112px + env(safe-area-inset-bottom))!important}
       }
+
+      /* iPhone-inspired liquid-glass finish for the shared Messages casing.
+         The scroll layer remains independent; these highlights belong to the
+         stationary casing and never intercept touch or scroll gestures. */
+      .rc-shell .rc-inbox-glass {
+        border:1px solid rgba(232,244,255,.42)!important;
+        border-radius:30px!important;
+        background:linear-gradient(145deg,rgba(218,235,255,.075) 0%,rgba(180,211,245,.035) 38%,rgba(225,240,255,.065) 72%,rgba(160,198,240,.045) 100%)!important;
+        -webkit-backdrop-filter:blur(22px) saturate(190%) brightness(1.08)!important;
+        backdrop-filter:blur(22px) saturate(190%) brightness(1.08)!important;
+        box-shadow:
+          inset 0 1.5px 1px rgba(255,255,255,.48),
+          inset 1.5px 0 1px rgba(255,255,255,.20),
+          inset -1.5px 0 1px rgba(178,211,255,.22),
+          inset 0 -1px 2px rgba(255,255,255,.20),
+          0 14px 34px rgba(0,0,0,.17),
+          0 1px 0 rgba(255,255,255,.10)!important;
+      }
+      .rc-shell .rc-inbox-glass::before {
+        content:""!important;
+        position:absolute!important;
+        inset:0!important;
+        z-index:0!important;
+        pointer-events:none!important;
+        border-radius:inherit!important;
+        background:
+          radial-gradient(115% 48% at 8% -8%,rgba(255,255,255,.19),transparent 58%),
+          radial-gradient(90% 38% at 100% 100%,rgba(126,180,255,.10),transparent 66%),
+          linear-gradient(118deg,rgba(255,255,255,.075) 0%,transparent 27%,transparent 68%,rgba(219,237,255,.055) 100%)!important;
+        box-shadow:
+          inset 0 0 0 1px rgba(255,255,255,.075),
+          inset 0 12px 22px rgba(255,255,255,.025),
+          inset 0 -16px 24px rgba(128,177,235,.035)!important;
+      }
+      .rc-shell .rc-inbox-glass::after {
+        content:""!important;
+        position:absolute!important;
+        inset:1px!important;
+        z-index:2!important;
+        pointer-events:none!important;
+        border-radius:29px!important;
+        opacity:.82!important;
+        background:
+          linear-gradient(164deg,transparent 0%,rgba(255,255,255,.12) 8%,rgba(255,255,255,.025) 14%,transparent 24%),
+          linear-gradient(342deg,transparent 0%,rgba(188,220,255,.10) 7%,rgba(255,255,255,.025) 13%,transparent 25%),
+          linear-gradient(90deg,rgba(255,255,255,.10),transparent 2.5%,transparent 97%,rgba(202,226,255,.12)),
+          radial-gradient(75% 15% at 50% 0%,rgba(255,255,255,.12),transparent 100%)!important;
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.34),
+          inset 1px 0 0 rgba(255,255,255,.13),
+          inset -1px 0 0 rgba(202,226,255,.16),
+          inset 0 -1px 0 rgba(255,255,255,.15)!important;
+      }
+      .rc-shell .rc-inbox-scroll {
+        z-index:1!important;
+        background:transparent!important;
+        background-color:transparent!important;
+      }
+      @media(max-width:800px) {
+        .rc-shell .rc-inbox-glass {
+          border-radius:28px!important;
+        }
+        .rc-shell .rc-inbox-glass::after {
+          border-radius:27px!important;
+        }
+      }
     `}
 
 
