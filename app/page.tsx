@@ -5132,6 +5132,138 @@ async function playVoiceNote(message: ChatMessage) {
 
 
 
+/* =========================================
+   MR RICH CONNECT — DEEP LIQUID GLASS
+   ========================================= */
+
+/* More transparent glass with visible depth and refraction */
+.rc-shell .rc-inbox-glass {
+  background:
+    linear-gradient(
+      125deg,
+      rgba(255,255,255,.075) 0%,
+      rgba(190,220,255,.025) 22%,
+      rgba(255,255,255,.012) 48%,
+      rgba(150,195,255,.045) 72%,
+      rgba(255,255,255,.065) 100%
+    ) !important;
+
+  -webkit-backdrop-filter: blur(17px) saturate(205%) brightness(1.13) !important;
+  backdrop-filter: blur(17px) saturate(205%) brightness(1.13) !important;
+
+  border: 1px solid rgba(225,240,255,.25) !important;
+  border-left: 1px solid rgba(255,255,255,.13) !important;
+  border-right: 1px solid rgba(190,220,255,.14) !important;
+
+  box-shadow:
+    inset 0 2px 2px rgba(255,255,255,.34),
+    inset 0 -2px 4px rgba(160,205,255,.13),
+    inset 2px 0 5px rgba(255,255,255,.08),
+    inset -2px 0 5px rgba(170,210,255,.09),
+    0 16px 38px rgba(0,0,0,.13) !important;
+}
+
+/* Flowing light refractions inside the glass */
+.rc-shell .rc-inbox-glass::before {
+  background:
+    radial-gradient(
+      ellipse 75% 35% at 8% 0%,
+      rgba(255,255,255,.23),
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 65% 45% at 100% 100%,
+      rgba(95,165,255,.14),
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 40% 25% at 48% 48%,
+      rgba(255,255,255,.045),
+      transparent 100%
+    ),
+    linear-gradient(
+      125deg,
+      rgba(255,255,255,.09),
+      transparent 35%,
+      rgba(160,205,255,.035) 70%,
+      transparent
+    ) !important;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.19),
+    inset 0 -1px 0 rgba(180,215,255,.12) !important;
+}
+
+/* Curved liquid highlights and refracted edges */
+.rc-shell .rc-inbox-glass::after {
+  opacity: .95 !important;
+  background:
+    linear-gradient(
+      160deg,
+      transparent 0%,
+      rgba(255,255,255,.19) 9%,
+      rgba(255,255,255,.025) 17%,
+      transparent 30%
+    ),
+    linear-gradient(
+      335deg,
+      transparent 0%,
+      rgba(160,205,255,.15) 8%,
+      rgba(255,255,255,.025) 16%,
+      transparent 29%
+    ),
+    radial-gradient(
+      ellipse 90% 12% at 50% 0%,
+      rgba(255,255,255,.16),
+      transparent 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255,255,255,.09),
+      transparent 3%,
+      transparent 97%,
+      rgba(190,220,255,.11)
+    ) !important;
+
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.32),
+    inset 0 -1px 1px rgba(190,220,255,.17) !important;
+}
+
+/* Keep conversation content above the glass reflections */
+.rc-shell .rc-inbox-scroll {
+  z-index: 2 !important;
+  background: transparent !important;
+}
+
+/* =========================================
+   BLACK HEADER FINISH
+   ========================================= */
+
+/* MR RICH CONNECT brand header */
+.rc-shell .rc-mobile-header {
+  background: #000 !important;
+  background-color: #000 !important;
+  background-image: none !important;
+  border-bottom: 1px solid rgba(255,255,255,.10) !important;
+}
+
+/* Messages page title/header */
+.rc-shell .rc-tab-panel:has(.rc-messages-layout) > .rc-page-heading {
+  background: #000 !important;
+  background-color: #000 !important;
+  background-image: none !important;
+  border-bottom: 1px solid rgba(255,255,255,.09) !important;
+}
+
+/* Header inside an open private or group conversation */
+.rc-shell .rc-messages-layout.has-chat .rc-chat-header {
+  background: #000 !important;
+  background-color: #000 !important;
+  background-image: none !important;
+  border-bottom: 1px solid rgba(255,255,255,.12) !important;
+    }
+      
 
 </style>
   </main>
